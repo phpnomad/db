@@ -18,10 +18,10 @@ interface QueryBuilder
      * Appends to the from clause.
      *
      * @param string $table
-     * @param string $alias
+     * @param ?string $alias
      * @return $this
      */
-    public function from(string $table, string $alias);
+    public function from(string $table, ?string $alias = null);
 
     /**
      * Creates, or overrides the where clause.
