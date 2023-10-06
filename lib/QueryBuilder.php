@@ -9,11 +9,11 @@ interface QueryBuilder
     /**
      * Set fields to select.
      *
-     * @param string $value
+     * @param string $field
      * @param string ...$values
      * @return $this
      */
-    public function select(string $value, string ...$values);
+    public function select(string $field, string ...$values);
 
     /**
      * Appends to the from clause.
