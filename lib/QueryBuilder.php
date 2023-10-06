@@ -7,14 +7,6 @@ use Phoenix\Database\Exceptions\QueryBuilderException;
 interface QueryBuilder
 {
     /**
-     * Appends to the select clause.
-     * @param string $field
-     * @param string $value
-     * @return $this
-     */
-    public function like(string $field, string $value);
-
-    /**
      * Appends to the from clause.
      *
      * @param string $table
