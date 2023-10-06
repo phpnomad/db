@@ -11,7 +11,7 @@ interface QueryBuilder
      *
      * @param string $value
      * @param string ...$values
-     * @return this
+     * @return $this
      */
     public function select(string $value, string ...$values);
 
