@@ -7,6 +7,15 @@ use Phoenix\Database\Exceptions\QueryBuilderException;
 interface QueryBuilder
 {
     /**
+     * Set fields to select.
+     *
+     * @param string $value
+     * @param string ...$values
+     * @return mixed
+     */
+    public function select(string $value, string ...$values);
+
+    /**
      * Appends to the from clause.
      *
      * @param string $table
