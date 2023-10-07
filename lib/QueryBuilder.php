@@ -140,5 +140,5 @@ interface QueryBuilder
      * @param string $clause
      * @return $this
      */
-    public function resetClause(string $clause);
+    public function resetClauses(string $clause, string ...$clauses);
 }
