@@ -71,10 +71,10 @@ interface QueryBuilder
     /**
      * Adds, or overrides the GROUP BY clause.
      *
-     * @param string|array $columns The columns to group by
+     * @param string ...$columns The columns to group by
      * @return $this
      */
-    public function groupBy($columns);
+    public function groupBy(string ...$columns);
 
     /**
      * Adds a sum field to the query.
