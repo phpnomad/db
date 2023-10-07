@@ -1,6 +1,6 @@
 <?php
 
-namespace Phoenix\Database;
+namespace Phoenix\Database\Interfaces;
 
 use Phoenix\Database\Exceptions\QueryBuilderException;
 
