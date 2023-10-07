@@ -79,15 +79,4 @@ interface DatabaseStrategy
      * @throws DatabaseErrorException
      */
     public function count(string $table, array $conditions = []): int;
-
-    /**
-     * Fetches data using a hard-coded query.
-     *
-     *
-     * @param QueryBuilder $query
-     * @throws QueryBuilderException
-     * @throws DatabaseErrorException
-     * @return array
-     */
-    public function query(QueryBuilder $query): array;
 }
