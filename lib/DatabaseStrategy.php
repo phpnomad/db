@@ -32,8 +32,8 @@ interface DatabaseStrategy
      *
      * @param string $table
      * @param array{column: string, operator: string, value: mixed}[] $conditions
-     * @param int|null $limit
-     * @param int|null $offset
+     * @param positive-int|null $limit
+     * @param positive-int|null $offset
      * @return array<string,mixed>[]
      * @throws DatabaseErrorException
      */
