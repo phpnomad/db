@@ -126,4 +126,19 @@ interface QueryBuilder
      * @return string
      */
     public function build(): string;
+
+    /**
+     * Reset the query to the default state.
+     *
+     * @return $this
+     */
+    public function reset();
+
+    /**
+     * Reset a specific clause to the specified state.
+     *
+     * @param string $clause
+     * @return $this
+     */
+    public function resetClause(string $clause);
 }
