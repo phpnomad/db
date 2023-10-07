@@ -28,33 +28,33 @@ interface QueryBuilder
      *
      * @param string $field The field name
      * @param string $operand The operand to use in the clause
-     * @param string|array $value The expected value, or multiple values
-     * @param string|array $values Optional. Additional values for operands that accept multiple values.
+     * @param scalar $value The expected value, or multiple values
+     * @param (int|float|string)[] $values Optional. Additional values for operands that accept multiple values.
      * @return $this
      */
-    public function where(string $field, string $operand, string $value, string ...$values);
+    public function where(string $field, string $operand, $value, ...$values);
 
     /**
      * appends an AND statement to the where clause
      *
      * @param string $field The field name
      * @param string $operand The operand to use in the clause
-     * @param string|array $value The expected value, or multiple values
-     * @param string|array $values Optional. Additional values for operands that accept multiple values.
+     * @param scalar $value The expected value, or multiple values
+     * @param (int|float|string)[] $values Optional. Additional values for operands that accept multiple values.
      * @return $this
      */
-    public function andWhere(string $field, string $operand, string $value, string ...$values);
+    public function andWhere(string $field, string $operand, $value, ...$values);
 
     /**
      * appends a OR statement to the where clause
      *
      * @param string $field The field name
      * @param string $operand The operand to use in the clause
-     * @param string|array $value The expected value, or multiple values
-     * @param string|array $values Optional. Additional values for operands that accept multiple values.
+     * @param scalar $value The expected value, or multiple values
+     * @param (int|float|string)[] $values Optional. Additional values for operands that accept multiple values.
      * @return $this
      */
-    public function orWhere(string $field, string $operand, string $value, string ...$values);
+    public function orWhere(string $field, string $operand, $value, ...$values);
 
     /**
      * Adds, or overrides the LEFT JOIN clause.
