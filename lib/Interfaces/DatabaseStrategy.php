@@ -103,5 +103,5 @@ interface DatabaseStrategy
      * @return int[]
      * @throws DatabaseErrorException
      */
-    public function findIds(string $table, array $conditions, ?int $limit = null, ?int $offset = null);
+    public function findIds(string $table, array $conditions, ?int $limit = null, ?int $offset = null): array;
 }
