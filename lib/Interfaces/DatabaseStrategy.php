@@ -92,4 +92,16 @@ interface DatabaseStrategy
      * @throws DatabaseErrorException
      */
     public function count(string $table, array $conditions = []): int;
+
+    /**
+     * Query the database with conditions.
+     *
+     * @param string $table
+     * @param array{column: string, operator: string, value: mixed}[] $conditions
+     * @param positive-int|null $limit
+     * @param positive-int|null $offset
+     * @return int[]
+     * @throws DatabaseErrorException
+     */
+    public function findIds(string $table, array $conditions, ?int $limit = null, ?int $offset = null);
 }
