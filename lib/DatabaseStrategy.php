@@ -45,7 +45,9 @@ interface DatabaseStrategy
      * @param string $table
      * @param string $column
      * @param $value
-     * @return array
+     * @return array<string,mixed>
+     * @throws DatabaseErrorException
+     * @throws RecordNotFoundException
      */
     public function findBy(string $table, string $column, $value): array;
 
