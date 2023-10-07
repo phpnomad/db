@@ -55,7 +55,6 @@ interface DatabaseStrategy
      * @param mixed $id
      * @param array<string, mixed> $attributes
      * @return void
-     * @throws RecordNotFoundException
      * @throws DatabaseErrorException
      */
     public function update(string $table, $id, array $attributes): void;
