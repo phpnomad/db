@@ -3,7 +3,6 @@
 namespace Phoenix\Database;
 
 use Phoenix\Database\Exceptions\DatabaseErrorException;
-use Phoenix\Database\Exceptions\QueryBuilderException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
 
 interface DatabaseStrategy
@@ -33,10 +32,22 @@ interface DatabaseStrategy
      *
      * @param string $table
      * @param array{column: string, operator: string, value: mixed}[] $conditions
+     * @param int|null $limit
+     * @param int|null $offset
      * @return array<string,mixed>[]
      * @throws DatabaseErrorException
      */
-    public function where(string $table, array $conditions): array;
+    public function where(string $table, array $conditions, ?int $limit = null, ?int $offset = null): array;
+
+    /**
+     * Finds the first available record that has the specified value in the specified column.
+     *
+     * @param string $table
+     * @param string $column
+     * @param $value
+     * @return array
+     */
+    public function findBy(string $table, string $column, $value): array;
 
     /**
      * Insert a new record and return the instance.
