@@ -3,6 +3,7 @@
 namespace Phoenix\Database;
 
 use Phoenix\Database\Exceptions\DatabaseErrorException;
+use Phoenix\Database\Exceptions\QueryBuilderException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
 
 interface DatabaseStrategy
@@ -83,8 +84,10 @@ interface DatabaseStrategy
      * Fetches data using a hard-coded query.
      *
      *
-     * @param string $query
+     * @param QueryBuilder $query
+     * @throws QueryBuilderException
+     * @throws DatabaseErrorException
      * @return array
      */
-    public function query(string $query): array;
+    public function query(QueryBuilder $query): array;
 }
