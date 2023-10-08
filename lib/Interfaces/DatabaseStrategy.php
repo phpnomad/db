@@ -110,6 +110,7 @@ interface DatabaseStrategy
      *
      * @param QueryBuilder $builder
      * @return array<string,mixed>[]
+     * @throws DatabaseErrorException
      */
     public function query(QueryBuilder $builder): array;
 }
