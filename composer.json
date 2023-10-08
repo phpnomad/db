@@ -11,6 +11,10 @@
     "repositories": [
         {
             "type": "vcs",
+            "url": "https://github.com/rooted-phoenix/utils.git"
+        },
+        {
+            "type": "vcs",
             "url": "https://github.com/rooted-phoenix/tests.git"
         }
     ],
@@ -31,7 +35,8 @@
         }
     ],
     "require-dev": {
-        "phoenix/tests": "^0.1.0"
+        "phoenix/tests": "^0.1.0",
+        "phoenix/utils": "dev-phx-38/core-repository-setup"
     },
     "config": {
         "allow-plugins": {

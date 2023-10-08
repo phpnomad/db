@@ -7,6 +7,14 @@ use Phoenix\Database\Exceptions\QueryBuilderException;
 interface QueryBuilder
 {
     /**
+     * Sets the specified table to be used in subsequent methods.
+     *
+     * @param class-string<Table> $table
+     * @return mixed
+     */
+    public function setTable(string $table);
+
+    /**
      * Set fields to select.
      *
      * @param array $fields - List of fields to select. Associative arrays expect the array key to be the alias.
@@ -60,8 +68,8 @@ interface QueryBuilder
      * Adds, or overrides the LEFT JOIN clause.
      *
      * @param string $type The type of join (e.g., INNER, LEFT, RIGHT).
-     * @param string $table The table to join.
-     * @param string $table The alias.
+     * @param class-string<Table> $table The table to join.
+     * @param string $alias The alias.
      * @param string $column The column to join by.
      * @param string $onColumn The joined column to join on.
      * @return $this
@@ -122,8 +130,8 @@ interface QueryBuilder
     /**
      * Builds the SQL query.
      *
-     * @throws QueryBuilderException
      * @return string
+     * @throws QueryBuilderException
      */
     public function build(): string;
 
@@ -138,6 +146,7 @@ interface QueryBuilder
      * Reset a specific clause to the specified state.
      *
      * @param string $clause
+     * @param string ...$clauses
      * @return $this
      */
     public function resetClauses(string $clause, string ...$clauses);
