@@ -13,11 +13,11 @@ class Offset implements QueryMutator
     protected int $offset;
 
     /**
-     * @param positive-int $limit
+     * @param positive-int $offset
      */
-    public function __construct(int $limit)
+    public function __construct(int $offset)
     {
-        $this->offset = $limit;
+        $this->offset = $offset;
     }
 
     public function mutateQuery(QueryBuilder $builder): void
