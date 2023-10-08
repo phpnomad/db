@@ -111,5 +111,5 @@ interface DatabaseStrategy
      * @param QueryBuilder $builder
      * @return array<string,mixed>[]
      */
-    public function query(QueryBuilder $builder);
+    public function query(QueryBuilder $builder): array;
 }
