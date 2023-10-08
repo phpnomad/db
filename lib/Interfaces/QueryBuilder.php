@@ -98,18 +98,16 @@ interface QueryBuilder
      * Adds a sum field to the query.
      *
      * @param string $fieldToSum The field to sum.
-     * @param ?string $alias Alias for the resultant sum column. Optional.
      * @return $this
      */
-    public function sum(string $fieldToSum, ?string $alias = null);
+    public function sum(string $fieldToSum);
 
     /**
      * Adds a sum field to the query.
      * @param string $fieldToCount
-     * @param ?string $alias Alias for the resultant sum column. Optional.
      * @return $this
      */
-    public function count(string $fieldToCount, ?string $alias = null);
+    public function count(string $fieldToCount);
 
     /**
      * Adds, or replaces the LIMIT clause.
