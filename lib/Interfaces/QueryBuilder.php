@@ -17,10 +17,11 @@ interface QueryBuilder
     /**
      * Set fields to select.
      *
-     * @param array $fields - List of fields to select. Associative arrays expect the array key to be the alias.
+     * @param string $field - Field to select.
+     * @param string $fields - List of additional fields to select.
      * @return $this
      */
-    public function select(array $fields);
+    public function select(string $field, string ...$fields);
 
     /**
      * Appends to the from clause.
