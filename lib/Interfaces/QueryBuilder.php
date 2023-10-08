@@ -12,7 +12,7 @@ interface QueryBuilder
      * @param class-string<Table> $table
      * @return $this
      */
-    public function setTable(string $table);
+    public function useTable(string $table);
 
     /**
      * Set fields to select. Uses the alias from the provided Table object
