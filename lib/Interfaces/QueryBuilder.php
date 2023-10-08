@@ -68,13 +68,22 @@ interface QueryBuilder
     /**
      * Adds, or overrides the LEFT JOIN clause.
      *
-     * @param string $type The type of join (e.g., INNER, LEFT, RIGHT).
      * @param class-string<Table> $table The table to join.
      * @param string $column The column to join by.
      * @param string $onColumn The joined column to join on.
      * @return $this
      */
-    public function join(string $type, string $table, string $column, string $onColumn);
+    public function leftJoin(string $table, string $column, string $onColumn);
+
+    /**
+     * Adds, or overrides the LEFT JOIN clause.
+     *
+     * @param class-string<Table> $table The table to join.
+     * @param string $column The column to join by.
+     * @param string $onColumn The joined column to join on.
+     * @return $this
+     */
+    public function rightJoin(string $table, string $column, string $onColumn);
 
     /**
      * Adds, or overrides the GROUP BY clause.
