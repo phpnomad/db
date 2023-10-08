@@ -15,7 +15,8 @@ interface QueryBuilder
     public function setTable(string $table);
 
     /**
-     * Set fields to select.
+     * Set fields to select. Uses the alias from the provided Table object
+     * @see setTable
      *
      * @param string $field - Field to select.
      * @param string $fields - List of additional fields to select.
@@ -24,13 +25,12 @@ interface QueryBuilder
     public function select(string $field, string ...$fields);
 
     /**
-     * Appends to the from clause.
+     * Sets the form clause to the current table.
+     * @see setTable
      *
-     * @param string $table
-     * @param ?string $alias
      * @return $this
      */
-    public function from(string $table, ?string $alias = null);
+    public function from();
 
     /**
      * Creates, or overrides the where clause.
