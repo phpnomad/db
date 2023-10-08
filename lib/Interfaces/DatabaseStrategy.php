@@ -108,7 +108,8 @@ interface DatabaseStrategy
     /**
      * Run an arbitrary query.
      *
+     * @param QueryBuilder $builder
      * @return array<string,mixed>[]
      */
-    public function query(): array;
+    public function query(QueryBuilder $builder): array;
 }
