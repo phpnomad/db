@@ -10,7 +10,7 @@ interface QueryBuilder
      * Sets the specified table to be used in subsequent methods.
      *
      * @param class-string<Table> $table
-     * @return mixed
+     * @return $this
      */
     public function setTable(string $table);
 
