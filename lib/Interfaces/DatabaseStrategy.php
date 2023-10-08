@@ -104,4 +104,12 @@ interface DatabaseStrategy
      * @throws DatabaseErrorException
      */
     public function findIds(Table $table, array $conditions, ?int $limit = null, ?int $offset = null): array;
+
+    /**
+     * Run an arbitrary query.
+     *
+     * @param QueryBuilder $builder
+     * @return array<string,mixed>[]
+     */
+    public function query(QueryBuilder $builder);
 }
