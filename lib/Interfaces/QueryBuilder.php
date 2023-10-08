@@ -9,10 +9,10 @@ interface QueryBuilder
     /**
      * Sets the specified table to be used in subsequent methods.
      *
-     * @param class-string<Table> $table
+     * @param Table $table
      * @return $this
      */
-    public function useTable(string $table);
+    public function useTable(Table $table);
 
     /**
      * Set fields to select. Uses the alias from the provided Table object
@@ -68,22 +68,22 @@ interface QueryBuilder
     /**
      * Adds, or overrides the LEFT JOIN clause.
      *
-     * @param class-string<Table> $table The table to join.
+     * @param Table $table The table to join.
      * @param string $column The column to join by.
      * @param string $onColumn The joined column to join on.
      * @return $this
      */
-    public function leftJoin(string $table, string $column, string $onColumn);
+    public function leftJoin(Table $table, string $column, string $onColumn);
 
     /**
      * Adds, or overrides the LEFT JOIN clause.
      *
-     * @param class-string<Table> $table The table to join.
+     * @param Table $table The table to join.
      * @param string $column The column to join by.
      * @param string $onColumn The joined column to join on.
      * @return $this
      */
-    public function rightJoin(string $table, string $column, string $onColumn);
+    public function rightJoin(Table $table, string $column, string $onColumn);
 
     /**
      * Adds, or overrides the GROUP BY clause.

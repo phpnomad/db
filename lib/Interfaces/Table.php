@@ -8,12 +8,12 @@ interface Table
      *
      * @return string
      */
-    public static function getName(): string;
+    public function getName(): string;
 
     /**
      * Gets the alias for this table.
      *
      * @return string
      */
-    public static function getAlias(): string;
+    public function getAlias(): string;
 }
