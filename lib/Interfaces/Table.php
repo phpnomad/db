@@ -1,6 +1,9 @@
 <?php
 
 namespace Phoenix\Database\Interfaces;
+
+use Phoenix\Database\Exceptions\DatabaseErrorException;
+
 interface Table
 {
     /**
@@ -23,4 +26,19 @@ interface Table
      * @return int
      */
     public function getCacheTtl(): int;
+
+    /**
+     * Gets the current version of the table.
+     *
+     * @return string
+     */
+    public function getTableVersion(): string;
+
+    /**
+     * Installs the table.
+     *
+     * @return void
+     * @throws DatabaseErrorException
+     */
+    public function install(): void;
 }
