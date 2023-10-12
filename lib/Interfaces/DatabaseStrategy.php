@@ -12,6 +12,7 @@ interface DatabaseStrategy
      * Gets the database global prefix, if it has one.
      *
      * @return ?string
+     * @throws DatabaseErrorException
      */
     public function prefix(): ?string;
 
