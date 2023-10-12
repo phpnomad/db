@@ -2,19 +2,24 @@
 
 namespace Phoenix\Database\Abstracts;
 
+use Phoenix\Core\Helpers\Str;
 use Phoenix\Database\Interfaces\HasDatabaseDefaultCacheTtl;
+use Phoenix\Database\Interfaces\HasGlobalDatabasePrefix;
 use Phoenix\Database\Interfaces\HasLocalDatabasePrefix;
 use Phoenix\Database\Interfaces\Table as CoreTable;
+use Phoenix\Utils\Helpers\Arr;
 
 abstract class Table implements CoreTable
 {
     protected HasDatabaseDefaultCacheTtl $defaultCacheTtlProvider;
-    protected HasLocalDatabasePrefix $prefixProvider;
+    protected HasLocalDatabasePrefix $localPrefixProvider;
+    protected HasGlobalDatabasePrefix $globalPrefixProvider;
 
-    public function __construct(HasDatabaseDefaultCacheTtl $defaultCacheTtlProvider, HasLocalDatabasePrefix $prefixProvider )
+    public function __construct(HasDatabaseDefaultCacheTtl $defaultCacheTtlProvider, HasLocalDatabasePrefix $localPrefixProvider, HasGlobalDatabasePrefix $globalPrefixProvider)
     {
         $this->defaultCacheTtlProvider = $defaultCacheTtlProvider;
-        $this->prefixProvider = $prefixProvider;
+        $this->localPrefixProvider = $localPrefixProvider;
+        $this->globalPrefixProvider = $globalPrefixProvider;
     }
 
     /** @inheritDoc */
@@ -30,13 +35,9 @@ abstract class Table implements CoreTable
      */
     public function getName(): string
     {
-        $prefix = $this->prefixProvider->getDatabasePrefix();
-
-        if (!empty($prefix)) {
-            $prefix = $prefix . '_';
-        }
-
-        return $prefix . $this->getUnprefixedName();
+        return Str::append($this->globalPrefixProvider->getGlobalDatabasePrefix(), '_')
+            . Str::append($this->localPrefixProvider->getLocalDatabasePrefix(), '_')
+            . $this->getUnprefixedName();
     }
 
     /**
