@@ -3,15 +3,15 @@
 namespace Phoenix\Database\Abstracts;
 
 use Phoenix\Database\Interfaces\HasDatabaseDefaultCacheTtl;
-use Phoenix\Database\Interfaces\HasDatabasePrefix;
+use Phoenix\Database\Interfaces\HasLocalDatabasePrefix;
 use Phoenix\Database\Interfaces\Table as CoreTable;
 
 abstract class Table implements CoreTable
 {
     protected HasDatabaseDefaultCacheTtl $defaultCacheTtlProvider;
-    protected HasDatabasePrefix $prefixProvider;
+    protected HasLocalDatabasePrefix $prefixProvider;
 
-    public function __construct(HasDatabaseDefaultCacheTtl $defaultCacheTtlProvider, HasDatabasePrefix $prefixProvider )
+    public function __construct(HasDatabaseDefaultCacheTtl $defaultCacheTtlProvider, HasLocalDatabasePrefix $prefixProvider )
     {
         $this->defaultCacheTtlProvider = $defaultCacheTtlProvider;
         $this->prefixProvider = $prefixProvider;
