@@ -7,6 +7,14 @@ use Phoenix\Database\Exceptions\RecordNotFoundException;
 
 interface DatabaseStrategy
 {
+
+    /**
+     * Gets the database global prefix, if it has one.
+     *
+     * @return ?string
+     */
+    public function prefix(): ?string;
+
     /**
      * Retrieve a record by its primary key.
      *
