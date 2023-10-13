@@ -6,16 +6,14 @@ use Phoenix\Database\Abstracts\DatabaseRepository;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
 use Phoenix\Database\Interfaces\DatabaseModel;
 use Phoenix\Database\Mutators\Interfaces\QueryMutator;
-use Phoenix\Singleton\Traits\WithInstance;
 
 /**
  * @template TModel of DatabaseModel
+ * @method static instance()
  * @method DatabaseRepository getContainedInstance()
  */
 trait WithDatabaseFacadeMethods
 {
-    use WithInstance;
-
     /**
      * @param int $id
      * @return DatabaseModel

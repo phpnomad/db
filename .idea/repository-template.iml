@@ -65,6 +65,7 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/phoenix/utils" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/phoenix/facade" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/phoenix/cache" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/phoenix/singleton" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
