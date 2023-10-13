@@ -19,6 +19,10 @@
         },
         {
             "type": "vcs",
+            "url": "https://github.com/rooted-phoenix/singleton.git"
+        },
+        {
+            "type": "vcs",
             "url": "https://github.com/rooted-phoenix/facade.git"
         },
         {
@@ -46,7 +50,8 @@
         "phoenix/tests": "^0.1.0",
         "phoenix/utils": "dev-main",
         "phoenix/cache": "dev-main",
-        "phoenix/facade": "dev-main"
+        "phoenix/facade": "dev-main",
+        "phoenix/singleton": "dev-main"
     },
     "config": {
         "allow-plugins": {

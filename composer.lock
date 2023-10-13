@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "5a955dc58182da465d753b2480c816f8",
+    "content-hash": "26b9a3c70f87d36bedb3187bf80e6070",
     "packages": [],
     "packages-dev": [
         {
@@ -850,6 +850,56 @@
                 "issues": "https://github.com/rooted-phoenix/facade/issues"
             },
             "time": "2023-10-13T12:06:51+00:00"
+        },
+        {
+            "name": "phoenix/singleton",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "git@github.com:rooted-phoenix/singleton.git",
+                "reference": "451fa0dd7631e4bcc01c4e9f5bbbe02cc0cc86b8"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/rooted-phoenix/singleton/zipball/451fa0dd7631e4bcc01c4e9f5bbbe02cc0cc86b8",
+                "reference": "451fa0dd7631e4bcc01c4e9f5bbbe02cc0cc86b8",
+                "shasum": ""
+            },
+            "require-dev": {
+                "phoenix/tests": "^0.1.0"
+            },
+            "default-branch": true,
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Phoenix\\Singleton\\": "lib/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Phoenix\\Singleton\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "php-cs-fixer": [
+                    "php-cs-fixer fix"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Alex Standiford",
+                    "email": "alex@standiford.us"
+                }
+            ],
+            "homepage": "https://github.com/phoenix/core",
+            "support": {
+                "source": "https://github.com/rooted-phoenix/singleton/tree/main",
+                "issues": "https://github.com/rooted-phoenix/singleton/issues"
+            },
+            "time": "2023-10-13T12:32:02+00:00"
         },
         {
             "name": "phoenix/tests",
@@ -3994,7 +4044,8 @@
     "stability-flags": {
         "phoenix/utils": 20,
         "phoenix/cache": 20,
-        "phoenix/facade": 20
+        "phoenix/facade": 20,
+        "phoenix/singleton": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,

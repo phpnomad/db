@@ -1,18 +1,21 @@
 <?php
 
-namespace Phoenix\Database\Abstracts;
+namespace Phoenix\Database\Traits;
 
-use Phoenix\Facade\Abstracts\Facade;
+use Phoenix\Database\Abstracts\DatabaseRepository;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
 use Phoenix\Database\Interfaces\DatabaseModel;
 use Phoenix\Database\Mutators\Interfaces\QueryMutator;
+use Phoenix\Singleton\Traits\WithInstance;
 
 /**
  * @template TModel of DatabaseModel
  * @method DatabaseRepository getContainedInstance()
  */
-abstract class DatabaseFacade extends Facade
+trait WithDatabaseFacadeMethods
 {
+    use WithInstance;
+
     /**
      * @param int $id
      * @return DatabaseModel
@@ -63,9 +66,4 @@ abstract class DatabaseFacade extends Facade
     {
         return static::instance()->getContainedInstance()->count(...$args);
     }
-
-    /**
-     * @return $this
-     */
-    abstract public static function instance();
 }
