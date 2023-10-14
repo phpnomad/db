@@ -2,12 +2,11 @@
 
 namespace Phoenix\Database\Abstracts;
 
-use Phoenix\Core\Helpers\Str;
 use Phoenix\Database\Interfaces\HasDatabaseDefaultCacheTtl;
 use Phoenix\Database\Interfaces\HasGlobalDatabasePrefix;
 use Phoenix\Database\Interfaces\HasLocalDatabasePrefix;
 use Phoenix\Database\Interfaces\Table as CoreTable;
-use Phoenix\Utils\Helpers\Arr;
+use Phoenix\Utils\Helpers\Str;
 
 abstract class Table implements CoreTable
 {
