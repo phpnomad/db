@@ -4,7 +4,7 @@ namespace Phoenix\Database\Interfaces;
 
 use Phoenix\Database\Exceptions\TableCreateFailedException;
 use Phoenix\Database\Exceptions\TableDropFailedException;
-use Phoenix\Database\Exceptions\TableUpdateFailedException;
+use Phoenix\Database\Exceptions\TableNotFoundException;
 
 interface TableStrategy {
     /**
@@ -16,16 +16,6 @@ interface TableStrategy {
      * @throws TableCreateFailedException
      */
     public function create(Table $table): void;
-
-    /**
-     * Update an existing table based on the provided table definition.
-     *
-     * @param Table $table The table definition detailing updates.
-     *
-     * @return void
-     * @throws TableUpdateFailedException
-     */
-    public function update(Table $table): void;
 
     /**
      * Check if a table exists in the database.
@@ -43,6 +33,7 @@ interface TableStrategy {
      *
      * @return void
      * @throws TableDropFailedException
+     * @throws TableNotFoundException
      */
     public function drop(string $tableName): void;
 }
