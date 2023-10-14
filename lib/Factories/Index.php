@@ -4,14 +4,14 @@ namespace Phoenix\Database\Factories;
 
 final class Index
 {
-    protected string $name;
+    protected ?string $name;
     protected array $columns;
     protected ?string $type = null;
     protected array $attributes = [];
 
     public function __construct(
-        string $name,
         array $columns,
+        ?string $name = null,
         ?string $type = null,
         ...$attributes
     ) {
@@ -24,9 +24,9 @@ final class Index
     /**
      * Gets the index name.
      *
-     * @return string
+     * @return ?string
      */
-    public function getName(): string
+    public function getName(): ?string
     {
         return $this->name;
     }
