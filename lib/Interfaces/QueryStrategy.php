@@ -5,7 +5,7 @@ namespace Phoenix\Database\Interfaces;
 use Phoenix\Database\Exceptions\DatabaseErrorException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
 
-interface DatabaseStrategy
+interface QueryStrategy
 {
     /**
      * Retrieve a record by its primary key.

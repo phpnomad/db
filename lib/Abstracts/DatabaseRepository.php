@@ -6,7 +6,7 @@ use Phoenix\Cache\Interfaces\InMemoryCacheStrategy;
 use Phoenix\Database\Exceptions\DatabaseErrorException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
 use Phoenix\Database\Interfaces\DatabaseModel;
-use Phoenix\Database\Interfaces\DatabaseStrategy;
+use Phoenix\Database\Interfaces\QueryStrategy;
 use Phoenix\Database\Interfaces\ModelAdapter;
 use Phoenix\Database\Interfaces\QueryBuilder;
 use Phoenix\Database\Interfaces\Table;
@@ -20,7 +20,7 @@ use Phoenix\Utils\Helpers\Arr;
  */
 abstract class DatabaseRepository
 {
-    protected DatabaseStrategy $databaseStrategy;
+    protected QueryStrategy $databaseStrategy;
     protected InMemoryCacheStrategy $cacheStrategy;
     protected QueryBuilder $queryBuilder;
 
@@ -30,7 +30,7 @@ abstract class DatabaseRepository
     public function __construct(
         Table                 $table,
         ModelAdapter          $modelAdapter,
-        DatabaseStrategy      $databaseStrategy,
+        QueryStrategy         $databaseStrategy,
         InMemoryCacheStrategy $cacheStrategy,
         QueryBuilder          $queryBuilder
     ) {

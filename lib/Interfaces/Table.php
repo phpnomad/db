@@ -3,6 +3,7 @@
 namespace Phoenix\Database\Interfaces;
 
 use Phoenix\Database\Exceptions\DatabaseErrorException;
+use Phoenix\Database\Factories\Column;
 
 interface Table
 {
@@ -41,4 +42,32 @@ interface Table
      * @throws DatabaseErrorException
      */
     public function install(): void;
+
+    /**
+     * Gets the list of columns in the table.
+     *
+     * @return Column[]
+     */
+    public function getColumns(): array;
+
+    /**
+     * Gets the list of columns in the table.
+     *
+     * @return Index[]
+     */
+    public function getIndices(): array;
+
+    /**
+     * Get the charset of the table.
+     *
+     * @return ?string
+     */
+    public function getCharset(): ?string;
+
+    /**
+     * Get the collation of the table.
+     *
+     * @return ?string
+     */
+    public function getCollation(): ?string;
 }
