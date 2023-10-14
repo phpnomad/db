@@ -2,7 +2,7 @@
 
 namespace Phoenix\Database\Factories;
 
-class Index
+final class Index
 {
     protected ?string $name;
     protected array $columns;

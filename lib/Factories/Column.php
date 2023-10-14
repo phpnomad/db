@@ -2,7 +2,7 @@
 
 namespace Phoenix\Database\Factories;
 
-class Column
+final class Column
 {
     protected string $name;
     protected string $type;
