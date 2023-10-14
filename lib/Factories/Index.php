@@ -6,8 +6,6 @@ final class Index
 {
     protected string $name;
     protected array $columns;
-    protected bool $isUnique;
-    protected bool $isPrimary;
     protected ?string $type = null;
     protected array $attributes = [];
 
