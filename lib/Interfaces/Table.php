@@ -2,8 +2,8 @@
 
 namespace Phoenix\Database\Interfaces;
 
-use Phoenix\Database\Exceptions\DatabaseErrorException;
 use Phoenix\Database\Factories\Column;
+use Phoenix\Database\Factories\Index;
 
 interface Table
 {
@@ -34,14 +34,6 @@ interface Table
      * @return string
      */
     public function getTableVersion(): string;
-
-    /**
-     * Installs the table.
-     *
-     * @return void
-     * @throws DatabaseErrorException
-     */
-    public function install(): void;
 
     /**
      * Gets the list of columns in the table.

@@ -295,6 +295,6 @@ abstract class DatabaseRepository
      */
     protected function getItemCacheKey(string $id): string
     {
-        return Config::get('core.general.prefix', '') . "__{$this->table->getName()}__{$id}";
+        return "{$this->table->getName()}__$id";
     }
 }

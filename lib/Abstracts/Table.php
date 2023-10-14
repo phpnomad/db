@@ -2,8 +2,6 @@
 
 namespace Phoenix\Database\Abstracts;
 
-use Cassandra\Column;
-use Phoenix\Database\Interfaces\QueryStrategy;
 use Phoenix\Database\Interfaces\HasDatabaseDefaultCacheTtl;
 use Phoenix\Database\Interfaces\HasGlobalDatabasePrefix;
 use Phoenix\Database\Interfaces\HasLocalDatabasePrefix;
