@@ -33,7 +33,6 @@ interface TableStrategy {
      *
      * @return void
      * @throws TableDropFailedException
-     * @throws TableNotFoundException
      */
     public function drop(string $tableName): void;
 }
