@@ -42,7 +42,7 @@ trait WithDatabaseFacadeMethods
      */
     public static function save(array $data): int
     {
-        static::instance()->getContainedInstance()->save($data);
+        return static::instance()->getContainedInstance()->save($data);
     }
 
     /**
