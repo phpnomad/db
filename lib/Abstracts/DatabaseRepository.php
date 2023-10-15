@@ -28,11 +28,14 @@ abstract class DatabaseRepository
     protected Table $table;
 
     public function __construct(
+        Table                 $table,
         ModelAdapter          $modelAdapter,
         QueryStrategy         $databaseStrategy,
         InMemoryCacheStrategy $cacheStrategy,
         QueryBuilder          $queryBuilder
-    ) {
+    )
+    {
+        $this->table = $table;
         $this->databaseStrategy = $databaseStrategy;
         $this->cacheStrategy = $cacheStrategy;
         $this->queryBuilder = $queryBuilder;
