@@ -28,7 +28,6 @@ abstract class DatabaseRepository
     protected Table $table;
 
     public function __construct(
-        Table                 $table,
         ModelAdapter          $modelAdapter,
         QueryStrategy         $databaseStrategy,
         InMemoryCacheStrategy $cacheStrategy,
@@ -38,7 +37,6 @@ abstract class DatabaseRepository
         $this->cacheStrategy = $cacheStrategy;
         $this->queryBuilder = $queryBuilder;
         $this->modelAdapter = $modelAdapter;
-        $this->table = $table;
     }
 
     /**
