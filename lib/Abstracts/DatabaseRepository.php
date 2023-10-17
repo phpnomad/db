@@ -3,8 +3,12 @@
 namespace Phoenix\Database\Abstracts;
 
 use Phoenix\Cache\Interfaces\InMemoryCacheStrategy;
+use Phoenix\Core\Exceptions\ItemNotFound;
+use Phoenix\Core\Facades\Logger;
+use Phoenix\Database\Exceptions\ColumnNotFoundException;
 use Phoenix\Database\Exceptions\DatabaseErrorException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
+use Phoenix\Database\Factories\Column;
 use Phoenix\Database\Interfaces\DatabaseModel;
 use Phoenix\Database\Interfaces\QueryStrategy;
 use Phoenix\Database\Interfaces\ModelAdapter;
@@ -14,6 +18,7 @@ use Phoenix\Database\Mutators\IdsOnly;
 use Phoenix\Database\Mutators\Interfaces\QueryMutator;
 use Phoenix\Database\Mutators\Limit;
 use Phoenix\Utils\Helpers\Arr;
+use Phoenix\Utils\Helpers\Obj;
 
 /**
  * @template TModel of DatabaseModel
@@ -63,7 +68,7 @@ abstract class DatabaseRepository
         } catch (RecordNotFoundException $e) {
             throw $e;
         } catch (DatabaseErrorException $e) {
-            // TODO LOG THIS EXCEPTION
+            Logger::logException($e, 'Could not get by ID');
         }
     }
 
@@ -79,7 +84,7 @@ abstract class DatabaseRepository
     {
         try {
             $id = Arr::pluck(
-                $this->databaseStrategy->findIds($this->table, ['column' => $column, 'operator' => '=', $value], 1),
+                $this->databaseStrategy->findIds($this->table, [['column' => $column, 'operator' => '=', 'value' => $value]], 1),
                 0
             );
 
@@ -87,12 +92,23 @@ abstract class DatabaseRepository
                 throw new RecordNotFoundException('Could not find item with ' . $column . ' value ' . $value);
             }
 
-            return $this->getById($id);
+            return $this->getById(Arr::get($id, 'id'));
         } catch (RecordNotFoundException $e) {
             throw $e;
         } catch (DatabaseErrorException $e) {
             // TODO LOG THIS EXCEPTION
         }
+    }
+
+    /**
+     * @param string $column
+     * @return bool
+     */
+    protected function columnIsInTable(string $column): bool
+    {
+        return Arr::find($this->table->getColumns(), function (Column $columnObject) use($column) {
+            return $columnObject->getName() === $column;
+        }, false) instanceof Column;
     }
 
     /**
@@ -107,13 +123,13 @@ abstract class DatabaseRepository
             $this->databaseStrategy->delete($this->table, $id);
             $this->cacheStrategy->delete($this->getItemCacheKey($id));
         } catch (DatabaseErrorException $e) {
-            // TODO LOG THIS EXCEPTION
+            Logger::logException($e, 'Could not delete record');
         }
     }
 
     /**
      * @param array $data
-     * @return void
+     * @return int
      * @throws RecordNotFoundException
      */
     public function save(array $data): int
@@ -133,7 +149,7 @@ abstract class DatabaseRepository
         } catch (RecordNotFoundException $e) {
             throw $e;
         } catch (DatabaseErrorException $e) {
-            // TODO LOG THIS EXCEPTION
+            Logger::logException($e, 'Failed to save a record');
         }
 
         return $id;
@@ -167,7 +183,7 @@ abstract class DatabaseRepository
 
         try {
             // Get the things that aren't in the cache.
-            $data = $this->databaseStrategy->where($this->table, ['column' => 'id', 'operator' => 'IN', [$idsToQuery]]);
+            $data = $this->databaseStrategy->where($this->table, [['column' => 'id', 'operator' => 'IN', 'value' => [$idsToQuery]]]);
         } catch (DatabaseErrorException $e) {
             //TODO: LOG THIS EXCEPTION.
         }
