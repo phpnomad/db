@@ -3,6 +3,7 @@
 namespace Phoenix\Database\Interfaces;
 
 use Phoenix\Database\Exceptions\DatabaseErrorException;
+use Phoenix\Database\Exceptions\DuplicateEntryException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
 
 interface QueryStrategy
@@ -57,6 +58,7 @@ interface QueryStrategy
      * @param Table $table
      * @param array<string, mixed> $attributes
      * @return int Inserted record ID.
+     * @throws DuplicateEntryException
      * @throws DatabaseErrorException
      */
     public function create(Table $table, array $attributes): int;
@@ -69,6 +71,7 @@ interface QueryStrategy
      * @param array<string, mixed> $attributes
      * @return void
      * @throws RecordNotFoundException
+     * @throws DuplicateEntryException
      * @throws DatabaseErrorException
      */
     public function update(Table $table, $id, array $attributes): void;

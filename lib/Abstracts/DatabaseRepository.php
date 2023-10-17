@@ -5,8 +5,8 @@ namespace Phoenix\Database\Abstracts;
 use Phoenix\Cache\Interfaces\InMemoryCacheStrategy;
 use Phoenix\Core\Exceptions\ItemNotFound;
 use Phoenix\Core\Facades\Logger;
-use Phoenix\Database\Exceptions\ColumnNotFoundException;
 use Phoenix\Database\Exceptions\DatabaseErrorException;
+use Phoenix\Database\Exceptions\DuplicateEntryException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
 use Phoenix\Database\Factories\Column;
 use Phoenix\Database\Interfaces\DatabaseModel;
@@ -18,7 +18,7 @@ use Phoenix\Database\Mutators\IdsOnly;
 use Phoenix\Database\Mutators\Interfaces\QueryMutator;
 use Phoenix\Database\Mutators\Limit;
 use Phoenix\Utils\Helpers\Arr;
-use Phoenix\Utils\Helpers\Obj;
+use Phoenix\Utils\Processors\ListFilter;
 
 /**
  * @template TModel of DatabaseModel
@@ -96,7 +96,7 @@ abstract class DatabaseRepository
         } catch (RecordNotFoundException $e) {
             throw $e;
         } catch (DatabaseErrorException $e) {
-            // TODO LOG THIS EXCEPTION
+            Logger::logException($e, 'Could not get by ID');
         }
     }
 
@@ -106,9 +106,9 @@ abstract class DatabaseRepository
      */
     protected function columnIsInTable(string $column): bool
     {
-        return Arr::find($this->table->getColumns(), function (Column $columnObject) use($column) {
-            return $columnObject->getName() === $column;
-        }, false) instanceof Column;
+        return Arr::find($this->table->getColumns(), function (Column $columnObject) use ($column) {
+                return $columnObject->getName() === $column;
+            }, false) instanceof Column;
     }
 
     /**
@@ -130,29 +130,34 @@ abstract class DatabaseRepository
     /**
      * @param array $data
      * @return int
-     * @throws RecordNotFoundException
+     * @throws DatabaseErrorException
      */
-    public function save(array $data): int
+    public function create(array $data): int
     {
+        // Create cannot set IDs.
         if (isset($data['id'])) {
-            $id = $data['id'];
             unset($data['id']);
         }
 
-        try {
-            if (isset($id)) {
-                $this->databaseStrategy->update($this->table, $id, $data);
-                $this->cacheStrategy->delete($this->getItemCacheKey($id));
-            } else {
-                $id = $this->databaseStrategy->create($this->table, $data);
-            }
-        } catch (RecordNotFoundException $e) {
-            throw $e;
-        } catch (DatabaseErrorException $e) {
-            Logger::logException($e, 'Failed to save a record');
+        return $this->databaseStrategy->create($this->table, $data);
+    }
+
+    /**
+     * @param int $id
+     * @param array $data
+     * @return void
+     * @throws RecordNotFoundException
+     * @throws DatabaseErrorException
+     */
+    public function update(int $id, array $data): void
+    {
+        // Strip ID from data, if it's accidentally set.
+        if (isset($data['id'])) {
+            unset($data['id']);
         }
 
-        return $id;
+        $this->databaseStrategy->update($this->table, $id, $data);
+        $this->cacheStrategy->delete($this->getItemCacheKey($id));
     }
 
     /**
@@ -172,20 +177,21 @@ abstract class DatabaseRepository
             if (empty($allIds) || $this->isIdOnlyQuery($args)) {
                 return $allIds;
             }
+            // Filter out the items that are currently in the cache.
+            $idsToQuery = (new ListFilter($allIds))
+                ->filterFromCallback('id', function (int $id) {
+                    $this->cacheStrategy->get($this->getItemCacheKey($id));
+                })
+                ->filter();
         } catch (DatabaseErrorException $e) {
-            //TODO: LOG THIS EXCEPTION.
+            Logger::logException($e, 'Could not get by ID');
         }
-
-        // Filter out the items that are currently in the cache.
-        $idsToQuery = Arr::filter($allIds, function (int $id) {
-            $this->cacheStrategy->get($this->getItemCacheKey($id));
-        });
 
         try {
             // Get the things that aren't in the cache.
             $data = $this->databaseStrategy->where($this->table, [['column' => 'id', 'operator' => 'IN', 'value' => [$idsToQuery]]]);
         } catch (DatabaseErrorException $e) {
-            //TODO: LOG THIS EXCEPTION.
+            Logger::logException($e, 'Could not get by ID');
         }
 
         // Cache those items.
