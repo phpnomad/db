@@ -4,7 +4,7 @@ namespace Phoenix\Database\Abstracts;
 
 use Phoenix\Cache\Interfaces\InMemoryCacheStrategy;
 use Phoenix\Core\Exceptions\ItemNotFound;
-use Phoenix\Core\Facades\Logger;
+use Phoenix\Logger\Facades\Logger;
 use Phoenix\Database\Exceptions\DatabaseErrorException;
 use Phoenix\Database\Exceptions\DuplicateEntryException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
