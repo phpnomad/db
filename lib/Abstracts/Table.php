@@ -8,6 +8,7 @@ use Phoenix\Database\Interfaces\HasDatabaseDefaultCacheTtl;
 use Phoenix\Database\Interfaces\HasGlobalDatabasePrefix;
 use Phoenix\Database\Interfaces\HasLocalDatabasePrefix;
 use Phoenix\Database\Interfaces\Table as CoreTable;
+use Phoenix\Database\Mutators\Limit;
 use Phoenix\Utils\Helpers\Str;
 
 abstract class Table implements CoreTable
@@ -77,5 +78,13 @@ abstract class Table implements CoreTable
     public function getCollation(): ?string
     {
         return $this->collateProvider->getCollation();
+    }
+
+    /** @inheritDoc */
+    public function getQueryDefaults(): array
+    {
+        return [
+            new Limit(10)
+        ];
     }
 }

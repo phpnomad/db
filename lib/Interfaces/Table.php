@@ -4,6 +4,7 @@ namespace Phoenix\Database\Interfaces;
 
 use Phoenix\Database\Factories\Column;
 use Phoenix\Database\Factories\Index;
+use Phoenix\Database\Mutators\Interfaces\QueryMutator;
 
 interface Table
 {
@@ -62,4 +63,11 @@ interface Table
      * @return ?string
      */
     public function getCollation(): ?string;
+
+    /**
+     * Specified the default arguments when querying against this
+     *
+     * @return QueryMutator[]
+     */
+    public function getQueryDefaults(): array;
 }

@@ -7,19 +7,9 @@ use Phoenix\Database\Exceptions\QueryBuilderException;
 interface QueryBuilder
 {
     /**
-     * Sets the specified table to be used in subsequent methods.
-     *
-     * @param Table $table
-     * @return $this
-     */
-    public function useTable(Table $table);
-
-    /**
      * Set fields to select. Uses the alias from the provided Table object
-     * @see setTable
-     *
      * @param string $field - Field to select.
-     * @param string $fields - List of additional fields to select.
+     * @param string ...$fields - List of additional fields to select.
      * @return $this
      */
     public function select(string $field, string ...$fields);

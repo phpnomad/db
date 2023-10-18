@@ -2,49 +2,53 @@
 
 namespace Phoenix\Database\Abstracts;
 
-use Phoenix\Cache\Interfaces\InMemoryCacheStrategy;
 use Phoenix\Database\Exceptions\DatabaseErrorException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
-use Phoenix\Database\Factories\Column;
 use Phoenix\Database\Interfaces\DatabaseModel;
-use Phoenix\Database\Interfaces\QueryStrategy;
 use Phoenix\Database\Interfaces\ModelAdapter;
 use Phoenix\Database\Interfaces\QueryBuilder;
+use Phoenix\Database\Interfaces\QueryStrategy;
 use Phoenix\Database\Interfaces\Table;
-use Phoenix\Database\Mutators\IdsOnly;
 use Phoenix\Database\Mutators\Interfaces\QueryMutator;
-use Phoenix\Database\Mutators\Limit;
+use Phoenix\Database\Providers\DatabaseCacheProvider;
+use Phoenix\Database\Services\CacheableQueryService;
 use Phoenix\Logger\Interfaces\LoggerStrategy;
 use Phoenix\Utils\Helpers\Arr;
-use Phoenix\Utils\Processors\ListFilter;
 
 /**
  * @template TModel of DatabaseModel
  */
 abstract class DatabaseRepository
 {
-    protected QueryStrategy $databaseStrategy;
-    protected InMemoryCacheStrategy $cacheStrategy;
+    protected QueryStrategy $queryStrategy;
     protected QueryBuilder $queryBuilder;
 
     protected ModelAdapter $modelAdapter;
     protected Table $table;
     protected LoggerStrategy $loggerStrategy;
+    protected DatabaseCacheProvider $cacheProvider;
+    protected CacheableQueryService $cacheableQueryService;
 
     public function __construct(
         Table                 $table,
         ModelAdapter          $modelAdapter,
-        QueryStrategy         $databaseStrategy,
-        InMemoryCacheStrategy $cacheStrategy,
+        QueryStrategy         $queryStrategy,
+        DatabaseCacheProvider $cacheProvider,
+        CacheableQueryService $cacheableQueryService,
         LoggerStrategy        $loggerStrategy,
         QueryBuilder          $queryBuilder
     )
     {
         $this->table = $table;
-        $this->databaseStrategy = $databaseStrategy;
-        $this->cacheStrategy = $cacheStrategy;
-        $this->queryBuilder = $queryBuilder;
         $this->modelAdapter = $modelAdapter;
+        $this->queryStrategy = $queryStrategy;
+        $this->queryBuilder = $queryBuilder;
+
+        $this->cacheableQueryService = (clone $cacheableQueryService)
+            ->useTable($this->table)
+            ->useModelAdapter($this->modelAdapter);
+
+        $this->cacheProvider = (clone $cacheProvider)->useTable($this->table);
         $this->loggerStrategy = $loggerStrategy;
     }
 
@@ -57,10 +61,10 @@ abstract class DatabaseRepository
     {
         try {
             /** @var TModel $record */
-            $record = $this->cacheStrategy->load($this->getItemCacheKey($id), function () use ($id) {
+            $record = $this->cacheProvider->load($id, function () use ($id) {
                 return $this->modelAdapter->toModel(
                     $this
-                        ->databaseStrategy
+                        ->queryStrategy
                         ->find($this->table, $id)
                 );
             });
@@ -71,6 +75,22 @@ abstract class DatabaseRepository
         } catch (DatabaseErrorException $e) {
             $this->loggerStrategy->logException($e, 'Could not get by ID');
         }
+    }
+
+    public function query(QueryMutator ...$args): array
+    {
+        return $this->cacheableQueryService->query(...$args);
+    }
+
+    /**
+     * Gets a count of records for the specified query.
+     *
+     * @param QueryMutator ...$args
+     * @return int
+     */
+    public function count(QueryMutator ...$args): int
+    {
+        return $this->cacheableQueryService->count(...$args);
     }
 
     /**
@@ -84,8 +104,8 @@ abstract class DatabaseRepository
     protected function getBy(string $column, $value): DatabaseModel
     {
         try {
-            $id = Arr::pluck(
-                $this->databaseStrategy->findIds($this->table, [['column' => $column, 'operator' => '=', 'value' => $value]], 1),
+            $id = Arr::get(
+                $this->queryStrategy->findIds($this->table, [['column' => $column, 'operator' => '=', 'value' => $value]], 1),
                 0
             );
 
@@ -102,17 +122,6 @@ abstract class DatabaseRepository
     }
 
     /**
-     * @param string $column
-     * @return bool
-     */
-    protected function columnIsInTable(string $column): bool
-    {
-        return Arr::find($this->table->getColumns(), function (Column $columnObject) use ($column) {
-                return $columnObject->getName() === $column;
-            }, false) instanceof Column;
-    }
-
-    /**
      * Delete the specified record.
      *
      * @param int $id
@@ -121,8 +130,8 @@ abstract class DatabaseRepository
     public function delete(int $id): void
     {
         try {
-            $this->databaseStrategy->delete($this->table, $id);
-            $this->cacheStrategy->delete($this->getItemCacheKey($id));
+            $this->queryStrategy->delete($this->table, $id);
+            $this->cacheProvider->delete($id);
         } catch (DatabaseErrorException $e) {
             $this->loggerStrategy->logException($e, 'Could not delete record');
         }
@@ -140,7 +149,7 @@ abstract class DatabaseRepository
             unset($data['id']);
         }
 
-        return $this->databaseStrategy->create($this->table, $data);
+        return $this->queryStrategy->create($this->table, $data);
     }
 
     /**
@@ -157,168 +166,7 @@ abstract class DatabaseRepository
             unset($data['id']);
         }
 
-        $this->databaseStrategy->update($this->table, $id, $data);
-        $this->cacheStrategy->delete($this->getItemCacheKey($id));
-    }
-
-    /**
-     * Queries data, leveraging the cache.
-     *
-     * @param QueryMutator ...$args List of args used to make this query.
-     * @return TModel[]|int[]
-     */
-    public function query(QueryMutator ...$args): array
-    {
-        $this->prepareQuery(...$args);
-        try {
-            // Do the actual query.
-            $allIds = $this->databaseStrategy->query($this->queryBuilder);
-
-            // In some cases, this should only return IDs.
-            if (empty($allIds) || $this->isIdOnlyQuery($args)) {
-                return $allIds;
-            }
-            // Filter out the items that are currently in the cache.
-            $idsToQuery = (new ListFilter($allIds))
-                ->filterFromCallback('id', function (int $id) {
-                    $this->cacheStrategy->get($this->getItemCacheKey($id));
-                })
-                ->filter();
-        } catch (DatabaseErrorException $e) {
-            $this->loggerStrategy->logException($e, 'Could not get by ID');
-        }
-
-        try {
-            // Get the things that aren't in the cache.
-            $data = $this->databaseStrategy->where($this->table, [['column' => 'id', 'operator' => 'IN', 'value' => [$idsToQuery]]]);
-        } catch (DatabaseErrorException $e) {
-            $this->loggerStrategy->logException($e, 'Could not get by ID');
-        }
-
-        // Cache those items.
-        $this->cacheItems($this->hydrateItems($data));
-
-        // Now, use the cache to get all the posts in the proper order.
-        return Arr::map($allIds, [$this, 'getById']);
-    }
-
-    /**
-     * @param QueryMutator ...$args
-     * @return int
-     */
-    public function count(QueryMutator ...$args): int
-    {
-        $this->prepareQuery(...$args);
-        $this->queryBuilder->resetClauses('select')->count('*', 'count');
-        try {
-            $results = $this->databaseStrategy->query($this->queryBuilder);
-            $count = Arr::get($results, 'count');
-
-            if (is_null($count)) {
-                throw new DatabaseErrorException('Could not find count column in response.');
-            }
-        } catch (DatabaseErrorException $e) {
-            //TODO: LOG THIS EXCEPTION.
-        }
-    }
-
-    /**
-     * Returns true if this query is supposed to only fetch IDs.
-     *
-     * @param array $args
-     * @return bool
-     */
-    protected function isIdOnlyQuery(array $args): bool
-    {
-        foreach ($args as $arg) {
-            if ($arg instanceof IdsOnly) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Converts the given dataset into model objects.
-     *
-     * @param array $data
-     * @return TModel[]
-     */
-    protected function hydrateItems(array $data): array
-    {
-        return Arr::map($data, [$this->modelAdapter, 'toModel']);
-    }
-
-    /**
-     * Caches items in-batch
-     *
-     * @param TModel[] $models
-     * @return void
-     */
-    protected function cacheItems(array $models): void
-    {
-        Arr::map($models, [$this, 'cacheItem']);
-    }
-
-    /**
-     * Caches a single item.
-     *
-     * @param DatabaseModel $model
-     * @return void
-     */
-    protected function cacheItem(DatabaseModel $model): void
-    {
-        $this->cacheStrategy->set($this->getItemCacheKey($model->getId()), $model, $this->table->getCacheTtl());
-    }
-
-    /**
-     * Mutates the query against the list of mutators.
-     * @param QueryMutator ...$mutators
-     * @return void
-     */
-    protected function prepareQuery(QueryMutator ...$mutators): void
-    {
-        $seen = [];
-
-        Arr::process($mutators)
-            ->merge($mutators, $this->getQueryDefaults())
-            ->filter(static function (QueryMutator $mutator) use ($seen) {
-                if (!isset($seen[get_class($mutator)])) {
-                    $seen[get_class($mutator)] = true;
-                    return true;
-                }
-
-                return false;
-            })
-            ->each(function (QueryMutator $mutator) {
-                $mutator->mutateQuery($this->queryBuilder);
-            });
-
-        // Force the query to only use IDs.
-        $this->queryBuilder->resetClauses('select')->select('id');
-    }
-
-    /**
-     * Gets the default arguments to use for the query() method.
-     *
-     * @return QueryMutator[]
-     */
-    protected function getQueryDefaults()
-    {
-        return [
-            new Limit(10)
-        ];
-    }
-
-    /**
-     * Gets the cache key for this item.
-     *
-     * @param string $id
-     * @return string
-     */
-    protected function getItemCacheKey(string $id): string
-    {
-        return "{$this->table->getName()}__$id";
+        $this->queryStrategy->update($this->table, $id, $data);
+        $this->cacheProvider->delete($id);
     }
 }

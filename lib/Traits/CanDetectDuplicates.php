@@ -4,7 +4,9 @@ namespace Phoenix\Database\Traits;
 
 use Phoenix\Database\Exceptions\DatabaseErrorException;
 use Phoenix\Database\Exceptions\DuplicateEntryException;
+use Phoenix\Database\Exceptions\RecordNotFoundException;
 use Phoenix\Database\Factories\Column;
+use Phoenix\Database\Factories\TableProcessor;
 use Phoenix\Database\Interfaces\DatabaseModel;
 use Phoenix\Database\Interfaces\QueryBuilder;
 use Phoenix\Database\Interfaces\QueryStrategy;
@@ -17,13 +19,9 @@ trait CanDetectDuplicates
 
     protected QueryBuilder $queryBuilder;
     protected QueryStrategy $queryStrategy;
+    protected TableProcessor $tableProcessor;
 
     abstract protected function getBy(string $column, $value): DatabaseModel;
-
-    /**
-     * @return Column[]
-     */
-    abstract protected function getUniqueColumns(): array;
 
     /**
      * Looks up records that already have records in the specified columns.
@@ -31,14 +29,16 @@ trait CanDetectDuplicates
      * @param array $data
      * @return int[] list of existing item IDs.
      * @throws DatabaseErrorException
+     * @throws RecordNotFoundException
      */
     protected function getDuplicates(array $data): array
     {
-        $uniqueColumns = $this->getUniqueColumns();
+        $uniqueColumns = $this->tableProcessor->getUniqueColumns($this->table);
         $firstColumn = array_shift($uniqueColumns);
         $query = $this->queryBuilder
             ->useTable($this->table)
-            ->select('id');
+            ->select('id')
+            ->from();
 
         if ($dataValue = Arr::get($data, $firstColumn->getName())) {
             $query->where($firstColumn->getName(), '=', $dataValue);
@@ -50,7 +50,7 @@ trait CanDetectDuplicates
             }
         }
 
-        return $this->queryStrategy->query($query);
+        return Arr::pluck($this->queryStrategy->query($query), 'id');
     }
 
     /**
@@ -62,9 +62,14 @@ trait CanDetectDuplicates
      */
     protected function maybeThrowForDuplicates(array $data, ?int $updateId = null): void
     {
-        $duplicates = Arr::filter($this->getDuplicates($data), function (int $existingId) use ($updateId) {
-            return $existingId !== $updateId;
-        });
+        try {
+            $duplicates = Arr::filter($this->getDuplicates($data), function (int $existingId) use ($updateId) {
+                return $existingId !== $updateId;
+            });
+        } catch (RecordNotFoundException $e) {
+            // Bail if no records were found.
+            return;
+        }
 
         if (!empty($duplicates)) {
             $duplicateString = Arr::process($duplicates)
