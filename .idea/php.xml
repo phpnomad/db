@@ -82,6 +82,7 @@
       <path value="$PROJECT_DIR$/vendor/phoenix/facade" />
       <path value="$PROJECT_DIR$/vendor/phoenix/cache" />
       <path value="$PROJECT_DIR$/vendor/phoenix/singleton" />
+      <path value="$PROJECT_DIR$/vendor/phoenix/logger" />
     </include_path>
   </component>
   <component name="PhpInterpreters">

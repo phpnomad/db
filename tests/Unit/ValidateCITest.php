@@ -2,7 +2,7 @@
 
 namespace Phoenix\Tests\Unit;
 
-use Phoenix\Core\Tests\TestCase;
+use Phoenix\Database\Tests\TestCase;
 
 class ValidateCITest extends TestCase
 {

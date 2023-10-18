@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "26b9a3c70f87d36bedb3187bf80e6070",
+    "content-hash": "2222af571254d85405038c1b4a06f17d",
     "packages": [],
     "packages-dev": [
         {
@@ -806,16 +806,17 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:rooted-phoenix/facade.git",
-                "reference": "0f076a0bebc80eda7e607f5c6185a4b2c40c6c77"
+                "reference": "d5109312e87d41b2ab892150d815eb012dd59d71"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/rooted-phoenix/facade/zipball/0f076a0bebc80eda7e607f5c6185a4b2c40c6c77",
-                "reference": "0f076a0bebc80eda7e607f5c6185a4b2c40c6c77",
+                "url": "https://api.github.com/repos/rooted-phoenix/facade/zipball/d5109312e87d41b2ab892150d815eb012dd59d71",
+                "reference": "d5109312e87d41b2ab892150d815eb012dd59d71",
                 "shasum": ""
             },
             "require-dev": {
                 "phoenix/di": "dev-main",
+                "phoenix/logger": "dev-main",
                 "phoenix/tests": "^0.1.0"
             },
             "default-branch": true,
@@ -849,7 +850,60 @@
                 "source": "https://github.com/rooted-phoenix/facade/tree/main",
                 "issues": "https://github.com/rooted-phoenix/facade/issues"
             },
-            "time": "2023-10-13T12:06:51+00:00"
+            "time": "2023-10-14T21:43:33+00:00"
+        },
+        {
+            "name": "phoenix/logger",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "git@github.com:rooted-phoenix/logger.git",
+                "reference": "28d541148790cae22cbfa0278012fbd1ff6a9e30"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/rooted-phoenix/logger/zipball/28d541148790cae22cbfa0278012fbd1ff6a9e30",
+                "reference": "28d541148790cae22cbfa0278012fbd1ff6a9e30",
+                "shasum": ""
+            },
+            "require-dev": {
+                "phoenix/di": "dev-main",
+                "phoenix/facade": "dev-main",
+                "phoenix/singleton": "dev-main",
+                "phoenix/tests": "^0.1.0"
+            },
+            "default-branch": true,
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Phoenix\\Logger\\": "lib/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Phoenix\\Logger\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "php-cs-fixer": [
+                    "php-cs-fixer fix"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Alex Standiford",
+                    "email": "alex@standiford.us"
+                }
+            ],
+            "homepage": "https://github.com/phoenix/core",
+            "support": {
+                "source": "https://github.com/rooted-phoenix/logger/tree/main",
+                "issues": "https://github.com/rooted-phoenix/logger/issues"
+            },
+            "time": "2023-10-18T10:39:29+00:00"
         },
         {
             "name": "phoenix/singleton",
@@ -959,12 +1013,12 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:rooted-phoenix/utils.git",
-                "reference": "1c45ab19a547e292a58981892c7bf40f4fc312c6"
+                "reference": "45c9c68202f875cbf2865bbf27e88572bbe5588c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/rooted-phoenix/utils/zipball/1c45ab19a547e292a58981892c7bf40f4fc312c6",
-                "reference": "1c45ab19a547e292a58981892c7bf40f4fc312c6",
+                "url": "https://api.github.com/repos/rooted-phoenix/utils/zipball/45c9c68202f875cbf2865bbf27e88572bbe5588c",
+                "reference": "45c9c68202f875cbf2865bbf27e88572bbe5588c",
                 "shasum": ""
             },
             "require-dev": {
@@ -1001,7 +1055,7 @@
                 "source": "https://github.com/rooted-phoenix/utils/tree/main",
                 "issues": "https://github.com/rooted-phoenix/utils/issues"
             },
-            "time": "2023-10-11T18:55:03+00:00"
+            "time": "2023-10-17T13:41:13+00:00"
         },
         {
             "name": "phpstan/extension-installer",
@@ -1049,16 +1103,16 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.10.38",
+            "version": "1.10.39",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "5302bb402c57f00fb3c2c015bac86e0827e4b691"
+                "reference": "d9dedb0413f678b4d03cbc2279a48f91592c97c4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/5302bb402c57f00fb3c2c015bac86e0827e4b691",
-                "reference": "5302bb402c57f00fb3c2c015bac86e0827e4b691",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/d9dedb0413f678b4d03cbc2279a48f91592c97c4",
+                "reference": "d9dedb0413f678b4d03cbc2279a48f91592c97c4",
                 "shasum": ""
             },
             "require": {
@@ -1107,7 +1161,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2023-10-06T14:19:14+00:00"
+            "time": "2023-10-17T15:46:26+00:00"
         },
         {
             "name": "phpstan/phpstan-mockery",
@@ -4045,7 +4099,8 @@
         "phoenix/utils": 20,
         "phoenix/cache": 20,
         "phoenix/facade": 20,
-        "phoenix/singleton": 20
+        "phoenix/singleton": 20,
+        "phoenix/logger": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,

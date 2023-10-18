@@ -2,18 +2,21 @@
 
 namespace Phoenix\Database\Traits;
 
+use Phoenix\Database\Exceptions\DatabaseErrorException;
 use Phoenix\Database\Exceptions\DuplicateEntryException;
-use Phoenix\Database\Exceptions\RecordNotFoundException;
 use Phoenix\Database\Factories\Column;
-use Phoenix\Database\Factories\TableProcessor;
 use Phoenix\Database\Interfaces\DatabaseModel;
-use Phoenix\Database\Interfaces\HasIntIdentity;
+use Phoenix\Database\Interfaces\QueryBuilder;
+use Phoenix\Database\Interfaces\QueryStrategy;
 use Phoenix\Database\Interfaces\Table;
 use Phoenix\Utils\Helpers\Arr;
 
 trait CanDetectDuplicates
 {
     protected Table $table;
+
+    protected QueryBuilder $queryBuilder;
+    protected QueryStrategy $queryStrategy;
 
     abstract protected function getBy(string $column, $value): DatabaseModel;
 
@@ -23,46 +26,52 @@ trait CanDetectDuplicates
     abstract protected function getUniqueColumns(): array;
 
     /**
+     * Looks up records that already have records in the specified columns.
+     *
      * @param array $data
-     * @return array list of existing items.
+     * @return int[] list of existing item IDs.
+     * @throws DatabaseErrorException
      */
     protected function getDuplicates(array $data): array
     {
-        $result = [];
-        foreach ($this->getUniqueColumns() as $uniqueColumn) {
-            try {
-                $item = $this->getBy($uniqueColumn->getName(), Arr::get($data, $uniqueColumn->getName()));
-                $result[$uniqueColumn->getName()] = $item;
-            } catch (RecordNotFoundException $e) {
-                // Ignore.
-                continue;
+        $uniqueColumns = $this->getUniqueColumns();
+        $firstColumn = array_shift($uniqueColumns);
+        $query = $this->queryBuilder
+            ->useTable($this->table)
+            ->select('id');
+
+        if ($dataValue = Arr::get($data, $firstColumn->getName())) {
+            $query->where($firstColumn->getName(), '=', $dataValue);
+        }
+
+        foreach ($uniqueColumns as $uniqueColumn) {
+            if ($dataValue = Arr::get($data, $uniqueColumn->getName())) {
+                $query->orWhere($firstColumn->getName(), '=', $dataValue);
             }
         }
 
-        return $result;
+        return $this->queryStrategy->query($query);
     }
 
     /**
      * @param array $data
-     * @param int|null $existingId
+     * @param int|null $updateId
      * @return void
      * @throws DuplicateEntryException
+     * @throws DatabaseErrorException
      */
-    protected function maybeThrowForDuplicates(array $data, ?int $existingId = null): void
+    protected function maybeThrowForDuplicates(array $data, ?int $updateId = null): void
     {
-        $duplicates = Arr::filter($this->getDuplicates($data), function (HasIntIdentity $identity) use ($existingId) {
-            $identity->getId() !== $existingId;
+        $duplicates = Arr::filter($this->getDuplicates($data), function (int $existingId) use ($updateId) {
+            return $existingId !== $updateId;
         });
 
         if (!empty($duplicates)) {
             $duplicateString = Arr::process($duplicates)
-                ->each(function (HasIntIdentity $identity, string $column) {
-                    return "Item ID {$identity->getId()} has duplicate $column value";
-                })
-                ->setSeparator(', and')
+                ->setSeparator(', ')
                 ->toString();
 
-            throw new DuplicateEntryException('Database operation stopped early because duplicate entries were detected: ' . $duplicateString . '.');
+            throw new DuplicateEntryException('Database operation stopped early because duplicate entries were detected. Items: ' . $duplicateString . '.');
         }
     }
 }

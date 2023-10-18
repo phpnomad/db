@@ -3,10 +3,7 @@
 namespace Phoenix\Database\Abstracts;
 
 use Phoenix\Cache\Interfaces\InMemoryCacheStrategy;
-use Phoenix\Core\Exceptions\ItemNotFound;
-use Phoenix\Logger\Facades\Logger;
 use Phoenix\Database\Exceptions\DatabaseErrorException;
-use Phoenix\Database\Exceptions\DuplicateEntryException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
 use Phoenix\Database\Factories\Column;
 use Phoenix\Database\Interfaces\DatabaseModel;
@@ -17,6 +14,7 @@ use Phoenix\Database\Interfaces\Table;
 use Phoenix\Database\Mutators\IdsOnly;
 use Phoenix\Database\Mutators\Interfaces\QueryMutator;
 use Phoenix\Database\Mutators\Limit;
+use Phoenix\Logger\Interfaces\LoggerStrategy;
 use Phoenix\Utils\Helpers\Arr;
 use Phoenix\Utils\Processors\ListFilter;
 
@@ -31,12 +29,14 @@ abstract class DatabaseRepository
 
     protected ModelAdapter $modelAdapter;
     protected Table $table;
+    protected LoggerStrategy $loggerStrategy;
 
     public function __construct(
         Table                 $table,
         ModelAdapter          $modelAdapter,
         QueryStrategy         $databaseStrategy,
         InMemoryCacheStrategy $cacheStrategy,
+        LoggerStrategy        $loggerStrategy,
         QueryBuilder          $queryBuilder
     )
     {
@@ -45,6 +45,7 @@ abstract class DatabaseRepository
         $this->cacheStrategy = $cacheStrategy;
         $this->queryBuilder = $queryBuilder;
         $this->modelAdapter = $modelAdapter;
+        $this->loggerStrategy = $loggerStrategy;
     }
 
     /**
@@ -68,7 +69,7 @@ abstract class DatabaseRepository
         } catch (RecordNotFoundException $e) {
             throw $e;
         } catch (DatabaseErrorException $e) {
-            Logger::logException($e, 'Could not get by ID');
+            $this->loggerStrategy->logException($e, 'Could not get by ID');
         }
     }
 
@@ -96,7 +97,7 @@ abstract class DatabaseRepository
         } catch (RecordNotFoundException $e) {
             throw $e;
         } catch (DatabaseErrorException $e) {
-            Logger::logException($e, 'Could not get by ID');
+            $this->loggerStrategy->logException($e, 'Could not get by ID');
         }
     }
 
@@ -123,7 +124,7 @@ abstract class DatabaseRepository
             $this->databaseStrategy->delete($this->table, $id);
             $this->cacheStrategy->delete($this->getItemCacheKey($id));
         } catch (DatabaseErrorException $e) {
-            Logger::logException($e, 'Could not delete record');
+            $this->loggerStrategy->logException($e, 'Could not delete record');
         }
     }
 
@@ -184,14 +185,14 @@ abstract class DatabaseRepository
                 })
                 ->filter();
         } catch (DatabaseErrorException $e) {
-            Logger::logException($e, 'Could not get by ID');
+            $this->loggerStrategy->logException($e, 'Could not get by ID');
         }
 
         try {
             // Get the things that aren't in the cache.
             $data = $this->databaseStrategy->where($this->table, [['column' => 'id', 'operator' => 'IN', 'value' => [$idsToQuery]]]);
         } catch (DatabaseErrorException $e) {
-            Logger::logException($e, 'Could not get by ID');
+            $this->loggerStrategy->logException($e, 'Could not get by ID');
         }
 
         // Cache those items.

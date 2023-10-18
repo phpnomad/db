@@ -11,7 +11,7 @@
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://github.com/rooted-phoenix/utils.git"
+            "url": "git@github.com:rooted-phoenix/utils.git"
         },
         {
             "type": "vcs",
@@ -19,15 +19,19 @@
         },
         {
             "type": "vcs",
-            "url": "https://github.com/rooted-phoenix/singleton.git"
+            "url": "git@github.com:rooted-phoenix/singleton.git"
         },
         {
             "type": "vcs",
-            "url": "https://github.com/rooted-phoenix/facade.git"
+            "url": "git@github.com:rooted-phoenix/facade.git"
         },
         {
             "type": "vcs",
-            "url": "https://github.com/rooted-phoenix/tests.git"
+            "url": "git@github.com:rooted-phoenix/logger.git"
+        },
+        {
+            "type": "vcs",
+            "url": "git@github.com:rooted-phoenix/tests.git"
         }
     ],
     "autoload": {
@@ -51,7 +55,8 @@
         "phoenix/utils": "dev-main",
         "phoenix/cache": "dev-main",
         "phoenix/facade": "dev-main",
-        "phoenix/singleton": "dev-main"
+        "phoenix/singleton": "dev-main",
+        "phoenix/logger": "dev-main"
     },
     "config": {
         "allow-plugins": {

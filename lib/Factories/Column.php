@@ -9,6 +9,12 @@ final class Column
     protected ?int $length = null;
     protected array $attributes = [];
 
+	/**
+	 * @param string   $name
+	 * @param string   $type
+	 * @param int|null $length
+	 * @param          ...$attributes
+	 */
     public function __construct(string $name, string $type, ?int $length = null, ...$attributes)
     {
         $this->name = $name;

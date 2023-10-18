@@ -1,6 +1,6 @@
 <?php
 
-namespace Phoenix\Core\Tests;
+namespace Phoenix\Database\Tests;
 
 
 use Phoenix\Tests\TestCase as CoreTestCase;
