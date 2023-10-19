@@ -114,7 +114,6 @@ interface QueryStrategy
      * @param QueryBuilder $builder
      * @return array<string,mixed>[]
      * @throws DatabaseErrorException
-     * @throws RecordNotFoundException
      */
     public function query(QueryBuilder $builder): array;
 }

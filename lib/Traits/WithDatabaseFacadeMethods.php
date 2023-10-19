@@ -5,7 +5,8 @@ namespace Phoenix\Database\Traits;
 use Phoenix\Database\Abstracts\DatabaseRepository;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
 use Phoenix\Database\Interfaces\DatabaseModel;
-use Phoenix\Database\Mutators\Interfaces\QueryMutator;
+use Phoenix\Database\Services\CacheableQueryService;
+use Siren\Collaborators\Facades\Collaborators;
 
 /**
  * @template TModel of DatabaseModel
@@ -48,20 +49,9 @@ trait WithDatabaseFacadeMethods
     /**
      * Queries data, leveraging the cache.
      *
-     * @param QueryMutator ...$args List of args used to make this query.
-     * @return TModel[]|int[]
      */
-    public static function query(QueryMutator ...$args): array
+    public static function query(): CacheableQueryService
     {
-        return static::instance()->getContainedInstance()->query(...$args);
-    }
-
-    /**
-     * @param QueryMutator ...$args
-     * @return int
-     */
-    public static function count(QueryMutator ...$args): int
-    {
-        return static::instance()->getContainedInstance()->count(...$args);
+        return static::instance()->getContainedInstance()->query();
     }
 }

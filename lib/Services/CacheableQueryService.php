@@ -3,6 +3,7 @@
 namespace Phoenix\Database\Services;
 
 use Phoenix\Database\Exceptions\DatabaseErrorException;
+use Phoenix\Database\Exceptions\RecordNotFoundException;
 use Phoenix\Database\Interfaces\DatabaseModel;
 use Phoenix\Database\Interfaces\HasUsableTable;
 use Phoenix\Database\Interfaces\ModelAdapter;
@@ -13,12 +14,14 @@ use Phoenix\Database\Interfaces\Table;
 use Phoenix\Database\Mutators\IdsOnly;
 use Phoenix\Database\Mutators\Interfaces\QueryMutator;
 use Phoenix\Database\Providers\DatabaseCacheProvider;
+use Phoenix\Database\Traits\WithUseTable;
 use Phoenix\Logger\Interfaces\LoggerStrategy;
 use Phoenix\Utils\Helpers\Arr;
 use Phoenix\Utils\Processors\ListFilter;
 
 class CacheableQueryService implements Query, HasUsableTable
 {
+    use WithUseTable;
 
     protected QueryStrategy $queryStrategy;
     protected QueryBuilder $queryBuilder;
@@ -28,31 +31,16 @@ class CacheableQueryService implements Query, HasUsableTable
     protected ModelAdapter $modelAdapter;
 
     public function __construct(
-        QueryStrategy  $queryStrategy,
-        QueryBuilder   $queryBuilder,
-        LoggerStrategy $loggerStrategy,
-        DatabaseCacheProvider  $cacheProvider
+        QueryStrategy         $queryStrategy,
+        QueryBuilder          $queryBuilder,
+        LoggerStrategy        $loggerStrategy,
+        DatabaseCacheProvider $cacheProvider
     )
     {
         $this->queryStrategy = $queryStrategy;
         $this->queryBuilder = $queryBuilder;
         $this->loggerStrategy = $loggerStrategy;
         $this->cacheProvider = clone $cacheProvider;
-    }
-
-    /**
-     * Sets the table instance.
-     *
-     * @param Table $table
-     *
-     * @return $this
-     */
-    public function useTable(Table $table)
-    {
-        $this->table = $table;
-        $this->cacheProvider->useTable($table);
-
-        return $this;
     }
 
     /**
@@ -68,17 +56,36 @@ class CacheableQueryService implements Query, HasUsableTable
         return $this;
     }
 
-    public function query(QueryMutator ...$args): array
+    /**
+     * Returns the count of records found.
+     *
+     * @return int
+     * @throws DatabaseErrorException
+     */
+    public function getCount(): int
     {
-        $this->prepareQuery(...$args);
-        try {
-            // Do the actual query.
-            $allIds = $this->queryStrategy->query($this->queryBuilder);
+        $this->queryBuilder->resetClauses('select')->count('id', 'count');
 
-            // In some cases, this should only return IDs.
-            if (empty($allIds) || $this->isIdOnlyQuery($args)) {
-                return $allIds;
-            }
+        return Arr::get($this->queryStrategy->query($this->queryBuilder), 'count', 0);
+    }
+
+    /**
+     * Gets a list of IDs from the query.
+     *
+     * @throws DatabaseErrorException
+     */
+    public function getIds(): array
+    {
+        $this->queryBuilder->resetClauses('select')->select('id');
+
+        return $this->queryStrategy->query($this->queryBuilder);
+    }
+
+    public function getModels(): array
+    {
+        try {
+            $allIds = $this->getIds();
+
             // Filter out the items that are currently in the cache.
             $idsToQuery = (new ListFilter($allIds))
                 ->filterFromCallback('id', function (int $id) {
@@ -104,73 +111,6 @@ class CacheableQueryService implements Query, HasUsableTable
     }
 
     /**
-     * @param QueryMutator ...$args
-     * @return int
-     */
-    public function count(QueryMutator ...$args): int
-    {
-        $this->prepareQuery(...$args);
-        $this->queryBuilder->resetClauses('select')->count('id', 'count');
-        try {
-            $results = $this->queryStrategy->query($this->queryBuilder);
-            $count = Arr::get($results, 'count');
-
-            if (is_null($count)) {
-                throw new DatabaseErrorException('Could not find count column in response.');
-            }
-        } catch (DatabaseErrorException $e) {
-            $this->loggerStrategy->logException($e);
-            $count = 0;
-        }
-
-        return $count;
-    }
-
-    /**
-     * Returns true if this query is supposed to only fetch IDs.
-     *
-     * @param array $args
-     * @return bool
-     */
-    protected function isIdOnlyQuery(array $args): bool
-    {
-        foreach ($args as $arg) {
-            if ($arg instanceof IdsOnly) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Mutates the query against the list of mutators.
-     * @param QueryMutator ...$mutators
-     * @return void
-     */
-    protected function prepareQuery(QueryMutator ...$mutators): void
-    {
-        $seen = [];
-
-        Arr::process($mutators)
-            ->merge($this->table->getQueryDefaults())
-            ->filter(static function (QueryMutator $mutator) use ($seen) {
-                if (!isset($seen[get_class($mutator)])) {
-                    $seen[get_class($mutator)] = true;
-                    return true;
-                }
-
-                return false;
-            })
-            ->each(function (QueryMutator $mutator) {
-                $mutator->mutateQuery($this->queryBuilder);
-            });
-
-        // Force the query to only use IDs.
-        $this->queryBuilder->resetClauses('select')->select('id');
-    }
-
-    /**
      * Converts the given dataset into model objects.
      *
      * @param array $data
@@ -192,4 +132,78 @@ class CacheableQueryService implements Query, HasUsableTable
         Arr::map($models, [$this, 'cacheItem']);
     }
 
+    public function where(string $field, string $operand, $value, ...$values)
+    {
+        $this->queryBuilder->where($field, $operand, $value, ...$values);
+
+        return $this;
+    }
+
+    public function andWhere(string $field, string $operand, $value, ...$values)
+    {
+        $this->andWhere($field, $operand, $value, ...$values);
+        return $this;
+    }
+
+    public function orWhere(string $field, string $operand, $value, ...$values)
+    {
+        $this->orWhere($field, $operand, $value, ...$values);
+        return $this;
+    }
+
+    public function leftJoin(Table $table, string $column, string $onColumn)
+    {
+        $this->queryBuilder->leftJoin($table, $column, $onColumn);
+
+        return $this;
+    }
+
+    public function rightJoin(Table $table, string $column, string $onColumn)
+    {
+        $this->queryBuilder->rightJoin($table, $column, $onColumn);
+
+        return $this;
+    }
+
+    public function groupBy(string $column, string ...$columns)
+    {
+        $this->queryBuilder->groupBy($column, ...$columns);
+
+        return $this;
+    }
+
+    public function limit(int $limit)
+    {
+        $this->queryBuilder->limit($limit);
+
+        return $this;
+    }
+
+    public function offset(int $offset)
+    {
+        $this->queryBuilder->offset($offset);
+
+        return $this;
+    }
+
+    public function orderBy(string $field, string $order)
+    {
+        $this->queryBuilder->orderBy($field, $order);
+
+        return $this;
+    }
+
+    public function reset()
+    {
+        $this->queryBuilder->reset();
+
+        return $this;
+    }
+
+    public function resetClauses(string $clause, string ...$clauses)
+    {
+        $this->queryBuilder->resetClauses($clause, ...$clauses);
+
+        return $this;
+    }
 }

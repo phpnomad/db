@@ -15,6 +15,10 @@
         },
         {
             "type": "vcs",
+            "url": "git@github.com:rooted-phoenix/event.git"
+        },
+        {
+            "type": "vcs",
             "url": "https://github.com/rooted-phoenix/cache.git"
         },
         {
@@ -56,6 +60,7 @@
         "phoenix/cache": "dev-main",
         "phoenix/facade": "dev-main",
         "phoenix/singleton": "dev-main",
+        "phoenix/event": "dev-main",
         "phoenix/logger": "dev-main"
     },
     "config": {

@@ -12,8 +12,17 @@ interface Query
     /**
      * Queries data, leveraging the cache.
      *
-     * @param QueryMutator ...$args List of args used to make this query.
-     * @return TModel[]|int[]
+     * @return TModel[]
      */
-    public function query(QueryMutator ...$args): array;
+    public function getModels(): array;
+
+    /**
+     * @return int
+     */
+    public function getCount(): int;
+
+    /**
+     * @return int[]
+     */
+    public function getIds(): array;
 }
