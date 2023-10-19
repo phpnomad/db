@@ -63,9 +63,7 @@ trait CanDetectDuplicates
     protected function maybeThrowForDuplicates(array $data, ?int $updateId = null): void
     {
         try {
-            $duplicates = Arr::filter($this->getDuplicates($data), function (int $existingId) use ($updateId) {
-                return $existingId !== $updateId;
-            });
+            $duplicates = Arr::filter($this->getDuplicates($data), fn(int $existingId) => $existingId !== $updateId);
         } catch (RecordNotFoundException $e) {
             // Bail if no records were found.
             return;

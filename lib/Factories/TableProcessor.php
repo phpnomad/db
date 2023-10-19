@@ -32,9 +32,11 @@ class TableProcessor
                 ->equals('type', 'UNIQUE')
                 ->filter();
 
-            $columns = Arr::reduce($uniqueIndices, function (array $acc, Index $index) {
-                return array_merge($acc, $index->getColumns());
-            }, []);
+            $columns = Arr::reduce(
+                $uniqueIndices,
+                fn (array $acc, Index $index) => array_merge($acc, $index->getColumns()),
+                []
+            );
 
             return (new ListFilter($table->getColumns()))
                 ->in('name', ...$columns)

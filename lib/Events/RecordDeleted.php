@@ -2,7 +2,7 @@
 
 namespace Phoenix\Database\Events;
 
-use Phoenix\Database\Abstracts\Table;
+use Phoenix\Database\Interfaces\Table;
 use Phoenix\Events\Interfaces\Event;
 
 class RecordDeleted implements Event

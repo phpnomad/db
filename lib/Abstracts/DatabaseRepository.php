@@ -63,13 +63,9 @@ abstract class DatabaseRepository
     {
         try {
             /** @var TModel $record */
-            $record = $this->cacheProvider->load($id, function () use ($id) {
-                return $this->modelAdapter->toModel(
-                    $this
-                        ->queryStrategy
-                        ->find($this->table, $id)
-                );
-            });
+            $record = $this->cacheProvider->load($id, fn() => $this->modelAdapter->toModel(
+                $this->queryStrategy->find($this->table, $id)
+            ));
 
             return $record;
         } catch (RecordNotFoundException $e) {

@@ -88,9 +88,7 @@ class CacheableQueryService implements Query, HasUsableTable
 
             // Filter out the items that are currently in the cache.
             $idsToQuery = (new ListFilter($allIds))
-                ->filterFromCallback('id', function (int $id) {
-                    return $this->cacheProvider->exists($id);
-                })
+                ->filterFromCallback('id', fn(int $id) => $this->cacheProvider->exists($id))
                 ->filter();
         } catch (DatabaseErrorException $e) {
             $this->loggerStrategy->logException($e, 'Could not get by ID');
