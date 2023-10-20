@@ -43,7 +43,7 @@ trait CanBind
                     ->andWhere($right, '=', $rightValue)
             );
 
-            throw new DuplicateEntryException("Junction table {$this->junctionTable->getName()} already have a record binding $left $leftValue to $right $rightValue.");
+            throw new DuplicateEntryException("Junction table {$this->junctionTable->getName()} already has a record binding $left $leftValue to $right $rightValue.");
         } catch (RecordNotFoundException $e) {
             // Ignore. This is expected in this case.
         }
