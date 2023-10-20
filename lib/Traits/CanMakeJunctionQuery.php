@@ -5,6 +5,7 @@ namespace Phoenix\Database\Traits;
 use Phoenix\Database\Abstracts\JunctionTable;
 use Phoenix\Database\Interfaces\QueryBuilder;
 use Phoenix\Database\Interfaces\QueryStrategy;
+use Phoenix\Utils\Helpers\Arr;
 
 trait CanMakeJunctionQuery
 {
@@ -26,7 +27,7 @@ trait CanMakeJunctionQuery
         if ($this->junctionTable->getLeftTable()->getName() === $tableName) {
             $select = $this->junctionTable->getLeftColumnName();
             $where = $this->junctionTable->getRightColumnName();
-        } else{
+        } else {
             $select = $this->junctionTable->getRightColumnName();
             $where = $this->junctionTable->getLeftColumnName();
         }
@@ -35,6 +36,6 @@ trait CanMakeJunctionQuery
             ->select($select)
             ->where($where, '=', $id);
 
-        return $this->queryStrategy->query($this->queryBuilder);
+        return Arr::cast(Arr::pluck($this->queryStrategy->query($this->queryBuilder), $select), 'int');
     }
 }

@@ -3,6 +3,7 @@
 namespace Phoenix\Database\Interfaces;
 
 use Phoenix\Database\Exceptions\DatabaseErrorException;
+use Phoenix\Database\Exceptions\DuplicateEntryException;
 
 interface JunctionTableQueryService
 {
@@ -17,4 +18,25 @@ interface JunctionTableQueryService
      * @throws DatabaseErrorException
      */
     public function getIdsFromTable(string $tableName, int $id, int $limit, int $offset): array;
+
+    /**
+     * Associates the specified ID with the junctioning ID of the other table.
+     *
+     * @param string $tableName The name table the ID came from.
+     * @param int $id The ID associated with the $table argument.
+     * @param int $bindingId The ID to bind the ID to.
+     * @return void
+     *@throws DuplicateEntryException
+     */
+    public function bind(string $table, int $id, int $bindingId): void;
+
+    /**
+     * Disassociates the specified ID with the junctioning ID of the other table.
+     *
+     * @param string $tableName The name table the ID came from.
+     * @param int $id The ID associated with the $table argument.
+     * @param int $bindingId The ID to bind the ID to.
+     * @return void
+     */
+    public function unbind(string $table, int $id, int $bindingId): void;
 }

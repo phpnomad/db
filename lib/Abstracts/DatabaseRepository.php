@@ -48,7 +48,7 @@ abstract class DatabaseRepository
         $this->modelAdapter = $modelAdapter;
         $this->queryStrategy = $queryStrategy;
         $this->queryBuilder = $queryBuilder;
-        $this->cacheableQueryService = (clone $cacheableQueryService);
+        $this->cacheableQueryService = (clone $cacheableQueryService)->useTable($this->table)->useModelAdapter($this->modelAdapter);
         $this->cacheProvider = (clone $cacheProvider)->useTable($this->table);
         $this->loggerStrategy = $loggerStrategy;
         $this->eventStrategy = $eventStrategy;
@@ -61,18 +61,7 @@ abstract class DatabaseRepository
      */
     public function getById(int $id): DatabaseModel
     {
-        try {
-            /** @var TModel $record */
-            $record = $this->cacheProvider->load($id, fn() => $this->modelAdapter->toModel(
-                $this->queryStrategy->find($this->table, $id)
-            ));
-
-            return $record;
-        } catch (RecordNotFoundException $e) {
-            throw $e;
-        } catch (DatabaseErrorException $e) {
-            $this->loggerStrategy->logException($e, 'Could not get by ID');
-        }
+        return $this->cacheableQueryService->getById($id);
     }
 
     /**

@@ -87,6 +87,16 @@ interface QueryStrategy
     public function delete(Table $table, $id): void;
 
     /**
+     * Delete a record from the database.
+     *
+     * @param Table $table
+     * @param array{string, string} $conditions - table column values keyed by their respective column.
+     * @return void
+     * @throws DatabaseErrorException
+     */
+    public function deleteWhere(Table $table, array $conditions): void;
+
+    /**
      * Count records in the table with optional conditions.
      *
      * @param Table $table

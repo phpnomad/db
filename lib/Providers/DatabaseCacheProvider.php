@@ -45,15 +45,14 @@ class DatabaseCacheProvider implements HasUsableTable
     }
 
     /**
-     * Sets the sepcified record in the cache.
+     * Sets the specified record in the cache.
      *
-     * @param int $id
-     * @param DatabaseModel $value
+     * @param DatabaseModel $model
      * @return void
      */
-    public function set(int $id, DatabaseModel $value): void
+    public function set(DatabaseModel $model): void
     {
-         $this->cacheStrategy->set($this->getItemCacheKey($id), $value, $this->table->getCacheTtl());
+         $this->cacheStrategy->set($this->getItemCacheKey($model->getId()), $model, $this->table->getCacheTtl());
     }
 
     /**

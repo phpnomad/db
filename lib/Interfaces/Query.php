@@ -2,8 +2,6 @@
 
 namespace Phoenix\Database\Interfaces;
 
-use Phoenix\Database\Mutators\Interfaces\QueryMutator;
-
 /**
  * @template TModel of DatabaseModel
  */
