@@ -10,8 +10,8 @@ use Phoenix\Database\Interfaces\HasCollateProvider;
 use Phoenix\Database\Interfaces\HasDatabaseDefaultCacheTtl;
 use Phoenix\Database\Interfaces\HasGlobalDatabasePrefix;
 use Phoenix\Database\Interfaces\HasLocalDatabasePrefix;
+use Phoenix\Database\Interfaces\Table as TableInterface;
 use Phoenix\Utils\Helpers\Arr;
-use Phoenix\Utils\Helpers\Str;
 
 abstract class JunctionTable extends Table
 {
@@ -56,6 +56,26 @@ abstract class JunctionTable extends Table
         return [$this->leftTable, $this->rightTable];
     }
 
+    /**
+     * Gets the left table.
+     *
+     * @return TableInterface
+     */
+    public function getLeftTable(): TableInterface
+    {
+        return $this->leftTable;
+    }
+
+    /**
+     * Gets the right table.
+     *
+     * @return TableInterface
+     */
+    public function getRightTable(): TableInterface
+    {
+        return $this->rightTable;
+    }
+
     /** @inheritDoc */
     public function getAlias(): string
     {
@@ -78,10 +98,10 @@ abstract class JunctionTable extends Table
     }
 
     /**
-     * @param Table $table
+     * @param TableInterface $table
      * @return Column
      */
-    protected function getPrimaryColumnForTable(Table $table): Column
+    protected function getPrimaryColumnForTable(TableInterface $table): Column
     {
         return $this->cacheStrategy->load(
             $this->getCacheKey($table->getName() . '_primary_column'),
@@ -95,10 +115,10 @@ abstract class JunctionTable extends Table
     /**
      * Gets the column name from the table. Uses the table name with the primary column name.
      *
-     * @param Table $table
+     * @param TableInterface $table
      * @return string
      */
-    protected function getColumnNameFromTable(Table $table): string
+    public function getColumnNameFromTable(TableInterface $table): string
     {
         return $table->getUnprefixedName() . '_' . $this->getPrimaryColumnForTable($table)->getName();
     }
@@ -108,7 +128,7 @@ abstract class JunctionTable extends Table
      *
      * @return string
      */
-    protected function getLeftColumnName(): string
+    public function getLeftColumnName(): string
     {
         return $this->getColumnNameFromTable($this->leftTable);
     }
@@ -118,7 +138,7 @@ abstract class JunctionTable extends Table
      *
      * @return string
      */
-    protected function getRightColumnName(): string
+    public function getRightColumnName(): string
     {
         return $this->getColumnNameFromTable($this->rightTable);
     }
@@ -144,10 +164,10 @@ abstract class JunctionTable extends Table
      * Builds a foreign key using the provided tables.
      *
      * @param string $columnName
-     * @param Table $references
+     * @param TableInterface $references
      * @return Index
      */
-    protected function buildForeignKeyFor(string $columnName, Table $references): Index
+    protected function buildForeignKeyFor(string $columnName, TableInterface $references): Index
     {
         return new Index(
             [$columnName],

@@ -3,7 +3,6 @@
 namespace Phoenix\Database\Services;
 
 use Phoenix\Database\Exceptions\DatabaseErrorException;
-use Phoenix\Database\Exceptions\RecordNotFoundException;
 use Phoenix\Database\Interfaces\DatabaseModel;
 use Phoenix\Database\Interfaces\HasUsableTable;
 use Phoenix\Database\Interfaces\ModelAdapter;
@@ -11,8 +10,6 @@ use Phoenix\Database\Interfaces\Query;
 use Phoenix\Database\Interfaces\QueryBuilder;
 use Phoenix\Database\Interfaces\QueryStrategy;
 use Phoenix\Database\Interfaces\Table;
-use Phoenix\Database\Mutators\IdsOnly;
-use Phoenix\Database\Mutators\Interfaces\QueryMutator;
 use Phoenix\Database\Providers\DatabaseCacheProvider;
 use Phoenix\Database\Traits\WithUseTable;
 use Phoenix\Logger\Interfaces\LoggerStrategy;
@@ -81,10 +78,10 @@ class CacheableQueryService implements Query, HasUsableTable
         return $this->queryStrategy->query($this->queryBuilder);
     }
 
-    public function getModels(): array
+    public function getModels(?array $ids = null): array
     {
         try {
-            $allIds = $this->getIds();
+            $allIds = $ids ?? $this->getIds();
 
             // Filter out the items that are currently in the cache.
             $idsToQuery = (new ListFilter($allIds))
