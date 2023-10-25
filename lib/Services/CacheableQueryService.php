@@ -2,22 +2,21 @@
 
 namespace Phoenix\Database\Services;
 
-use Phoenix\Database\Exceptions\DatabaseErrorException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
-use Phoenix\Database\Interfaces\DatabaseModel;
 use Phoenix\Database\Interfaces\HasUsableTable;
 use Phoenix\Database\Interfaces\ModelAdapter;
-use Phoenix\Database\Interfaces\Query;
 use Phoenix\Database\Interfaces\QueryBuilder;
-use Phoenix\Database\Interfaces\QueryStrategy;
 use Phoenix\Database\Interfaces\Table;
 use Phoenix\Database\Providers\DatabaseCacheProvider;
+use Phoenix\Datastore\Exceptions\DatastoreErrorException;
+use Phoenix\Datastore\Interfaces\DataModel;
+use Phoenix\Datastore\Interfaces\Datastore;
 use Phoenix\Logger\Interfaces\LoggerStrategy;
 use Phoenix\Utils\Helpers\Arr;
 
-class CacheableQueryService implements Query, HasUsableTable
+class CacheableQueryService implements HasUsableTable
 {
-    protected QueryStrategy $queryStrategy;
+    protected Datastore $queryStrategy;
     protected QueryBuilder $queryBuilder;
     protected LoggerStrategy $loggerStrategy;
     protected DatabaseCacheProvider $cacheProvider;
@@ -25,13 +24,11 @@ class CacheableQueryService implements Query, HasUsableTable
     protected ModelAdapter $modelAdapter;
 
     public function __construct(
-        QueryStrategy         $queryStrategy,
         QueryBuilder          $queryBuilder,
         LoggerStrategy        $loggerStrategy,
         DatabaseCacheProvider $cacheProvider
     )
     {
-        $this->queryStrategy = $queryStrategy;
         $this->queryBuilder = $queryBuilder;
         $this->loggerStrategy = $loggerStrategy;
         $this->cacheProvider = clone $cacheProvider;
@@ -63,7 +60,7 @@ class CacheableQueryService implements Query, HasUsableTable
      * Returns the count of records found.
      *
      * @return int
-     * @throws DatabaseErrorException
+     * @throws DatastoreErrorException
      */
     public function getCount(): int
     {
@@ -75,7 +72,7 @@ class CacheableQueryService implements Query, HasUsableTable
     /**
      * Gets a list of IDs from the query.
      *
-     * @throws DatabaseErrorException
+     * @throws DatastoreErrorException
      */
     public function getIds(): array
     {
@@ -98,7 +95,7 @@ class CacheableQueryService implements Query, HasUsableTable
             // Filter out the items that are currently in the cache.
             $idsToQuery = Arr::filter($allIds, fn(int $id) => !$this->cacheProvider->exists($id));
 
-        } catch (DatabaseErrorException $e) {
+        } catch (DatastoreErrorException $e) {
             $this->loggerStrategy->logException($e, 'Could not get by ID');
         }
 
@@ -106,7 +103,7 @@ class CacheableQueryService implements Query, HasUsableTable
             try {
                 // Get the things that aren't in the cache.
                 $data = $this->queryStrategy->where($this->table, [['column' => 'id', 'operator' => 'IN', 'value' => $idsToQuery]]);
-            } catch (DatabaseErrorException $e) {
+            } catch (DatastoreErrorException $e) {
                 $this->loggerStrategy->logException($e, 'Could not get by ID');
             }
 
@@ -120,10 +117,11 @@ class CacheableQueryService implements Query, HasUsableTable
 
     /**
      * @param int $id
-     * @return DatabaseModel
+     *
+     * @return DataModel
      * @throws RecordNotFoundException
      */
-    public function getById(int $id): DatabaseModel
+    public function getById(int $id) : DataModel
     {
         try {
             return $this->cacheProvider->load($id, fn() => $this->modelAdapter->toModel(
@@ -131,7 +129,7 @@ class CacheableQueryService implements Query, HasUsableTable
             ));
         } catch (RecordNotFoundException $e) {
             throw $e;
-        } catch (DatabaseErrorException $e) {
+        } catch (DatastoreErrorException $e) {
             $this->loggerStrategy->logException($e, 'Could not get by ID');
         }
     }
@@ -140,7 +138,8 @@ class CacheableQueryService implements Query, HasUsableTable
      * Converts the given dataset into model objects.
      *
      * @param array $data
-     * @return DatabaseModel[]
+     *
+		 * @return DataModel[]
      */
     protected function hydrateItems(array $data): array
     {
@@ -150,12 +149,13 @@ class CacheableQueryService implements Query, HasUsableTable
     /**
      * Caches items in-batch
      *
-     * @param DatabaseModel[] $models
+		 * @param DataModel[] $models
+     *
      * @return void
      */
     protected function cacheItems(array $models): void
     {
-        Arr::map($models, fn(DatabaseModel $model) => $this->cacheProvider->set($model));
+        Arr::map($models, fn(DataModel $model) => $this->cacheProvider->set($model));
     }
 
     /**
@@ -301,5 +301,45 @@ class CacheableQueryService implements Query, HasUsableTable
         $this->queryBuilder->resetClauses($clause, ...$clauses);
 
         return $this;
+    }
+
+    public function find($id): array
+    {
+        // TODO: Implement find() method.
+    }
+
+    public function findBy(string $field, $value): array
+    {
+        // TODO: Implement findBy() method.
+    }
+
+    public function create(array $attributes): int
+    {
+        // TODO: Implement create() method.
+    }
+
+    public function update($id, array $attributes): void
+    {
+        // TODO: Implement update() method.
+    }
+
+    public function delete($id): void
+    {
+        // TODO: Implement delete() method.
+    }
+
+    public function deleteWhere(array $conditions): void
+    {
+        // TODO: Implement deleteWhere() method.
+    }
+
+    public function count(array $conditions = []): int
+    {
+        // TODO: Implement count() method.
+    }
+
+    public function findIds(array $conditions, ?int $limit = null, ?int $offset = null): array
+    {
+        // TODO: Implement findIds() method.
     }
 }

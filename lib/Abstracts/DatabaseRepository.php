@@ -5,27 +5,22 @@ namespace Phoenix\Database\Abstracts;
 use Phoenix\Database\Events\RecordCreated;
 use Phoenix\Database\Events\RecordDeleted;
 use Phoenix\Database\Events\RecordUpdated;
-use Phoenix\Database\Exceptions\DatabaseErrorException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
-use Phoenix\Database\Interfaces\DatabaseModel;
 use Phoenix\Database\Interfaces\ModelAdapter;
-use Phoenix\Database\Interfaces\QueryBuilder;
-use Phoenix\Database\Interfaces\QueryStrategy;
 use Phoenix\Database\Interfaces\Table;
 use Phoenix\Database\Providers\DatabaseCacheProvider;
 use Phoenix\Database\Services\CacheableQueryService;
+use Phoenix\Datastore\Exceptions\DatastoreErrorException;
+use Phoenix\Datastore\Interfaces\DataModel;
 use Phoenix\Events\Interfaces\EventStrategy;
 use Phoenix\Logger\Interfaces\LoggerStrategy;
 use Phoenix\Utils\Helpers\Arr;
 
 /**
- * @template TModel of DatabaseModel
+ * @template TModel of DataModel
  */
 abstract class DatabaseRepository
 {
-    protected QueryStrategy $queryStrategy;
-    protected QueryBuilder $queryBuilder;
-
     protected ModelAdapter $modelAdapter;
     protected Table $table;
     protected LoggerStrategy $loggerStrategy;
@@ -36,18 +31,14 @@ abstract class DatabaseRepository
     public function __construct(
         Table                 $table,
         ModelAdapter          $modelAdapter,
-        QueryStrategy         $queryStrategy,
         DatabaseCacheProvider $cacheProvider,
         CacheableQueryService $cacheableQueryService,
         LoggerStrategy        $loggerStrategy,
-        EventStrategy         $eventStrategy,
-        QueryBuilder          $queryBuilder
+        EventStrategy         $eventStrategy
     )
     {
         $this->table = $table;
         $this->modelAdapter = $modelAdapter;
-        $this->queryStrategy = $queryStrategy;
-        $this->queryBuilder = $queryBuilder;
         $this->cacheableQueryService = (clone $cacheableQueryService)->useTable($this->table)->useModelAdapter($this->modelAdapter);
         $this->cacheProvider = (clone $cacheProvider)->useTable($this->table);
         $this->loggerStrategy = $loggerStrategy;
@@ -59,22 +50,9 @@ abstract class DatabaseRepository
      * @return TModel
      * @throws RecordNotFoundException
      */
-    public function getById(int $id): DatabaseModel
+    public function getById(int $id): DataModel
     {
         return $this->cacheableQueryService->getById($id);
-    }
-
-    /**
-     * Sets up the query interface for this table.
-     *
-     * @return CacheableQueryService
-     */
-    public function query(): CacheableQueryService
-    {
-        return (clone $this->cacheableQueryService)
-            ->limit(10)
-            ->useTable($this->table)
-            ->useModelAdapter($this->modelAdapter);
     }
 
     /**
@@ -85,11 +63,11 @@ abstract class DatabaseRepository
      * @return TModel
      * @throws RecordNotFoundException
      */
-    protected function getBy(string $column, $value): DatabaseModel
+    protected function getBy(string $column, $value): DataModel
     {
         try {
             $id = Arr::get(
-                $this->queryStrategy->findIds($this->table, [['column' => $column, 'operator' => '=', 'value' => $value]], 1),
+                $this->cacheableQueryService->where($column, '=', $value),
                 0
             );
 
@@ -100,7 +78,7 @@ abstract class DatabaseRepository
             return $this->getById(Arr::get($id, 'id'));
         } catch (RecordNotFoundException $e) {
             throw $e;
-        } catch (DatabaseErrorException $e) {
+        } catch (DatastoreErrorException $e) {
             $this->loggerStrategy->logException($e, 'Could not get by ID');
         }
     }
@@ -114,10 +92,10 @@ abstract class DatabaseRepository
     public function delete(int $id): void
     {
         try {
-            $this->queryStrategy->delete($this->table, $id);
+            $this->datastore->delete($this->table, $id);
             $this->cacheProvider->delete($id);
             $this->eventStrategy->broadcast(new RecordDeleted($this->table, $id));
-        } catch (DatabaseErrorException $e) {
+        } catch (DatastoreErrorException $e) {
             $this->loggerStrategy->logException($e, 'Could not delete record');
         }
     }
@@ -125,7 +103,7 @@ abstract class DatabaseRepository
     /**
      * @param array $data
      * @return int
-     * @throws DatabaseErrorException
+     * @throws DatastoreErrorException
      */
     public function create(array $data): int
     {
@@ -134,7 +112,7 @@ abstract class DatabaseRepository
             unset($data['id']);
         }
 
-        $id = $this->queryStrategy->create($this->table, $data);
+        $id = $this->datastore->create($this->table, $data);
         $this->eventStrategy->broadcast(new RecordCreated($this->table, $data, $id));
 
         return $id;
@@ -145,7 +123,7 @@ abstract class DatabaseRepository
      * @param array $data
      * @return void
      * @throws RecordNotFoundException
-     * @throws DatabaseErrorException
+     * @throws DatastoreErrorException
      */
     public function update(int $id, array $data): void
     {
@@ -154,7 +132,7 @@ abstract class DatabaseRepository
             unset($data['id']);
         }
 
-        $this->queryStrategy->update($this->table, $id, $data);
+        $this->datastore->update($this->table, $id, $data);
         $this->cacheProvider->delete($id);
         $this->eventStrategy->broadcast(new RecordUpdated($this->table, $data, $id));
     }

@@ -4,12 +4,12 @@ namespace Phoenix\Database\Traits;
 
 use Phoenix\Database\Abstracts\JunctionTable;
 use Phoenix\Database\Interfaces\QueryBuilder;
-use Phoenix\Database\Interfaces\QueryStrategy;
+use Phoenix\Datastore\Interfaces\Datastore;
 use Phoenix\Utils\Helpers\Arr;
 
 trait CanMakeJunctionQuery
 {
-    protected QueryStrategy $queryStrategy;
+    protected Datastore $queryStrategy;
 
     protected QueryBuilder $queryBuilder;
 

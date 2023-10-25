@@ -4,9 +4,9 @@ namespace Phoenix\Database\Providers;
 
 use Phoenix\Cache\Exceptions\CachedItemNotFoundException;
 use Phoenix\Cache\Interfaces\InMemoryCacheStrategy;
-use Phoenix\Database\Interfaces\DatabaseModel;
 use Phoenix\Database\Interfaces\HasUsableTable;
 use Phoenix\Database\Traits\WithUseTable;
+use Phoenix\Datastore\Interfaces\DataModel;
 
 class DatabaseCacheProvider implements HasUsableTable
 {
@@ -47,10 +47,11 @@ class DatabaseCacheProvider implements HasUsableTable
     /**
      * Sets the specified record in the cache.
      *
-     * @param DatabaseModel $model
+     * @param DataModel $model
+     *
      * @return void
      */
-    public function set(DatabaseModel $model): void
+    public function set(DataModel $model): void
     {
          $this->cacheStrategy->set($this->getItemCacheKey($model->getId()), $model, $this->table->getCacheTtl());
     }

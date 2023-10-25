@@ -4,6 +4,9 @@ namespace Phoenix\Database\Interfaces;
 
 use Phoenix\Database\Exceptions\QueryBuilderException;
 
+/**
+ * Builder class to create safe SQL queries
+ */
 interface QueryBuilder
 {
     /**
@@ -16,11 +19,10 @@ interface QueryBuilder
 
     /**
      * Sets the form clause to the current table.
-     * @see setTable
      *
      * @return $this
      */
-    public function from();
+    public function from(Table $table);
 
     /**
      * Creates, or overrides the where clause.
@@ -127,7 +129,7 @@ interface QueryBuilder
     public function orderBy(string $field, string $order);
 
     /**
-     * Builds the SQL query.
+     * Builds a secure, fully escaped SQL query.
      *
      * @return string
      * @throws QueryBuilderException

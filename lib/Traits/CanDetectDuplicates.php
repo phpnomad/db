@@ -2,33 +2,32 @@
 
 namespace Phoenix\Database\Traits;
 
-use Phoenix\Database\Exceptions\DatabaseErrorException;
-use Phoenix\Database\Exceptions\DuplicateEntryException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
-use Phoenix\Database\Factories\Column;
 use Phoenix\Database\Factories\TableProcessor;
-use Phoenix\Database\Interfaces\DatabaseModel;
 use Phoenix\Database\Interfaces\QueryBuilder;
-use Phoenix\Database\Interfaces\QueryStrategy;
 use Phoenix\Database\Interfaces\Table;
+use Phoenix\Datastore\Exceptions\DatastoreErrorException;
+use Phoenix\Datastore\Exceptions\DuplicateEntryException;
+use Phoenix\Datastore\Interfaces\DataModel;
+use Phoenix\Datastore\Interfaces\Datastore;
 use Phoenix\Utils\Helpers\Arr;
 
 trait CanDetectDuplicates
 {
     protected Table $table;
 
-    protected QueryBuilder $queryBuilder;
-    protected QueryStrategy $queryStrategy;
+    protected QueryBuilder   $queryBuilder;
+    protected Datastore      $queryStrategy;
     protected TableProcessor $tableProcessor;
 
-    abstract protected function getBy(string $column, $value): DatabaseModel;
+    abstract protected function getBy(string $column, $value): DataModel;
 
     /**
      * Looks up records that already have records in the specified columns.
      *
      * @param array $data
      * @return int[] list of existing item IDs.
-     * @throws DatabaseErrorException
+     * @throws DatastoreErrorException
      * @throws RecordNotFoundException
      */
     protected function getDuplicates(array $data): array
@@ -50,7 +49,7 @@ trait CanDetectDuplicates
             }
         }
 
-        return Arr::pluck($this->queryStrategy->query($query), 'id');
+        return Arr::pluck($this->datastore->query($query), 'id');
     }
 
     /**
@@ -58,7 +57,7 @@ trait CanDetectDuplicates
      * @param int|null $updateId
      * @return void
      * @throws DuplicateEntryException
-     * @throws DatabaseErrorException
+     * @throws DatastoreErrorException
      */
     protected function maybeThrowForDuplicates(array $data, ?int $updateId = null): void
     {

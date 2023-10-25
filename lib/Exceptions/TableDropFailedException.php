@@ -2,6 +2,8 @@
 
 namespace Phoenix\Database\Exceptions;
 
-class TableDropFailedException extends DatabaseErrorException
+use Phoenix\Datastore\Exceptions\DatastoreErrorException;
+
+class TableDropFailedException extends DatastoreErrorException
 {
 }

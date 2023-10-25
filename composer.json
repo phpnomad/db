@@ -54,14 +54,16 @@
             "email": "alex@standiford.us"
         }
     ],
-    "require-dev": {
-        "phoenix/tests": "^0.1.0",
+    "require": {
         "phoenix/utils": "dev-main",
         "phoenix/cache": "dev-main",
         "phoenix/facade": "dev-main",
         "phoenix/singleton": "dev-main",
         "phoenix/event": "dev-main",
         "phoenix/logger": "dev-main"
+    },
+    "require-dev": {
+        "phoenix/tests": "^0.1.0"
     },
     "config": {
         "allow-plugins": {

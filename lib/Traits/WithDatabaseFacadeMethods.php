@@ -4,12 +4,10 @@ namespace Phoenix\Database\Traits;
 
 use Phoenix\Database\Abstracts\DatabaseRepository;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
-use Phoenix\Database\Interfaces\DatabaseModel;
-use Phoenix\Database\Services\CacheableQueryService;
-use Siren\Collaborators\Facades\Collaborators;
+use Phoenix\Datastore\Interfaces\DataModel;
 
 /**
- * @template TModel of DatabaseModel
+ * @template TModel of DataModel
  * @method static instance()
  * @method DatabaseRepository getContainedInstance()
  */
@@ -17,10 +15,11 @@ trait WithDatabaseFacadeMethods
 {
     /**
      * @param int $id
-     * @return DatabaseModel
+     *
+     * @return DataModel
      * @throws RecordNotFoundException
      */
-    public static function getById(int $id): DatabaseModel
+    public static function getById(int $id) : DataModel
     {
         return static::instance()->getContainedInstance()->getById($id);
     }
@@ -44,14 +43,5 @@ trait WithDatabaseFacadeMethods
     public static function save(array $data): int
     {
         return static::instance()->getContainedInstance()->save($data);
-    }
-
-    /**
-     * Queries data, leveraging the cache.
-     *
-     */
-    public static function query(): CacheableQueryService
-    {
-        return static::instance()->getContainedInstance()->query();
     }
 }

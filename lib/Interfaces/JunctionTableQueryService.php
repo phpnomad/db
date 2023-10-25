@@ -2,8 +2,8 @@
 
 namespace Phoenix\Database\Interfaces;
 
-use Phoenix\Database\Exceptions\DatabaseErrorException;
-use Phoenix\Database\Exceptions\DuplicateEntryException;
+use Phoenix\Datastore\Exceptions\DatastoreErrorException;
+use Phoenix\Datastore\Exceptions\DuplicateEntryException;
 
 interface JunctionTableQueryService
 {
@@ -15,7 +15,7 @@ interface JunctionTableQueryService
      * @param int $limit The limit of records to get.
      * @param int $offset The record offset.
      * @return int[] IDs associated with the table specified in $tableName.
-     * @throws DatabaseErrorException
+     * @throws DatastoreErrorException
      */
     public function getIdsFromTable(string $tableName, int $id, int $limit, int $offset): array;
 

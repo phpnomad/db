@@ -2,6 +2,8 @@
 
 namespace Phoenix\Database\Exceptions;
 
-class RecordNotFoundException extends DatabaseErrorException
+use Phoenix\Datastore\Exceptions\DatastoreErrorException;
+
+class RecordNotFoundException extends DatastoreErrorException
 {
 }

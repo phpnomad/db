@@ -7,7 +7,6 @@ use Phoenix\Database\Factories\Column;
 use Phoenix\Database\Factories\Index;
 use Phoenix\Database\Interfaces\HasCharsetProvider;
 use Phoenix\Database\Interfaces\HasCollateProvider;
-use Phoenix\Database\Interfaces\HasDatabaseDefaultCacheTtl;
 use Phoenix\Database\Interfaces\HasGlobalDatabasePrefix;
 use Phoenix\Database\Interfaces\HasLocalDatabasePrefix;
 use Phoenix\Database\Interfaces\Table as TableInterface;
@@ -29,12 +28,10 @@ abstract class JunctionTable extends Table
     protected Table $leftTable;
 
     public function __construct(
-        HasDatabaseDefaultCacheTtl $defaultCacheTtlProvider,
         HasLocalDatabasePrefix     $localPrefixProvider,
         HasGlobalDatabasePrefix    $globalPrefixProvider,
         HasCharsetProvider         $charsetProvider,
         HasCollateProvider         $collateProvider,
-        InMemoryCacheStrategy      $cacheStrategy,
         Table                      $leftTable,
         Table                      $rightTable
     )

@@ -2,6 +2,8 @@
 
 namespace Phoenix\Database\Exceptions;
 
-class TableCreateFailedException extends DatabaseErrorException
+use Phoenix\Datastore\Exceptions\DatastoreErrorException;
+
+class TableCreateFailedException extends DatastoreErrorException
 {
 }

@@ -2,6 +2,8 @@
 
 namespace Phoenix\Database\Exceptions;
 
-class ColumnNotFoundException extends DatabaseErrorException
+use Phoenix\Datastore\Exceptions\DatastoreErrorException;
+
+class ColumnNotFoundException extends DatastoreErrorException
 {
 }

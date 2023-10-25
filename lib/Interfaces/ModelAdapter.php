@@ -2,8 +2,10 @@
 
 namespace Phoenix\Database\Interfaces;
 
+use Phoenix\Datastore\Interfaces\DataModel;
+
 /**
- * @template TModel of DatabaseModel
+ * @template TModel of DataModel
  */
 interface ModelAdapter
 {
@@ -11,11 +13,11 @@ interface ModelAdapter
      * @param TModel $model
      * @return array
      */
-    public function toArray(DatabaseModel $model): array;
+    public function toArray(DataModel $model): array;
 
     /**
      * @param array $array
      * @return TModel
      */
-    public function toModel(array $array): DatabaseModel;
+    public function toModel(array $array): DataModel;
 }

@@ -2,9 +2,9 @@
 
 namespace Phoenix\Database\Abstracts;
 
+use Phoenix\Cache\Interfaces\HasDefaultTtl;
 use Phoenix\Database\Interfaces\HasCharsetProvider;
 use Phoenix\Database\Interfaces\HasCollateProvider;
-use Phoenix\Database\Interfaces\HasDatabaseDefaultCacheTtl;
 use Phoenix\Database\Interfaces\HasGlobalDatabasePrefix;
 use Phoenix\Database\Interfaces\HasLocalDatabasePrefix;
 use Phoenix\Database\Interfaces\Table as CoreTable;
@@ -12,18 +12,18 @@ use Phoenix\Utils\Helpers\Str;
 
 abstract class Table implements CoreTable
 {
-    protected HasDatabaseDefaultCacheTtl $defaultCacheTtlProvider;
+    protected HasDefaultTtl            $defaultCacheTtlProvider;
     protected HasLocalDatabasePrefix $localPrefixProvider;
     protected HasGlobalDatabasePrefix $globalPrefixProvider;
     protected HasCharsetProvider $charsetProvider;
     protected HasCollateProvider $collateProvider;
 
     public function __construct(
-        HasDatabaseDefaultCacheTtl $defaultCacheTtlProvider,
-        HasLocalDatabasePrefix     $localPrefixProvider,
-        HasGlobalDatabasePrefix    $globalPrefixProvider,
-        HasCharsetProvider         $charsetProvider,
-        HasCollateProvider         $collateProvider
+        HasDefaultTtl           $defaultCacheTtlProvider,
+        HasLocalDatabasePrefix  $localPrefixProvider,
+        HasGlobalDatabasePrefix $globalPrefixProvider,
+        HasCharsetProvider      $charsetProvider,
+        HasCollateProvider      $collateProvider
     )
     {
         $this->defaultCacheTtlProvider = $defaultCacheTtlProvider;
@@ -36,7 +36,7 @@ abstract class Table implements CoreTable
     /** @inheritDoc */
     public function getCacheTtl(): int
     {
-        return $this->defaultCacheTtlProvider->getDatabaseDefaultCacheTtl();
+        return $this->defaultCacheTtlProvider->getDefaultTtl();
     }
 
     /**

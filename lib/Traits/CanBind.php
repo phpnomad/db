@@ -5,16 +5,16 @@ namespace Phoenix\Database\Traits;
 namespace Phoenix\Database\Traits;
 
 use Phoenix\Database\Abstracts\JunctionTable;
-use Phoenix\Database\Exceptions\DatabaseErrorException;
-use Phoenix\Database\Exceptions\DuplicateEntryException;
 use Phoenix\Database\Exceptions\RecordNotFoundException;
 use Phoenix\Database\Interfaces\QueryBuilder;
-use Phoenix\Database\Interfaces\QueryStrategy;
+use Phoenix\Datastore\Exceptions\DatastoreErrorException;
+use Phoenix\Datastore\Exceptions\DuplicateEntryException;
+use Phoenix\Datastore\Interfaces\Datastore;
 use Phoenix\Logger\Interfaces\LoggerStrategy;
 
 trait CanBind
 {
-    protected QueryStrategy $queryStrategy;
+    protected Datastore $queryStrategy;
 
     protected QueryBuilder $queryBuilder;
 
@@ -54,7 +54,7 @@ trait CanBind
                 $right => $rightValue
             ]);
 
-        } catch (DatabaseErrorException $e) {
+        } catch (DatastoreErrorException $e) {
             $this->loggerStrategy->logException($e);
         }
     }
@@ -76,7 +76,7 @@ trait CanBind
                     $right => $rightValue
                 ]
             );
-        } catch (DatabaseErrorException $e) {
+        } catch (DatastoreErrorException $e) {
             $this->loggerStrategy->logException($e);
         }
     }
