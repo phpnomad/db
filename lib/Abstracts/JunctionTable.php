@@ -101,7 +101,7 @@ abstract class JunctionTable extends Table
     protected function getPrimaryColumnForTable(TableInterface $table): Column
     {
         return $this->cacheStrategy->load(
-            $this->getCacheKey($table->getName() . '_primary_column'),
+            $this->getCacheKey($table->getName() . 'PrimaryColumn'),
             fn() => Arr::find(
                 $table->getColumns(),
                 fn(Column $column) => Arr::hasValues($column->getAttributes(), 'PRIMARY KEY')

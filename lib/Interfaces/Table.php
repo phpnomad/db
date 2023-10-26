@@ -4,7 +4,6 @@ namespace Phoenix\Database\Interfaces;
 
 use Phoenix\Database\Factories\Column;
 use Phoenix\Database\Factories\Index;
-use Phoenix\Database\Mutators\Interfaces\QueryMutator;
 
 interface Table
 {
@@ -63,4 +62,11 @@ interface Table
      * @return ?string
      */
     public function getCollation(): ?string;
+
+    /**
+     * Gets the list of field names that are required to identify this model.
+     *
+     * @return non-empty-array<string>
+     */
+    public static function getFieldsForIdentity(): array;
 }

@@ -10,6 +10,10 @@ class DatabaseContextProvider
 {
     public Table $table;
     public ModelAdapter $modelAdapter;
+
+    /**
+     * @var class-string<DataModel>
+     */
     public string $model;
 
     /**

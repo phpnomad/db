@@ -9,6 +9,6 @@ class DateCreatedFactory implements CanConvertToColumn
 {
     public function toColumn(): Column
     {
-        return new Column('date_created','TIMESTAMP', null, 'NOT NULL');
+        return new Column('dateCreated,'TIMESTAMP', null, 'NOT NULL');
     }
 }

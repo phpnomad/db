@@ -2,7 +2,6 @@
 
 namespace Phoenix\Database\Abstracts;
 
-use Phoenix\Cache\Interfaces\HasDefaultTtl;
 use Phoenix\Database\Interfaces\HasCharsetProvider;
 use Phoenix\Database\Interfaces\HasCollateProvider;
 use Phoenix\Database\Interfaces\HasGlobalDatabasePrefix;
@@ -12,31 +11,22 @@ use Phoenix\Utils\Helpers\Str;
 
 abstract class Table implements CoreTable
 {
-    protected HasDefaultTtl            $defaultCacheTtlProvider;
     protected HasLocalDatabasePrefix $localPrefixProvider;
     protected HasGlobalDatabasePrefix $globalPrefixProvider;
     protected HasCharsetProvider $charsetProvider;
     protected HasCollateProvider $collateProvider;
 
     public function __construct(
-        HasDefaultTtl           $defaultCacheTtlProvider,
         HasLocalDatabasePrefix  $localPrefixProvider,
         HasGlobalDatabasePrefix $globalPrefixProvider,
         HasCharsetProvider      $charsetProvider,
         HasCollateProvider      $collateProvider
     )
     {
-        $this->defaultCacheTtlProvider = $defaultCacheTtlProvider;
         $this->localPrefixProvider = $localPrefixProvider;
         $this->globalPrefixProvider = $globalPrefixProvider;
         $this->charsetProvider = $charsetProvider;
         $this->collateProvider = $collateProvider;
-    }
-
-    /** @inheritDoc */
-    public function getCacheTtl(): int
-    {
-        return $this->defaultCacheTtlProvider->getDefaultTtl();
     }
 
     /**

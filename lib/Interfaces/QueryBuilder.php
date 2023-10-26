@@ -25,6 +25,17 @@ interface QueryBuilder
     public function from(Table $table);
 
     /**
+     * Creates, or overrides the where clause with a compound statement.
+     *
+     * @param array $fields The field name
+     * @param string $operand The operand to use in the clause
+     * @param array<scalar> $valueSet The expected value, or multiple values
+     * @param array<scalar>[] $valueSet Optional. Additional values for operands that accept multiple values.
+     * @return $this
+     */
+    public function compoundWhere(array $fields, array $valueSet, array ...$valueSets);
+
+    /**
      * Creates, or overrides the where clause.
      *
      * @param string $field The field name
