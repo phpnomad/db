@@ -22,13 +22,6 @@ interface Table
     public function getAlias(): string;
 
     /**
-     * Gets the TTL value that should be used when caching data in this table.
-     *
-     * @return int
-     */
-    public function getCacheTtl(): int;
-
-    /**
      * Gets the current version of the table.
      *
      * @return string

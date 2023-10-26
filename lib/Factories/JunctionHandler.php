@@ -17,7 +17,7 @@ class JunctionHandler implements JunctionHandlerInterface
      *
      * @var JunctionContextProvider
      */
-    protected JunctionContextProvider $leftProvider;
+    public JunctionContextProvider $leftProvider;
 
     /**
      * Provider for the "right" datastore. Generally accessed using getContextForResource() or getOppositeContext()
@@ -25,14 +25,14 @@ class JunctionHandler implements JunctionHandlerInterface
      *
      * @var JunctionContextProvider
      */
-    protected JunctionContextProvider $rightProvider;
+    public JunctionContextProvider $rightProvider;
 
     /**
      * Provider for the datastore that binds the two other datastores together.
      *
      * @var JunctionContextProvider
      */
-    protected JunctionContextProvider $middleProvider;
+    public JunctionContextProvider $middleProvider;
 
     public function __construct(
         JunctionContextProvider $leftProvider,
@@ -59,7 +59,7 @@ class JunctionHandler implements JunctionHandlerInterface
             return $this->rightProvider;
         }
 
-        throw new InvalidArgumentException('The provided resource is invalid for this junction. Valid options are ' . $this->leftProvider->resource . ', ' . $this->rightProvider->resource);
+        throw new InvalidArgumentException('The provided resource is invalid for this junction. Valid options are ' . $this->leftProvider->getResource() . ', ' . $this->rightProvider->getResource());
     }
 
     protected function getOppositeContext(JunctionContextProvider $junctionContextProvider): JunctionContextProvider
@@ -91,7 +91,10 @@ class JunctionHandler implements JunctionHandlerInterface
             throw new DuplicateEntryException('The specified binding already exists');
         }
 
-        $this->middleProvider->getDatastore()->create(Arr::merge($context->getCreateAttributes(), $binding->getCreateAttributes()));
+        $this->middleProvider->getDatastore()->create([
+            $binding->getJunctionFieldName() => $bindingId,
+            $context->getJunctionFieldName() => $id
+        ]);
     }
 
     /** @inheritDoc */

@@ -2,7 +2,9 @@
 
 namespace Phoenix\Database\Abstracts;
 
-use Phoenix\Cache\Interfaces\InMemoryCacheStrategy;
+use Phoenix\Cache\Enums\Operation;
+use Phoenix\Cache\Services\CacheableService;
+use Phoenix\Cache\Traits\WithInstanceCache;
 use Phoenix\Database\Factories\Column;
 use Phoenix\Database\Factories\Index;
 use Phoenix\Database\Interfaces\HasCharsetProvider;
@@ -10,28 +12,22 @@ use Phoenix\Database\Interfaces\HasCollateProvider;
 use Phoenix\Database\Interfaces\HasGlobalDatabasePrefix;
 use Phoenix\Database\Interfaces\HasLocalDatabasePrefix;
 use Phoenix\Database\Interfaces\Table as TableInterface;
+use Phoenix\Database\Services\JunctionTableNamingService;
 use Phoenix\Utils\Helpers\Arr;
 
 abstract class JunctionTable extends Table
 {
-    /**
-     * @var mixed|null
-     */
-    protected InMemoryCacheStrategy $cacheStrategy;
-    /**
-     * @var mixed|null
-     */
+    use WithInstanceCache;
     protected Table $rightTable;
-    /**
-     * @var mixed|null
-     */
     protected Table $leftTable;
+    protected $junctionTableNamingService;
 
     public function __construct(
         HasLocalDatabasePrefix     $localPrefixProvider,
         HasGlobalDatabasePrefix    $globalPrefixProvider,
         HasCharsetProvider         $charsetProvider,
         HasCollateProvider         $collateProvider,
+        JunctionTableNamingService $junctionTableNamingService,
         Table                      $leftTable,
         Table                      $rightTable
     )
@@ -39,7 +35,7 @@ abstract class JunctionTable extends Table
         $args = func_get_args();
         $this->rightTable = array_pop($args);
         $this->leftTable = array_pop($args);
-        $this->cacheStrategy = array_pop($args);
+        $this->junctionTableNamingService = array_pop($args);
         parent::__construct(...$args);
     }
 
@@ -76,48 +72,23 @@ abstract class JunctionTable extends Table
     /** @inheritDoc */
     public function getAlias(): string
     {
-        return $this->cacheStrategy->load(
-            $this->getCacheKey('alias'),
-            fn() => Arr::process($this->getTables())
-                ->map(fn(Table $table) => $table->getAlias())
-                ->setSeparator('_')
+        return $this->getFromInstanceCache('alias', fn() => lcfirst(
+            Arr::process($this->getTables())
+                ->map(fn(Table $table) => ucFirst($table->getAlias()))
+                ->setSeparator('')
                 ->toString()
-        );
+        ));
     }
 
     /** @inheritDoc */
     public function getUnprefixedName(): string
     {
-        return Arr::process($this->getTables())
-            ->map(fn(Table $table) => $table->getUnprefixedName())
-            ->setSeparator('_')
-            ->toString();
-    }
-
-    /**
-     * @param TableInterface $table
-     * @return Column
-     */
-    protected function getPrimaryColumnForTable(TableInterface $table): Column
-    {
-        return $this->cacheStrategy->load(
-            $this->getCacheKey($table->getName() . 'PrimaryColumn'),
-            fn() => Arr::find(
-                $table->getColumns(),
-                fn(Column $column) => Arr::hasValues($column->getAttributes(), 'PRIMARY KEY')
-            )
-        );
-    }
-
-    /**
-     * Gets the column name from the table. Uses the table name with the primary column name.
-     *
-     * @param TableInterface $table
-     * @return string
-     */
-    public function getColumnNameFromTable(TableInterface $table): string
-    {
-        return $table->getUnprefixedName() . '_' . $this->getPrimaryColumnForTable($table)->getName();
+        return $this->getFromInstanceCache('unprefixedName', lcfirst(
+            Arr::process($this->getTables())
+                ->map(fn(Table $table) => ucfirst($table->getUnprefixedName()))
+                ->setSeparator('')
+                ->toString()
+        ));
     }
 
     /**
@@ -127,7 +98,7 @@ abstract class JunctionTable extends Table
      */
     public function getLeftColumnName(): string
     {
-        return $this->getColumnNameFromTable($this->leftTable);
+        return $this->junctionTableNamingService->getColumnNameFromTable($this->leftTable);
     }
 
     /**
@@ -137,7 +108,7 @@ abstract class JunctionTable extends Table
      */
     public function getRightColumnName(): string
     {
-        return $this->getColumnNameFromTable($this->rightTable);
+        return $this->junctionTableNamingService->getColumnNameFromTable($this->rightTable);
     }
 
     /**
@@ -170,7 +141,7 @@ abstract class JunctionTable extends Table
             [$columnName],
             null,
             'FOREIGN KEY',
-            "REFERENCES {$references->getName()}({$this->getPrimaryColumnForTable($references)->getName()})"
+            "REFERENCES {$references->getName()}({$this->junctionTableNamingService->getPrimaryColumnForTable($references)->getName()})"
         );
     }
 
@@ -191,16 +162,5 @@ abstract class JunctionTable extends Table
             $this->buildForeignKeyFor($this->getLeftColumnName(), $this->leftTable),
             $this->buildForeignKeyFor($this->getRightColumnName(), $this->rightTable),
         ];
-    }
-
-    /**
-     * Gets the cache key for this table. Used to cut back on processing when making this table.
-     *
-     * @param string $append
-     * @return string
-     */
-    protected function getCacheKey(string $append): string
-    {
-        return $this->getUnprefixedName() . '__' . $this->getTableVersion() . '__' . $append;
     }
 }
