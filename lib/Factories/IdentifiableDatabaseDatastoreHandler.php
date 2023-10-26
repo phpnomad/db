@@ -7,9 +7,9 @@ use Phoenix\Database\Providers\DatabaseServiceProvider;
 use Phoenix\Database\Traits\WithDatastoreHandlerMethods;
 use Phoenix\Datastore\Interfaces\DataModel;
 use Phoenix\Datastore\Interfaces\Datastore;
-use Phoenix\Datastore\Interfaces\WithPrimaryKey;
+use Phoenix\Datastore\Interfaces\DatastoreHasPrimaryKey;
 
-class IdentifiableDatabaseDatastoreHandler implements Datastore, WithPrimaryKey
+class IdentifiableDatabaseDatastoreHandler implements Datastore, DatastoreHasPrimaryKey
 {
     use WithDatastoreHandlerMethods;
 

@@ -2,8 +2,6 @@
 
 namespace Phoenix\Database\Abstracts;
 
-use Phoenix\Cache\Enums\Operation;
-use Phoenix\Cache\Services\CacheableService;
 use Phoenix\Cache\Traits\WithInstanceCache;
 use Phoenix\Database\Factories\Column;
 use Phoenix\Database\Factories\Index;
@@ -12,30 +10,29 @@ use Phoenix\Database\Interfaces\HasCollateProvider;
 use Phoenix\Database\Interfaces\HasGlobalDatabasePrefix;
 use Phoenix\Database\Interfaces\HasLocalDatabasePrefix;
 use Phoenix\Database\Interfaces\Table as TableInterface;
-use Phoenix\Database\Services\JunctionTableNamingService;
+use Phoenix\Database\Services\TableSchemaService;
 use Phoenix\Utils\Helpers\Arr;
 
 abstract class JunctionTable extends Table
 {
     use WithInstanceCache;
+
     protected Table $rightTable;
     protected Table $leftTable;
-    protected $junctionTableNamingService;
 
     public function __construct(
-        HasLocalDatabasePrefix     $localPrefixProvider,
-        HasGlobalDatabasePrefix    $globalPrefixProvider,
-        HasCharsetProvider         $charsetProvider,
-        HasCollateProvider         $collateProvider,
-        JunctionTableNamingService $junctionTableNamingService,
-        Table                      $leftTable,
-        Table                      $rightTable
+        HasLocalDatabasePrefix  $localPrefixProvider,
+        HasGlobalDatabasePrefix $globalPrefixProvider,
+        HasCharsetProvider      $charsetProvider,
+        HasCollateProvider      $collateProvider,
+        TableSchemaService      $tableSchemaService,
+        Table                   $leftTable,
+        Table                   $rightTable
     )
     {
         $args = func_get_args();
         $this->rightTable = array_pop($args);
         $this->leftTable = array_pop($args);
-        $this->junctionTableNamingService = array_pop($args);
         parent::__construct(...$args);
     }
 
@@ -98,7 +95,7 @@ abstract class JunctionTable extends Table
      */
     public function getLeftColumnName(): string
     {
-        return $this->junctionTableNamingService->getColumnNameFromTable($this->leftTable);
+        return $this->tableSchemaService->getJunctionColumnNameFromTable($this->leftTable);
     }
 
     /**
@@ -108,7 +105,7 @@ abstract class JunctionTable extends Table
      */
     public function getRightColumnName(): string
     {
-        return $this->junctionTableNamingService->getColumnNameFromTable($this->rightTable);
+        return $this->tableSchemaService->getJunctionColumnNameFromTable($this->rightTable);
     }
 
     /**
@@ -141,7 +138,7 @@ abstract class JunctionTable extends Table
             [$columnName],
             null,
             'FOREIGN KEY',
-            "REFERENCES {$references->getName()}({$this->junctionTableNamingService->getPrimaryColumnForTable($references)->getName()})"
+            "REFERENCES {$references->getName()}({$this->tableSchemaService->getPrimaryColumnForTable($references)->getName()})"
         );
     }
 
@@ -162,5 +159,11 @@ abstract class JunctionTable extends Table
             $this->buildForeignKeyFor($this->getLeftColumnName(), $this->leftTable),
             $this->buildForeignKeyFor($this->getRightColumnName(), $this->rightTable),
         ];
+    }
+
+    /** @inheritDoc */
+    public function getFieldsForIdentity(): array
+    {
+        return [$this->getLeftColumnName(), $this->getRightColumnName()];
     }
 }

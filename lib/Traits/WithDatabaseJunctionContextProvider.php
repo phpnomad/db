@@ -5,7 +5,7 @@ namespace Phoenix\Database\Traits;
 use Phoenix\Cache\Traits\WithInstanceCache;
 use Phoenix\Database\Factories\DatabaseDatastoreHandler;
 use Phoenix\Database\Interfaces\Table;
-use Phoenix\Database\Services\JunctionTableNamingService;
+use Phoenix\Database\Services\TableSchemaService;
 use Phoenix\Datastore\Factories\JunctionContextProvider as JunctionContextProviderFactory;
 use Phoenix\Datastore\Interfaces\JunctionContextProvider;
 
@@ -15,7 +15,7 @@ trait WithDatabaseJunctionContextProvider
 
     protected DatabaseDatastoreHandler $handler;
     protected Table $table;
-    protected JunctionTableNamingService $junctionTableNamingService;
+    protected TableSchemaService $junctionTableNamingService;
 
     /**
      * The context resource.
@@ -32,7 +32,7 @@ trait WithDatabaseJunctionContextProvider
         return $this->getFromInstanceCache('databaseJunctionContextProvider', fn() => new JunctionContextProviderFactory(
             $this->getResource(),
             $this->handler,
-            $this->junctionTableNamingService->getColumnNameFromTable($this->table),
+            $this->junctionTableNamingService->getJunctionColumnNameFromTable($this->table),
         ));
     }
 }

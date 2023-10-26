@@ -8,7 +8,7 @@ use Phoenix\Database\Factories\Index;
 interface Table
 {
     /**
-     * Gets the name of this table.
+     * Gets the name of this table. Must include any necessary prefixes.
      *
      * @return string
      */
@@ -61,5 +61,19 @@ interface Table
      *
      * @return non-empty-array<string>
      */
-    public static function getFieldsForIdentity(): array;
+    public function getFieldsForIdentity(): array;
+
+    /**
+     * Gets the table name, without a prefix. Should be plural.
+     *
+     * @return string
+     */
+    public function getUnprefixedName(): string;
+
+    /**
+     * Gets the singular form of the unprefixed name.
+     *
+     * @return string
+     */
+    public function getSingularUnprefixedName(): string;
 }

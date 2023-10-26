@@ -7,6 +7,7 @@ use Phoenix\Database\Interfaces\HasCollateProvider;
 use Phoenix\Database\Interfaces\HasGlobalDatabasePrefix;
 use Phoenix\Database\Interfaces\HasLocalDatabasePrefix;
 use Phoenix\Database\Interfaces\Table as CoreTable;
+use Phoenix\Database\Services\TableSchemaService;
 use Phoenix\Utils\Helpers\Str;
 
 abstract class Table implements CoreTable
@@ -15,14 +16,17 @@ abstract class Table implements CoreTable
     protected HasGlobalDatabasePrefix $globalPrefixProvider;
     protected HasCharsetProvider $charsetProvider;
     protected HasCollateProvider $collateProvider;
+    protected TableSchemaService $tableSchemaService;
 
     public function __construct(
         HasLocalDatabasePrefix  $localPrefixProvider,
         HasGlobalDatabasePrefix $globalPrefixProvider,
         HasCharsetProvider      $charsetProvider,
-        HasCollateProvider      $collateProvider
+        HasCollateProvider      $collateProvider,
+        TableSchemaService      $tableSchemaService
     )
     {
+        $this->tableSchemaService = $tableSchemaService;
         $this->localPrefixProvider = $localPrefixProvider;
         $this->globalPrefixProvider = $globalPrefixProvider;
         $this->charsetProvider = $charsetProvider;
@@ -41,13 +45,8 @@ abstract class Table implements CoreTable
             . $this->getUnprefixedName();
     }
 
-    /**
-     * Gets the table name, without a prefix.
-     *
-     * @return string
-     */
+    /** @inheritdoc */
     abstract public function getUnprefixedName(): string;
-
 
     /**
      * Get the charset of the table.
@@ -67,5 +66,11 @@ abstract class Table implements CoreTable
     public function getCollation(): ?string
     {
         return $this->collateProvider->getCollation();
+    }
+
+    /** @inheritDoc */
+    public function getFieldsForIdentity(): array
+    {
+        return [$this->tableSchemaService->getPrimaryColumnForTable($this)->getName()];
     }
 }

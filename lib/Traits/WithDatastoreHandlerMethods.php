@@ -21,7 +21,7 @@ trait WithDatastoreHandlerMethods
     public function where(array $conditions, ?int $limit = null, ?int $offset = null): array
     {
         $this->serviceProvider->queryBuilder
-            ->select(...$this->contextProvider->table::getFieldsForIdentity())
+            ->select(...$this->contextProvider->table->getFieldsForIdentity())
             ->from($this->contextProvider->table);
 
         if ($limit) {
@@ -49,7 +49,7 @@ trait WithDatastoreHandlerMethods
     /** @inheritDoc */
     public function create(array $attributes): DataModel
     {
-        $fields = $this->contextProvider->table::getFieldsForIdentity();
+        $fields = $this->contextProvider->table->getFieldsForIdentity();
         $ids = Arr::process($fields)
             ->flip()
             ->intersect($attributes, $fields)
@@ -166,7 +166,7 @@ trait WithDatastoreHandlerMethods
     public function findIds(array $conditions, ?int $limit = null, ?int $offset = null): array
     {
         $this->serviceProvider->queryBuilder
-            ->select(...$this->contextProvider->table::getFieldsForIdentity())
+            ->select(...$this->contextProvider->table->getFieldsForIdentity())
             ->from($this->contextProvider->table);
 
 
@@ -202,7 +202,7 @@ trait WithDatastoreHandlerMethods
                 // Get the things that aren't in the cache.
                 $data = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder
                     ->select('*')
-                    ->compoundWhere($this->contextProvider->table::getFieldsForIdentity(), ...$idsToQuery)
+                    ->compoundWhere($this->contextProvider->table->getFieldsForIdentity(), ...$idsToQuery)
                     ->from($this->contextProvider->table)
                 );
             } catch (DatastoreErrorException $e) {
@@ -233,7 +233,7 @@ trait WithDatastoreHandlerMethods
                     $this->serviceProvider->queryBuilder
                         ->select('*')
                         ->from($this->contextProvider->table)
-                        ->compoundWhere($this->contextProvider->table::getFieldsForIdentity(), ...$ids)
+                        ->compoundWhere($this->contextProvider->table->getFieldsForIdentity(), ...$ids)
                         ->limit(1)
                 )
             )

@@ -8,7 +8,7 @@ use Phoenix\Database\Factories\Column;
 use Phoenix\Database\Interfaces\Table as TableInterface;
 use Phoenix\Utils\Helpers\Arr;
 
-class JunctionTableNamingService
+class TableSchemaService
 {
     protected CacheableService $cacheableService;
 
@@ -39,9 +39,9 @@ class JunctionTableNamingService
      * @param TableInterface $table
      * @return string
      */
-    public function getColumnNameFromTable(TableInterface $table): string
+    public function getJunctionColumnNameFromTable(TableInterface $table): string
     {
-        return $table->getUnprefixedName() . ucfirst($this->getPrimaryColumnForTable($table)->getName());
+        return $table->getSingularUnprefixedName() . ucfirst($this->getPrimaryColumnForTable($table)->getName());
     }
 
     /**
