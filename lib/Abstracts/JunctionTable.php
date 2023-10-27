@@ -80,7 +80,7 @@ abstract class JunctionTable extends Table
     /** @inheritDoc */
     public function getUnprefixedName(): string
     {
-        return $this->getFromInstanceCache('unprefixedName', lcfirst(
+        return $this->getFromInstanceCache('unprefixedName', fn() => lcfirst(
             Arr::process($this->getTables())
                 ->map(fn(Table $table) => ucfirst($table->getUnprefixedName()))
                 ->setSeparator('')

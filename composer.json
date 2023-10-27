@@ -15,6 +15,10 @@
         },
         {
             "type": "vcs",
+            "url": "git@github.com:rooted-phoenix/datastore.git"
+        },
+        {
+            "type": "vcs",
             "url": "git@github.com:rooted-phoenix/event.git"
         },
         {
@@ -57,6 +61,7 @@
     "require": {
         "phoenix/utils": "dev-main",
         "phoenix/cache": "dev-main",
+        "phoenix/datastore": "dev-main",
         "phoenix/facade": "dev-main",
         "phoenix/singleton": "dev-main",
         "phoenix/event": "dev-main",
