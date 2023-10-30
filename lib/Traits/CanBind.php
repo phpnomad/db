@@ -1,16 +1,16 @@
 <?php
 
-namespace Phoenix\Database\Traits;
+namespace PHPNomad\Database\Traits;
 
-namespace Phoenix\Database\Traits;
+namespace PHPNomad\Database\Traits;
 
-use Phoenix\Database\Abstracts\JunctionTable;
-use Phoenix\Database\Exceptions\RecordNotFoundException;
-use Phoenix\Database\Interfaces\QueryBuilder;
-use Phoenix\Datastore\Exceptions\DatastoreErrorException;
-use Phoenix\Datastore\Exceptions\DuplicateEntryException;
-use Phoenix\Datastore\Interfaces\Datastore;
-use Phoenix\Logger\Interfaces\LoggerStrategy;
+use PHPNomad\Database\Abstracts\JunctionTable;
+use PHPNomad\Database\Exceptions\RecordNotFoundException;
+use PHPNomad\Database\Interfaces\QueryBuilder;
+use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
+use PHPNomad\Datastore\Exceptions\DuplicateEntryException;
+use PHPNomad\Datastore\Interfaces\Datastore;
+use PHPNomad\Logger\Interfaces\LoggerStrategy;
 
 trait CanBind
 {

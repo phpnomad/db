@@ -1,9 +1,9 @@
 <?php
 
-namespace Phoenix\Database\Interfaces;
+namespace PHPNomad\Database\Interfaces;
 
-use Phoenix\Database\Exceptions\RecordNotFoundException;
-use Phoenix\Datastore\Exceptions\DatastoreErrorException;
+use PHPNomad\Database\Exceptions\RecordNotFoundException;
+use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
 
 interface QueryStrategy
 {

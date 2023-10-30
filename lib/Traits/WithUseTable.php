@@ -1,10 +1,10 @@
 <?php
 
-namespace Phoenix\Database\Traits;
+namespace PHPNomad\Database\Traits;
 
-namespace Phoenix\Database\Traits;
+namespace PHPNomad\Database\Traits;
 
-use Phoenix\Database\Interfaces\Table;
+use PHPNomad\Database\Interfaces\Table;
 
 trait WithUseTable
 {

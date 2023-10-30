@@ -1,9 +1,9 @@
 <?php
 
-namespace Phoenix\Database\Interfaces;
+namespace PHPNomad\Database\Interfaces;
 
-use Phoenix\Datastore\Exceptions\DatastoreErrorException;
-use Phoenix\Datastore\Exceptions\DuplicateEntryException;
+use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
+use PHPNomad\Datastore\Exceptions\DuplicateEntryException;
 
 interface JunctionTableQueryService
 {

@@ -1,12 +1,12 @@
 <?php
 
-namespace Phoenix\Database\Factories;
+namespace PHPNomad\Database\Factories;
 
-use Phoenix\Cache\Interfaces\PersistentCacheStrategy;
-use Phoenix\Database\Interfaces\Table;
-use Phoenix\Integrations\WordPress\Cache\ObjectCacheStrategy;
-use Phoenix\Utils\Helpers\Arr;
-use Phoenix\Utils\Processors\ListFilter;
+use PHPNomad\Cache\Interfaces\PersistentCacheStrategy;
+use PHPNomad\Database\Interfaces\Table;
+use PHPNomad\Integrations\WordPress\Cache\ObjectCacheStrategy;
+use PHPNomad\Utils\Helpers\Arr;
+use PHPNomad\Utils\Processors\ListFilter;
 
 class TableProcessor
 {

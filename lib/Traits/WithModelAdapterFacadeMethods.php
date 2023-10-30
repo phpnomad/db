@@ -1,11 +1,11 @@
 <?php
 
-namespace Phoenix\Database\Traits;
+namespace PHPNomad\Database\Traits;
 
-namespace Phoenix\Database\Traits;
+namespace PHPNomad\Database\Traits;
 
-use Phoenix\Database\Interfaces\ModelAdapter;
-use Phoenix\Datastore\Interfaces\DataModel;
+use PHPNomad\Database\Interfaces\ModelAdapter;
+use PHPNomad\Datastore\Interfaces\DataModel;
 
 /**
  * @template TModelAdapter of ModelAdapter

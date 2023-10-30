@@ -1,9 +1,9 @@
 <?php
 
-namespace Phoenix\Database\Factories\Columns;
+namespace PHPNomad\Database\Factories\Columns;
 
-use Phoenix\Database\Factories\Column;
-use Phoenix\Database\Interfaces\CanConvertToColumn;
+use PHPNomad\Database\Factories\Column;
+use PHPNomad\Database\Interfaces\CanConvertToColumn;
 
 class DateModifiedFactory implements CanConvertToColumn
 {

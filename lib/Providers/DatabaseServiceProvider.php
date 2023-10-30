@@ -1,11 +1,11 @@
 <?php
 
-namespace Phoenix\Database\Providers;
+namespace PHPNomad\Database\Providers;
 
-use Phoenix\Cache\Services\CacheableService;
-use Phoenix\Database\Interfaces\QueryBuilder;
-use Phoenix\Database\Interfaces\QueryStrategy;
-use Phoenix\Logger\Interfaces\LoggerStrategy;
+use PHPNomad\Cache\Services\CacheableService;
+use PHPNomad\Database\Interfaces\QueryBuilder;
+use PHPNomad\Database\Interfaces\QueryStrategy;
+use PHPNomad\Logger\Interfaces\LoggerStrategy;
 
 class DatabaseServiceProvider
 {

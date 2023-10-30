@@ -1,6 +1,6 @@
 <?php
 
-namespace Phoenix\Database\Traits;
+namespace PHPNomad\Database\Traits;
 
 use DateTime;
 

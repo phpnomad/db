@@ -1,8 +1,8 @@
 <?php
 
-namespace Phoenix\Database\Interfaces;
+namespace PHPNomad\Database\Interfaces;
 
-use Phoenix\Database\Exceptions\QueryBuilderException;
+use PHPNomad\Database\Exceptions\QueryBuilderException;
 
 /**
  * Builder class to create safe SQL queries

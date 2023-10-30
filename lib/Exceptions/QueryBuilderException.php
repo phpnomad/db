@@ -1,5 +1,5 @@
 <?php
-namespace Phoenix\Database\Exceptions;
+namespace PHPNomad\Database\Exceptions;
 
 use Exception;
 

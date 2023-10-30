@@ -1,10 +1,10 @@
 <?php
 
-namespace Phoenix\Database\Services;
+namespace PHPNomad\Database\Services;
 
 use DateTime;
-use Phoenix\Database\Interfaces\CanConvertDatabaseStringToDateTime;
-use Phoenix\Database\Interfaces\CanConvertToDatabaseDateString;
+use PHPNomad\Database\Interfaces\CanConvertDatabaseStringToDateTime;
+use PHPNomad\Database\Interfaces\CanConvertToDatabaseDateString;
 
 class DateFormatterService
 {

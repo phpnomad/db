@@ -1,10 +1,10 @@
 <?php
 
-namespace Phoenix\Database\Traits;
+namespace PHPNomad\Database\Traits;
 
-use Phoenix\Database\Abstracts\DatabaseRepository;
-use Phoenix\Database\Exceptions\RecordNotFoundException;
-use Phoenix\Datastore\Interfaces\DataModel;
+use PHPNomad\Database\Abstracts\DatabaseRepository;
+use PHPNomad\Database\Exceptions\RecordNotFoundException;
+use PHPNomad\Datastore\Interfaces\DataModel;
 
 /**
  * @template TModel of DataModel

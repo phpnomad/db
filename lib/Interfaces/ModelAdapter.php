@@ -1,8 +1,8 @@
 <?php
 
-namespace Phoenix\Database\Interfaces;
+namespace PHPNomad\Database\Interfaces;
 
-use Phoenix\Datastore\Interfaces\DataModel;
+use PHPNomad\Datastore\Interfaces\DataModel;
 
 /**
  * @template TModel of DataModel

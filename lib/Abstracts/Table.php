@@ -1,14 +1,14 @@
 <?php
 
-namespace Phoenix\Database\Abstracts;
+namespace PHPNomad\Database\Abstracts;
 
-use Phoenix\Database\Interfaces\HasCharsetProvider;
-use Phoenix\Database\Interfaces\HasCollateProvider;
-use Phoenix\Database\Interfaces\HasGlobalDatabasePrefix;
-use Phoenix\Database\Interfaces\HasLocalDatabasePrefix;
-use Phoenix\Database\Interfaces\Table as CoreTable;
-use Phoenix\Database\Services\TableSchemaService;
-use Phoenix\Utils\Helpers\Str;
+use PHPNomad\Database\Interfaces\HasCharsetProvider;
+use PHPNomad\Database\Interfaces\HasCollateProvider;
+use PHPNomad\Database\Interfaces\HasGlobalDatabasePrefix;
+use PHPNomad\Database\Interfaces\HasLocalDatabasePrefix;
+use PHPNomad\Database\Interfaces\Table as CoreTable;
+use PHPNomad\Database\Services\TableSchemaService;
+use PHPNomad\Utils\Helpers\Str;
 
 abstract class Table implements CoreTable
 {

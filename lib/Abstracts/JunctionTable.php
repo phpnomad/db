@@ -1,17 +1,17 @@
 <?php
 
-namespace Phoenix\Database\Abstracts;
+namespace PHPNomad\Database\Abstracts;
 
-use Phoenix\Cache\Traits\WithInstanceCache;
-use Phoenix\Database\Factories\Column;
-use Phoenix\Database\Factories\Index;
-use Phoenix\Database\Interfaces\HasCharsetProvider;
-use Phoenix\Database\Interfaces\HasCollateProvider;
-use Phoenix\Database\Interfaces\HasGlobalDatabasePrefix;
-use Phoenix\Database\Interfaces\HasLocalDatabasePrefix;
-use Phoenix\Database\Interfaces\Table as TableInterface;
-use Phoenix\Database\Services\TableSchemaService;
-use Phoenix\Utils\Helpers\Arr;
+use PHPNomad\Cache\Traits\WithInstanceCache;
+use PHPNomad\Database\Factories\Column;
+use PHPNomad\Database\Factories\Index;
+use PHPNomad\Database\Interfaces\HasCharsetProvider;
+use PHPNomad\Database\Interfaces\HasCollateProvider;
+use PHPNomad\Database\Interfaces\HasGlobalDatabasePrefix;
+use PHPNomad\Database\Interfaces\HasLocalDatabasePrefix;
+use PHPNomad\Database\Interfaces\Table as TableInterface;
+use PHPNomad\Database\Services\TableSchemaService;
+use PHPNomad\Utils\Helpers\Arr;
 
 abstract class JunctionTable extends Table
 {

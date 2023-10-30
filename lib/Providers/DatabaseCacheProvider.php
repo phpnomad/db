@@ -1,12 +1,12 @@
 <?php
 
-namespace Phoenix\Database\Providers;
+namespace PHPNomad\Database\Providers;
 
-use Phoenix\Cache\Exceptions\CachedItemNotFoundException;
-use Phoenix\Cache\Interfaces\InMemoryCacheStrategy;
-use Phoenix\Database\Interfaces\HasUsableTable;
-use Phoenix\Database\Traits\WithUseTable;
-use Phoenix\Datastore\Interfaces\DataModel;
+use PHPNomad\Cache\Exceptions\CachedItemNotFoundException;
+use PHPNomad\Cache\Interfaces\InMemoryCacheStrategy;
+use PHPNomad\Database\Interfaces\HasUsableTable;
+use PHPNomad\Database\Traits\WithUseTable;
+use PHPNomad\Datastore\Interfaces\DataModel;
 
 class DatabaseCacheProvider implements HasUsableTable
 {

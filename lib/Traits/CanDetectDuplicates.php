@@ -1,16 +1,16 @@
 <?php
 
-namespace Phoenix\Database\Traits;
+namespace PHPNomad\Database\Traits;
 
-use Phoenix\Database\Exceptions\RecordNotFoundException;
-use Phoenix\Database\Factories\TableProcessor;
-use Phoenix\Database\Interfaces\QueryBuilder;
-use Phoenix\Database\Interfaces\Table;
-use Phoenix\Datastore\Exceptions\DatastoreErrorException;
-use Phoenix\Datastore\Exceptions\DuplicateEntryException;
-use Phoenix\Datastore\Interfaces\DataModel;
-use Phoenix\Datastore\Interfaces\Datastore;
-use Phoenix\Utils\Helpers\Arr;
+use PHPNomad\Database\Exceptions\RecordNotFoundException;
+use PHPNomad\Database\Factories\TableProcessor;
+use PHPNomad\Database\Interfaces\QueryBuilder;
+use PHPNomad\Database\Interfaces\Table;
+use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
+use PHPNomad\Datastore\Exceptions\DuplicateEntryException;
+use PHPNomad\Datastore\Interfaces\DataModel;
+use PHPNomad\Datastore\Interfaces\Datastore;
+use PHPNomad\Utils\Helpers\Arr;
 
 trait CanDetectDuplicates
 {

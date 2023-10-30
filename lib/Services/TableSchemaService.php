@@ -1,12 +1,12 @@
 <?php
 
-namespace Phoenix\Database\Services;
+namespace PHPNomad\Database\Services;
 
-use Phoenix\Cache\Enums\Operation;
-use Phoenix\Cache\Services\CacheableService;
-use Phoenix\Database\Factories\Column;
-use Phoenix\Database\Interfaces\Table as TableInterface;
-use Phoenix\Utils\Helpers\Arr;
+use PHPNomad\Cache\Enums\Operation;
+use PHPNomad\Cache\Services\CacheableService;
+use PHPNomad\Database\Factories\Column;
+use PHPNomad\Database\Interfaces\Table as TableInterface;
+use PHPNomad\Utils\Helpers\Arr;
 
 class TableSchemaService
 {

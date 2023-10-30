@@ -1,8 +1,8 @@
 <?php
 
-namespace Phoenix\Database\Exceptions;
+namespace PHPNomad\Database\Exceptions;
 
-use Phoenix\Datastore\Exceptions\DatastoreErrorException;
+use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
 
 class RecordNotFoundException extends DatastoreErrorException
 {

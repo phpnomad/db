@@ -1,9 +1,9 @@
 <?php
 
-namespace Phoenix\Database\Events;
+namespace PHPNomad\Database\Events;
 
-use Phoenix\Database\Interfaces\Table;
-use Phoenix\Events\Interfaces\Event;
+use PHPNomad\Database\Interfaces\Table;
+use PHPNomad\Events\Interfaces\Event;
 
 class RecordUpdated implements Event
 {

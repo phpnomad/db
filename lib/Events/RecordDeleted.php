@@ -1,9 +1,9 @@
 <?php
 
-namespace Phoenix\Database\Events;
+namespace PHPNomad\Database\Events;
 
-use Phoenix\Database\Interfaces\Table;
-use Phoenix\Events\Interfaces\Event;
+use PHPNomad\Database\Interfaces\Table;
+use PHPNomad\Events\Interfaces\Event;
 
 class RecordDeleted implements Event
 {
@@ -30,7 +30,7 @@ class RecordDeleted implements Event
     /**
      * Gets the table this record was deleted from.
      *
-     * @return \Phoenix\Database\Interfaces\Table
+     * @return \PHPNomad\Database\Interfaces\Table
      */
     public function getTable(): Table
     {

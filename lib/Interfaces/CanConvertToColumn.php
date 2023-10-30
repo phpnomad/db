@@ -1,8 +1,8 @@
 <?php
 
-namespace Phoenix\Database\Interfaces;
+namespace PHPNomad\Database\Interfaces;
 
-use Phoenix\Database\Factories\Column;
+use PHPNomad\Database\Factories\Column;
 
 interface CanConvertToColumn
 {

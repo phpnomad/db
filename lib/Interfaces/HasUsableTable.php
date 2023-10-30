@@ -1,6 +1,6 @@
 <?php
 
-namespace Phoenix\Database\Interfaces;
+namespace PHPNomad\Database\Interfaces;
 
 interface HasUsableTable
 {

@@ -1,11 +1,11 @@
 <?php
 
-namespace Phoenix\Database\Traits;
+namespace PHPNomad\Database\Traits;
 
-use Phoenix\Database\Abstracts\JunctionTable;
-use Phoenix\Database\Interfaces\QueryBuilder;
-use Phoenix\Datastore\Interfaces\Datastore;
-use Phoenix\Utils\Helpers\Arr;
+use PHPNomad\Database\Abstracts\JunctionTable;
+use PHPNomad\Database\Interfaces\QueryBuilder;
+use PHPNomad\Datastore\Interfaces\Datastore;
+use PHPNomad\Utils\Helpers\Arr;
 
 trait CanMakeJunctionQuery
 {

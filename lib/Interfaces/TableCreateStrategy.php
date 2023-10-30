@@ -1,10 +1,10 @@
 <?php
 
-namespace Phoenix\Database\Interfaces;
+namespace PHPNomad\Database\Interfaces;
 
-use Phoenix\Database\Exceptions\TableCreateFailedException;
-use Phoenix\Database\Exceptions\TableDropFailedException;
-use Phoenix\Database\Exceptions\TableNotFoundException;
+use PHPNomad\Database\Exceptions\TableCreateFailedException;
+use PHPNomad\Database\Exceptions\TableDropFailedException;
+use PHPNomad\Database\Exceptions\TableNotFoundException;
 
 interface TableCreateStrategy {
     /**

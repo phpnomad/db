@@ -1,28 +1,37 @@
 <?php
 
-namespace Phoenix\Database\Traits;
+namespace PHPNomad\Database\Traits;
 
-use Phoenix\Cache\Enums\Operation;
-use Phoenix\Core\Exceptions\ItemNotFound;
-use Phoenix\Database\Exceptions\RecordNotFoundException;
-use Phoenix\Database\Providers\DatabaseContextProvider;
-use Phoenix\Database\Providers\DatabaseServiceProvider;
-use Phoenix\Datastore\Exceptions\DatastoreErrorException;
-use Phoenix\Datastore\Exceptions\DuplicateEntryException;
-use Phoenix\Datastore\Interfaces\DataModel;
-use Phoenix\Utils\Helpers\Arr;
+use PHPNomad\Cache\Enums\Operation;
+use PHPNomad\Core\Exceptions\ItemNotFound;
+use PHPNomad\Database\Exceptions\RecordNotFoundException;
+use PHPNomad\Database\Interfaces\DatabaseContextProvider;
+use PHPNomad\Database\Interfaces\ModelAdapter;
+use PHPNomad\Database\Interfaces\Table;
+use PHPNomad\Database\Providers\DatabaseServiceProvider;
+use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
+use PHPNomad\Datastore\Exceptions\DuplicateEntryException;
+use PHPNomad\Datastore\Interfaces\DataModel;
+use PHPNomad\Utils\Helpers\Arr;
 
 trait WithDatastoreHandlerMethods
 {
     protected DatabaseServiceProvider $serviceProvider;
-    protected DatabaseContextProvider $contextProvider;
+    protected Table $table;
+
+    /**
+     * @var class-string<DataModel>
+     */
+    protected string $model;
+    protected ModelAdapter $modelAdapter;
+
 
     /** @inheritDoc */
     public function where(array $conditions, ?int $limit = null, ?int $offset = null): array
     {
         $this->serviceProvider->queryBuilder
-            ->select(...$this->contextProvider->table->getFieldsForIdentity())
-            ->from($this->contextProvider->table);
+            ->select(...$this->table->getFieldsForIdentity())
+            ->from($this->table);
 
         if ($limit) {
             $this->serviceProvider->queryBuilder->limit($limit);
@@ -49,7 +58,7 @@ trait WithDatastoreHandlerMethods
     /** @inheritDoc */
     public function create(array $attributes): DataModel
     {
-        $fields = $this->contextProvider->table->getFieldsForIdentity();
+        $fields = $this->table->getFieldsForIdentity();
         $ids = Arr::process($fields)
             ->flip()
             ->intersect($attributes, $fields)
@@ -126,7 +135,7 @@ trait WithDatastoreHandlerMethods
      */
     protected function getCacheContextForItem(array $identities): array
     {
-        return ['identities' => Arr::merge($identities), 'type' => $this->contextProvider->model];
+        return ['identities' => Arr::merge($identities), 'type' => $this->model];
     }
 
     /**
@@ -153,7 +162,7 @@ trait WithDatastoreHandlerMethods
      */
     protected function hydrateItems(array $data): array
     {
-        return Arr::map($data, [$this->contextProvider->modelAdapter, 'toModel']);
+        return Arr::map($data, [$this->modelAdapter, 'toModel']);
     }
 
     /**
@@ -166,8 +175,8 @@ trait WithDatastoreHandlerMethods
     public function findIds(array $conditions, ?int $limit = null, ?int $offset = null): array
     {
         $this->serviceProvider->queryBuilder
-            ->select(...$this->contextProvider->table->getFieldsForIdentity())
-            ->from($this->contextProvider->table);
+            ->select(...$this->table->getFieldsForIdentity())
+            ->from($this->table);
 
 
         if ($limit) {
@@ -202,8 +211,8 @@ trait WithDatastoreHandlerMethods
                 // Get the things that aren't in the cache.
                 $data = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder
                     ->select('*')
-                    ->compoundWhere($this->contextProvider->table->getFieldsForIdentity(), ...$idsToQuery)
-                    ->from($this->contextProvider->table)
+                    ->compoundWhere($this->table->getFieldsForIdentity(), ...$idsToQuery)
+                    ->from($this->table)
                 );
             } catch (DatastoreErrorException $e) {
                 $this->serviceProvider->loggerStrategy->logException($e, 'Could not get by ID');
@@ -228,12 +237,12 @@ trait WithDatastoreHandlerMethods
         return $this->serviceProvider->cacheableService->getWithCache(
             Operation::Read,
             $this->getCacheContextForItem($ids),
-            fn() => $this->contextProvider->modelAdapter->toModel(
+            fn() => $this->modelAdapter->toModel(
                 $this->serviceProvider->queryStrategy->query(
                     $this->serviceProvider->queryBuilder
                         ->select('*')
-                        ->from($this->contextProvider->table)
-                        ->compoundWhere($this->contextProvider->table->getFieldsForIdentity(), ...$ids)
+                        ->from($this->table)
+                        ->compoundWhere($this->table->getFieldsForIdentity(), ...$ids)
                         ->limit(1)
                 )
             )

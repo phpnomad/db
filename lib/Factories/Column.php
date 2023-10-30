@@ -1,6 +1,6 @@
 <?php
 
-namespace Phoenix\Database\Factories;
+namespace PHPNomad\Database\Factories;
 
 final class Column
 {
