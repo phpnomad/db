@@ -5,8 +5,10 @@ namespace PHPNomad\Database\Traits;
 namespace PHPNomad\Database\Traits;
 
 use InvalidArgumentException;
+use PHPNomad\Database\Exceptions\RecordNotFoundException;
 use PHPNomad\Datastore\Exceptions\DuplicateEntryException;
 use PHPNomad\Datastore\Interfaces\JunctionContextProvider;
+use PHPNomad\Utils\Helpers\Arr;
 
 trait WithDatabaseJunctionHandler
 {
@@ -62,7 +64,7 @@ trait WithDatabaseJunctionHandler
         $context = $this->getContextForResource($resource);
         $opposite = $this->getOppositeContext($context);
 
-        return $context->getDatastore()->findIds([$opposite->getJunctionFieldName(), '=', $id], $limit, $offset);
+        return $this->middleProvider->getDatastore()->where([['column' => $opposite->getJunctionFieldName(), 'operator' => '=', 'value' => $id]], $limit, $offset);
     }
 
     /** @inheritDoc */
@@ -71,19 +73,18 @@ trait WithDatabaseJunctionHandler
         $context = $this->getContextForResource($resource);
         $binding = $this->getOppositeContext($context);
 
-        $exists = $this->middleProvider->getDatastore()->where([
-            [$binding->getJunctionFieldName(), '=', $bindingId],
-            [$context->getJunctionFieldName(), '=', $id]
-        ], 1);
-
-        if ($exists) {
+        try {
+            $this->middleProvider->getDatastore()->where([
+                ['column' => $binding->getJunctionFieldName(), 'operator' => '=', 'value' => $bindingId],
+                ['column' => $context->getJunctionFieldName(), 'operator' => '=', 'value' => $id]
+            ], 1);
             throw new DuplicateEntryException('The specified binding already exists');
+        }catch(RecordNotFoundException $e){
+            $this->middleProvider->getDatastore()->create([
+                $binding->getJunctionFieldName() => $bindingId,
+                $context->getJunctionFieldName() => $id
+            ]);
         }
-
-        $this->middleProvider->getDatastore()->create([
-            $binding->getJunctionFieldName() => $bindingId,
-            $context->getJunctionFieldName() => $id
-        ]);
     }
 
     /** @inheritDoc */
@@ -102,8 +103,8 @@ trait WithDatabaseJunctionHandler
     public function getModelsFromResource(string $resource, int $id, int $limit, int $offset): array
     {
         $context = $this->getContextForResource($resource);
-        $ids = $this->getIdsFromResource($resource, $id, $limit, $offset);
+        $ids = Arr::pluck($this->getIdsFromResource($resource, $id, $limit, $offset), $context->getJunctionFieldName());
 
-        return $context->getDatastore()->where([['id', 'IN', $ids]]);
+        return $context->getDatastore()->where([['column' => 'id', 'operator' => 'IN', 'value' => $ids]]);
     }
 }

@@ -12,6 +12,7 @@ use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
 use PHPNomad\Datastore\Exceptions\DuplicateEntryException;
 use PHPNomad\Datastore\Interfaces\DataModel;
+use PHPNomad\Logger\Traits\CanLogException;
 use PHPNomad\Utils\Helpers\Arr;
 
 trait WithDatastoreHandlerMethods
@@ -30,8 +31,8 @@ trait WithDatastoreHandlerMethods
     public function where(array $conditions, ?int $limit = null, ?int $offset = null): array
     {
         $this->serviceProvider->queryBuilder
-            ->select(...$this->table->getFieldsForIdentity())
-            ->from($this->table);
+            ->from($this->table)
+            ->select(...$this->table->getFieldsForIdentity());
 
         if ($limit) {
             $this->serviceProvider->queryBuilder->limit($limit);
@@ -59,9 +60,9 @@ trait WithDatastoreHandlerMethods
     public function create(array $attributes): DataModel
     {
         $fields = $this->table->getFieldsForIdentity();
-        $ids = Arr::process($fields)
-            ->flip()
-            ->intersect($attributes, $fields)
+        $ids = Arr::process(array_keys($attributes))
+            ->intersect($fields)
+            ->map(fn($fieldName) => $attributes[$fieldName])
             ->toArray();
 
         // Validate item does not already exist.
@@ -75,12 +76,12 @@ trait WithDatastoreHandlerMethods
                     ->toString();
 
                 throw new DuplicateEntryException('The specified item identified as ' . $identity . ' already exists.');
-            } catch (ItemNotFound $e) {
+            } catch (RecordNotFoundException $e) {
                 //continue
             }
         }
 
-        $ids = $this->serviceProvider->queryStrategy->insert($attributes);
+        $ids = $this->serviceProvider->queryStrategy->insert($this->table, $attributes);
 
         return Arr::get($this->getModels([$ids]), 0);
     }
@@ -98,7 +99,7 @@ trait WithDatastoreHandlerMethods
 
         foreach ($items as $item) {
             $identity = $item->getIdentity();
-            $this->serviceProvider->queryStrategy->delete($identity);
+            $this->serviceProvider->queryStrategy->delete($this->table, $identity);
             $this->serviceProvider->cacheableService->delete($this->getCacheContextForItem($identity));
         }
     }
@@ -175,8 +176,8 @@ trait WithDatastoreHandlerMethods
     public function findIds(array $conditions, ?int $limit = null, ?int $offset = null): array
     {
         $this->serviceProvider->queryBuilder
-            ->select(...$this->table->getFieldsForIdentity())
-            ->from($this->table);
+            ->from($this->table)
+            ->select(...$this->table->getFieldsForIdentity());
 
 
         if ($limit) {
@@ -209,10 +210,11 @@ trait WithDatastoreHandlerMethods
         if (!empty($idsToQuery)) {
             try {
                 // Get the things that aren't in the cache.
-                $data = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder
-                    ->select('*')
-                    ->compoundWhere($this->table->getFieldsForIdentity(), ...$idsToQuery)
-                    ->from($this->table)
+                $data = $this->serviceProvider->queryStrategy->query(
+                    $this->serviceProvider->queryBuilder
+                        ->from($this->table)
+                        ->select('*')
+                        ->compoundWhere($this->table->getFieldsForIdentity(), ...$idsToQuery)
                 );
             } catch (DatastoreErrorException $e) {
                 $this->serviceProvider->loggerStrategy->logException($e, 'Could not get by ID');
@@ -227,25 +229,37 @@ trait WithDatastoreHandlerMethods
     }
 
     /**
-     * @param array $ids
+     * @param non-empty-array<string, int> $ids
      * @return mixed
      * @throws DatastoreErrorException
      * @throws RecordNotFoundException
      */
     protected function findFromCompound(array $ids)
     {
+        if (empty($ids)) {
+            throw new RecordNotFoundException('Record cannot be found, no IDs provided.');
+        }
+
         return $this->serviceProvider->cacheableService->getWithCache(
             Operation::Read,
             $this->getCacheContextForItem($ids),
-            fn() => $this->modelAdapter->toModel(
-                $this->serviceProvider->queryStrategy->query(
+            function () use ($ids){
+                $items = $this->serviceProvider->queryStrategy->query(
                     $this->serviceProvider->queryBuilder
                         ->select('*')
                         ->from($this->table)
-                        ->compoundWhere($this->table->getFieldsForIdentity(), ...$ids)
+                        ->compoundWhere($this->table->getFieldsForIdentity(), $ids)
                         ->limit(1)
-                )
-            )
+                );
+
+                $item = Arr::get($items,0);
+
+                if(!$item){
+                    throw new RecordNotFoundException('Record not found using the provided identity');
+                }
+
+                return $this->modelAdapter->toModel($item);
+            }
         );
     }
 
@@ -255,7 +269,7 @@ trait WithDatastoreHandlerMethods
     {
         $this->findFromCompound($ids);
 
-        $this->serviceProvider->queryStrategy->update($ids, $attributes);
+        $this->serviceProvider->queryStrategy->update($this->table, $ids, $attributes);
         $this->serviceProvider->cacheableService->delete($this->getCacheContextForItem($ids));
     }
 }

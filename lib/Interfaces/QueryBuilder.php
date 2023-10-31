@@ -7,7 +7,7 @@ use PHPNomad\Database\Exceptions\QueryBuilderException;
 /**
  * Builder class to create safe SQL queries
  */
-interface QueryBuilder
+interface QueryBuilder extends HasUsableTable
 {
     /**
      * Set fields to select. Uses the alias from the provided Table object
