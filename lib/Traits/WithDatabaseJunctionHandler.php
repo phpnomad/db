@@ -94,8 +94,8 @@ trait WithDatabaseJunctionHandler
         $binding = $this->getOppositeContext($context);
 
         $this->middleProvider->getDatastore()->deleteWhere([
-            [$binding->getJunctionFieldName(), '=', $bindingId],
-            [$context->getJunctionFieldName(), '=', $id]
+            ['column' => $binding->getJunctionFieldName(), 'operator' => '=', 'value' => $bindingId],
+            ['column' => $context->getJunctionFieldName(), 'operator' => '=', 'value' => $id]
         ]);
     }
 

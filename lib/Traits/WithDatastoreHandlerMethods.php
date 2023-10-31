@@ -12,8 +12,10 @@ use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
 use PHPNomad\Datastore\Exceptions\DuplicateEntryException;
 use PHPNomad\Datastore\Interfaces\DataModel;
+use PHPNomad\Datastore\Interfaces\HasSingleIntIdentity;
 use PHPNomad\Logger\Traits\CanLogException;
 use PHPNomad\Utils\Helpers\Arr;
+use PHPNomad\Utils\Helpers\Obj;
 
 trait WithDatastoreHandlerMethods
 {
@@ -53,31 +55,43 @@ trait WithDatastoreHandlerMethods
 
     public function findBy(string $field, $value): DataModel
     {
-        return Arr::get($this->where([[$field, '=', $value]], 1), 0);
+        return Arr::get($this->where([['column' => $field, 'operator' => '=', 'value' => $value]], 1), 0);
     }
 
     /** @inheritDoc */
     public function create(array $attributes): DataModel
     {
         $fields = $this->table->getFieldsForIdentity();
-        $ids = Arr::process(array_keys($attributes))
-            ->intersect($fields)
-            ->map(fn($fieldName) => $attributes[$fieldName])
-            ->toArray();
 
-        // Validate item does not already exist.
-        if (count($ids) === count($fields)) {
-            try {
-                $this->findFromCompound($ids);
+        if(Obj::implements($this->model, HasSingleIntIdentity::class)){
+            foreach($attributes as $fieldName => $value){
+                if(in_array($fieldName, $fields)){
+                    unset($attributes[$fieldName]);
+                }
+            }
+        } else{
+            $ids = [];
 
-                $identity = Arr::process($ids)
-                    ->map(fn($item, $key) => $item . ' => ' . $key)
-                    ->setSeparator(',')
-                    ->toString();
+            foreach($attributes as $fieldName => $value){
+                if(in_array($fieldName, $fields)){
+                    $ids[$fieldName] = $value;
+                }
+            }
 
-                throw new DuplicateEntryException('The specified item identified as ' . $identity . ' already exists.');
-            } catch (RecordNotFoundException $e) {
-                //continue
+            // Validate item does not already exist.
+            if (count($ids) === count($fields)) {
+                try {
+                    $this->findFromCompound($ids);
+
+                    $identity = Arr::process($ids)
+                        ->map(fn($item, $key) => $item . ' => ' . $key)
+                        ->setSeparator(',')
+                        ->toString();
+
+                    throw new DuplicateEntryException('The specified item identified as ' . $identity . ' already exists.');
+                } catch (RecordNotFoundException $e) {
+                    //continue
+                }
             }
         }
 

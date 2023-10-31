@@ -23,12 +23,12 @@ abstract class IdentifiableDatabaseDatastoreHandler implements Datastore, Datast
     /** @inheritDoc */
     public function delete($id): void
     {
-        $this->deleteWhere([['id', '=', $id]]);
+        $this->deleteWhere([['column' => 'id', 'operator' => '=', 'value' => $id]]);
     }
 
     /** @inheritDoc */
     public function update($id, array $attributes): void
     {
-        $this->updateCompound(['id', '=', $id], $attributes);
+        $this->updateCompound(['id' => $id], $attributes);
     }
 }
