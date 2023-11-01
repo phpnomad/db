@@ -3,6 +3,7 @@
 namespace PHPNomad\Database\Abstracts;
 
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
+use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Traits\WithDatastoreHandlerMethods;
 use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Datastore\Interfaces\Datastore;
@@ -13,6 +14,7 @@ abstract class IdentifiableDatabaseDatastoreHandler implements Datastore, Datast
     use WithDatastoreHandlerMethods;
 
     protected DatabaseServiceProvider $serviceProvider;
+    protected TableSchemaService $tableSchemaService;
 
     /** @inheritDoc */
     public function find($id): DataModel

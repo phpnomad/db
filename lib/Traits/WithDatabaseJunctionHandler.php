@@ -64,7 +64,7 @@ trait WithDatabaseJunctionHandler
         $context = $this->getContextForResource($resource);
         $opposite = $this->getOppositeContext($context);
 
-        return $this->middleProvider->getDatastore()->where([['column' => $opposite->getJunctionFieldName(), 'operator' => '=', 'value' => $id]], $limit, $offset);
+        return $this->middleProvider->getDatastore()->andWhere([['column' => $opposite->getJunctionFieldName(), 'operator' => '=', 'value' => $id]], $limit, $offset);
     }
 
     /** @inheritDoc */
@@ -74,10 +74,10 @@ trait WithDatabaseJunctionHandler
         $binding = $this->getOppositeContext($context);
 
         try {
-            $this->middleProvider->getDatastore()->where([
+            $this->middleProvider->getDatastore()->andWhere([
                 ['column' => $binding->getJunctionFieldName(), 'operator' => '=', 'value' => $bindingId],
                 ['column' => $context->getJunctionFieldName(), 'operator' => '=', 'value' => $id]
-            ], 1);
+            ],                                              1);
             throw new DuplicateEntryException('The specified binding already exists');
         }catch(RecordNotFoundException $e){
             $this->middleProvider->getDatastore()->create([
@@ -105,6 +105,6 @@ trait WithDatabaseJunctionHandler
         $context = $this->getContextForResource($resource);
         $ids = Arr::pluck($this->getIdsFromResource($resource, $id, $limit, $offset), $context->getJunctionFieldName());
 
-        return $context->getDatastore()->where([['column' => 'id', 'operator' => 'IN', 'value' => $ids]]);
+        return $context->getDatastore()->andWhere([['column' => 'id', 'operator' => 'IN', 'value' => $ids]]);
     }
 }
