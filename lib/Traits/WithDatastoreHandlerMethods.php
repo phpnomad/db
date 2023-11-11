@@ -359,6 +359,10 @@ trait WithDatastoreHandlerMethods
             }
         }
 
+        if(empty($where)){
+            return [];
+        }
+
         return $this->orWhere($where);
     }
 
