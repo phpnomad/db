@@ -4,7 +4,7 @@ namespace PHPNomad\Database\Traits;
 
 namespace PHPNomad\Database\Traits;
 
-use PHPNomad\Database\Interfaces\ModelAdapter;
+use PHPNomad\Datastore\Interfaces\ModelAdapter;
 use PHPNomad\Datastore\Interfaces\DataModel;
 
 /**

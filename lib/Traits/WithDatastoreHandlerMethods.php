@@ -6,7 +6,7 @@ use PHPNomad\Cache\Enums\Operation;
 use PHPNomad\Core\Exceptions\ItemNotFound;
 use PHPNomad\Database\Exceptions\RecordNotFoundException;
 use PHPNomad\Database\Interfaces\DatabaseContextProvider;
-use PHPNomad\Database\Interfaces\ModelAdapter;
+use PHPNomad\Datastore\Interfaces\ModelAdapter;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
