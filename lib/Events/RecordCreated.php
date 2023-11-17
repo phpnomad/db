@@ -3,49 +3,21 @@
 namespace PHPNomad\Database\Events;
 
 use PHPNomad\Database\Interfaces\Table;
+use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Events\Interfaces\Event;
 
 class RecordCreated implements Event
 {
-    protected Table $table;
-    protected array $data;
-    protected int $dataId;
+    protected DataModel $record;
 
-    public function __construct(Table $table, array $data, int $dataId)
+    public function __construct(DataModel $record)
     {
-        $this->table = $table;
-        $this->data = $data;
-        $this->dataId = $dataId;
+        $this->record = $record;
     }
 
-    /**
-     * Gets the table this record was created in.
-     *
-     * @return Table
-     */
-    public function getTable(): Table
+    public function getRecord(): DataModel
     {
-        return $this->table;
-    }
-
-    /**
-     * Gets the data used to store the record in the database.
-     *
-     * @return array
-     */
-    public function getData(): array
-    {
-        return $this->data;
-    }
-
-    /**
-     * Gets the record ID
-     *
-     * @return int
-     */
-    public function getDataId(): int
-    {
-        return $this->dataId;
+        return $this->record;
     }
 
     public static function getId(): string

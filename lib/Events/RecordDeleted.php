@@ -3,38 +3,42 @@
 namespace PHPNomad\Database\Events;
 
 use PHPNomad\Database\Interfaces\Table;
+use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Events\Interfaces\Event;
 
 class RecordDeleted implements Event
 {
+    protected string $type;
+    protected array $identity;
 
-    protected Table $table;
-    protected int $dataId;
-
-    public function __construct(Table $table, int $dataId)
+    /**
+     * @param class-string<DataModel>|string $type
+     * @param array $identity
+     */
+    public function __construct(string $type, array $identity)
     {
-        $this->table = $table;
-        $this->dataId = $dataId;
+        $this->type = $type;
+        $this->identity = $identity;
     }
 
     /**
-     * Gets the record ID that was deleted.
+     * Gets the identity for the record that was deleted.
      *
-     * @return int
+     * @return array
      */
-    public function getDataId(): int
+    public function getIdentity(): array
     {
-        return $this->dataId;
+        return $this->identity;
     }
 
     /**
-     * Gets the table this record was deleted from.
+     * Gets the model type this record was deleted from.
      *
-     * @return \PHPNomad\Database\Interfaces\Table
+     * @return string
      */
-    public function getTable(): Table
+    public function getType(): string
     {
-        return $this->table;
+        return $this->type;
     }
 
     public static function getId(): string

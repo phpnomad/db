@@ -4,6 +4,10 @@ namespace PHPNomad\Database\Traits;
 
 use PHPNomad\Cache\Enums\Operation;
 use PHPNomad\Core\Exceptions\ItemNotFound;
+use PHPNomad\Core\Facades\Event;
+use PHPNomad\Database\Events\RecordCreated;
+use PHPNomad\Database\Events\RecordDeleted;
+use PHPNomad\Database\Events\RecordUpdated;
 use PHPNomad\Database\Exceptions\RecordNotFoundException;
 use PHPNomad\Database\Interfaces\DatabaseContextProvider;
 use PHPNomad\Datastore\Interfaces\ModelAdapter;
@@ -100,7 +104,11 @@ trait WithDatastoreHandlerMethods
 
         $ids = $this->serviceProvider->queryStrategy->insert($this->table, $attributes);
 
-        return Arr::get($this->getModels([$ids]), 0);
+        $result = Arr::get($this->getModels([$ids]), 0);
+
+        Event::broadcast(new RecordCreated($result));
+
+        return $result;
     }
 
     /**
@@ -116,8 +124,11 @@ trait WithDatastoreHandlerMethods
 
         foreach ($items as $item) {
             $identity = $item->getIdentity();
+
             $this->serviceProvider->queryStrategy->delete($this->table, $identity);
             $this->serviceProvider->cacheableService->delete($this->getCacheContextForItem($identity));
+
+            Event::broadcast(new RecordDeleted($this->model, $identity));
         }
     }
 
@@ -293,6 +304,8 @@ trait WithDatastoreHandlerMethods
 
         $this->serviceProvider->queryStrategy->update($this->table, $ids, $attributes);
         $this->serviceProvider->cacheableService->delete($this->getCacheContextForItem($ids));
+
+        Event::broadcast(new RecordUpdated($this->model, $ids, $attributes));
     }
 
     /**
@@ -359,7 +372,7 @@ trait WithDatastoreHandlerMethods
             }
         }
 
-        if(empty($where)){
+        if (empty($where)) {
             return [];
         }
 
