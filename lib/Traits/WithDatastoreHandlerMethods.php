@@ -37,52 +37,50 @@ trait WithDatastoreHandlerMethods
 
 
     /** @inheritDoc */
-    public function andWhere(array $conditions, ?int $limit = null, ?int $offset = null): array
+    public function andWhere(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): array
     {
-        $this->serviceProvider->queryBuilder
-            ->from($this->table)
-            ->select(...$this->table->getFieldsForIdentity());
-
-        if ($limit) {
-            $this->serviceProvider->queryBuilder->limit($limit);
-        }
-
-        if ($offset) {
-            $this->serviceProvider->queryBuilder->offset($offset);
-        }
-
-        if (!empty($conditions)) {
-            $this->buildConditions($conditions);
-        }
-
+        $this->buildAndConditions($conditions, $limit, $offset, $orderBy, $order);
         $ids = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
 
         return $this->getModels($ids);
     }
 
     /** @inheritDoc */
-    public function orWhere(array $conditions, ?int $limit = null, ?int $offset = null): array
+    public function orWhere(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): array
     {
-        $this->serviceProvider->queryBuilder
-            ->from($this->table)
-            ->select(...$this->table->getFieldsForIdentity());
-
-        if ($limit) {
-            $this->serviceProvider->queryBuilder->limit($limit);
-        }
-
-        if ($offset) {
-            $this->serviceProvider->queryBuilder->offset($offset);
-        }
-
-        if (!empty($conditions)) {
-            $this->buildConditions($conditions, 'or');
-        }
+        $this->buildOrConditions($conditions, $limit, $offset, $orderBy, $order);
 
         $ids = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
 
         return $this->getModels($ids);
     }
+
+    public function countAndWhere(array $conditions): int
+    {
+        $this->buildAndConditions($conditions);
+
+        $this->serviceProvider->queryBuilder->count('*', 'count');
+
+        $results = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
+
+        $result = (array) Arr::first($results);
+
+        return Arr::get($result, 'count', 0);
+    }
+
+    public function countOrWhere(array $conditions): int
+    {
+        $this->buildOrConditions($conditions);
+
+        $this->serviceProvider->queryBuilder->count('*', 'count');
+
+        $results = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
+
+        $result = (array) Arr::first($results);
+
+        return Arr::get($result, 'count', 0);
+    }
+
 
     public function findBy(string $field, $value): DataModel
     {
@@ -405,6 +403,52 @@ trait WithDatastoreHandlerMethods
 
         if (!empty($duplicates)) {
             throw new DuplicateEntryException('Database operation stopped early because duplicate entries were detected.');
+        }
+    }
+
+    protected function buildOrConditions(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): void
+    {
+        $this->serviceProvider->queryBuilder
+            ->from($this->table)
+            ->select(...$this->table->getFieldsForIdentity());
+
+        if ($limit) {
+            $this->serviceProvider->queryBuilder->limit($limit);
+        }
+
+        if ($offset) {
+            $this->serviceProvider->queryBuilder->offset($offset);
+        }
+
+        if($orderBy){
+            $this->serviceProvider->queryBuilder->orderBy($orderBy, $order);
+        }
+
+        if (!empty($conditions)) {
+            $this->buildConditions($conditions, 'or');
+        }
+    }
+
+    protected function buildAndConditions(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): void
+    {
+        $this->serviceProvider->queryBuilder
+            ->from($this->table)
+            ->select(...$this->table->getFieldsForIdentity());
+
+        if ($limit) {
+            $this->serviceProvider->queryBuilder->limit($limit);
+        }
+
+        if ($offset) {
+            $this->serviceProvider->queryBuilder->offset($offset);
+        }
+
+        if($orderBy){
+            $this->serviceProvider->queryBuilder->orderBy($orderBy, $order);
+        }
+
+        if (!empty($conditions)) {
+            $this->buildConditions($conditions);
         }
     }
 }
