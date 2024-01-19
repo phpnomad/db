@@ -12,6 +12,7 @@ use PHPNomad\Database\Interfaces\HasLocalDatabasePrefix;
 use PHPNomad\Database\Interfaces\Table as TableInterface;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Utils\Helpers\Arr;
+use RuntimeException;
 
 abstract class JunctionTable extends Table
 {
@@ -134,11 +135,23 @@ abstract class JunctionTable extends Table
      */
     protected function buildForeignKeyFor(string $columnName, TableInterface $references): Index
     {
+        $primaryColumns = $this->tableSchemaService->getPrimaryColumnsForTable($references);
+
+        // Find the corresponding primary column by the column name
+        $primaryColumn = Arr::find(
+            $primaryColumns,
+            fn(Column $column) => $column->getName() === $columnName
+        );
+
+        if ($primaryColumn === null) {
+            throw new RuntimeException("Primary key column with name: $columnName does not exist.");
+        }
+
         return new Index(
             [$columnName],
             null,
             'FOREIGN KEY',
-            "REFERENCES {$references->getName()}({$this->tableSchemaService->getPrimaryColumnForTable($references)->getName()})"
+            "REFERENCES {$references->getName()}({$primaryColumn->getName()})"
         );
     }
 

@@ -2,12 +2,14 @@
 
 namespace PHPNomad\Database\Abstracts;
 
+use PHPNomad\Database\Factories\Column;
 use PHPNomad\Database\Interfaces\HasCharsetProvider;
 use PHPNomad\Database\Interfaces\HasCollateProvider;
 use PHPNomad\Database\Interfaces\HasGlobalDatabasePrefix;
 use PHPNomad\Database\Interfaces\HasLocalDatabasePrefix;
 use PHPNomad\Database\Interfaces\Table as CoreTable;
 use PHPNomad\Database\Services\TableSchemaService;
+use PHPNomad\Utils\Helpers\Arr;
 use PHPNomad\Utils\Helpers\Str;
 
 abstract class Table implements CoreTable
@@ -71,6 +73,6 @@ abstract class Table implements CoreTable
     /** @inheritDoc */
     public function getFieldsForIdentity(): array
     {
-        return [$this->tableSchemaService->getPrimaryColumnForTable($this)->getName()];
+        return Arr::map($this->tableSchemaService->getPrimaryColumnsForTable($this), fn(Column $column) => $column->getName());
     }
 }

@@ -21,18 +21,51 @@ class TableSchemaService
 
     /**
      * @param TableInterface $table
-     * @return Column
+     * @return Column[]
      */
-    public function getPrimaryColumnForTable(TableInterface $table): Column
+    public function getPrimaryColumnsForTable(TableInterface $table): array
     {
         return $this->cacheableService->getWithCache(
             Operation::Read,
-            $this->getCacheContext($table->getName() . 'PrimaryColumn'),
-            fn() => Arr::find(
-                $table->getColumns(),
-                fn(Column $column) => Arr::hasValues($column->getAttributes(), 'PRIMARY KEY')
-            )
+            $this->getCacheContext($table->getName() . 'PrimaryColumns'),
+            fn() => $this->findPrimaryColumns($table)
         );
+    }
+
+    /**
+     * Locates the primary columns used for this table.
+     *
+     * @param TableInterface $table
+     * @return Column[]
+     */
+    private function findPrimaryColumns(TableInterface $table): array
+    {
+        $primaryColumns = Arr::filter(
+            $table->getColumns(),
+            fn(Column $column) => Arr::hasValues($column->getAttributes(), 'PRIMARY KEY')
+        );
+
+        /** @var ?Index $primaryKeyIndex */
+        $primaryKeyIndex = Arr::find(
+            $table->getIndices(),
+            fn(Index $index) => $index->getType() === 'PRIMARY KEY'
+        );
+
+        if ($primaryKeyIndex) {
+            $primaryColumns = Arr::merge($primaryColumns, $this->getIndexColumns($table, $primaryKeyIndex));
+        }
+
+        return $primaryColumns;
+    }
+
+    /**
+     * @param TableInterface $table
+     * @param Index $index
+     * @return Column[]
+     */
+    private function getIndexColumns(TableInterface $table, Index $index): array
+    {
+        return Arr::filter($table->getColumns(), fn(Column $column) => in_array($column->getName(), $index->getColumns()));
     }
 
     /**
@@ -70,7 +103,7 @@ class TableSchemaService
      */
     public function getJunctionColumnNameFromTable(TableInterface $table): string
     {
-        return $table->getSingularUnprefixedName() . ucfirst($this->getPrimaryColumnForTable($table)->getName());
+        return $table->getSingularUnprefixedName() . 'BindingId';
     }
 
     /**
