@@ -3,6 +3,7 @@
 namespace PHPNomad\Database\Abstracts;
 
 use PHPNomad\Cache\Traits\WithInstanceCache;
+use PHPNomad\Database\Exceptions\ColumnNotFoundException;
 use PHPNomad\Database\Factories\Column;
 use PHPNomad\Database\Factories\Index;
 use PHPNomad\Database\Interfaces\HasCharsetProvider;
@@ -12,7 +13,6 @@ use PHPNomad\Database\Interfaces\HasLocalDatabasePrefix;
 use PHPNomad\Database\Interfaces\Table as TableInterface;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Utils\Helpers\Arr;
-use RuntimeException;
 
 abstract class JunctionTable extends Table
 {
@@ -144,7 +144,7 @@ abstract class JunctionTable extends Table
         );
 
         if ($primaryColumn === null) {
-            throw new RuntimeException("Primary key column with name: $columnName does not exist.");
+            throw new ColumnNotFoundException("Primary key column with name: $columnName does not exist.");
         }
 
         return new Index(

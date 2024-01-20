@@ -4,6 +4,7 @@ namespace PHPNomad\Database\Services;
 
 use PHPNomad\Cache\Enums\Operation;
 use PHPNomad\Cache\Services\CacheableService;
+use PHPNomad\Database\Exceptions\ColumnNotFoundException;
 use PHPNomad\Database\Factories\Column;
 use PHPNomad\Database\Factories\Index;
 use PHPNomad\Database\Interfaces\Table as TableInterface;
@@ -103,7 +104,15 @@ class TableSchemaService
      */
     public function getJunctionColumnNameFromTable(TableInterface $table): string
     {
-        return $table->getSingularUnprefixedName() . 'BindingId';
+        // Get the primary columns of the given table.
+        $primaryColumns = $this->getPrimaryColumnsForTable($table);
+
+        // If there's not exactly one primary column, throw an exception.
+        if (count($primaryColumns) !== 1) {
+            throw new ColumnNotFoundException('Junction Tables must have exactly one primary key column.');
+        }
+
+        return $table->getSingularUnprefixedName() . ucfirst(Arr::first($primaryColumns)->getName());
     }
 
     /**
