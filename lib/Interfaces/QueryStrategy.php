@@ -47,4 +47,12 @@ interface QueryStrategy
      * @throws DatastoreErrorException
      */
     public function update(Table $table, array $ids, array $data): void;
+
+    /**
+     * Retrieves an estimated count of records.
+     *
+     * @return int The estimated count of records.
+     * @throws DatastoreErrorException
+     */
+    public function estimatedCount(Table $table): int;
 }

@@ -3,14 +3,11 @@
 namespace PHPNomad\Database\Traits;
 
 use PHPNomad\Cache\Enums\Operation;
-use PHPNomad\Core\Exceptions\ItemNotFound;
 use PHPNomad\Core\Facades\Event;
 use PHPNomad\Database\Events\RecordCreated;
 use PHPNomad\Database\Events\RecordDeleted;
 use PHPNomad\Database\Events\RecordUpdated;
 use PHPNomad\Database\Exceptions\RecordNotFoundException;
-use PHPNomad\Database\Interfaces\DatabaseContextProvider;
-use PHPNomad\Datastore\Interfaces\ModelAdapter;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
@@ -19,7 +16,7 @@ use PHPNomad\Datastore\Exceptions\DuplicateEntryException;
 use PHPNomad\Datastore\Interfaces\CanIdentify;
 use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Datastore\Interfaces\HasSingleIntIdentity;
-use PHPNomad\Logger\Traits\CanLogException;
+use PHPNomad\Datastore\Interfaces\ModelAdapter;
 use PHPNomad\Utils\Helpers\Arr;
 use PHPNomad\Utils\Helpers\Obj;
 
@@ -35,6 +32,16 @@ trait WithDatastoreHandlerMethods
     protected string $model;
     protected ModelAdapter $modelAdapter;
 
+    /**
+     * @inheritDoc
+     */
+    public function getEstimatedCount(): int
+    {
+        return $this->serviceProvider->cacheableService
+            ->getWithCache('estimatedCount', ['type' => $this->model], function () {
+                return $this->serviceProvider->queryStrategy->estimatedCount($this->table);
+            });
+    }
 
     /** @inheritDoc */
     public function andWhere(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): array
@@ -63,7 +70,7 @@ trait WithDatastoreHandlerMethods
 
         $results = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
 
-        $result = (array) Arr::first($results);
+        $result = (array)Arr::first($results);
 
         return Arr::get($result, 'count', 0);
     }
@@ -76,7 +83,7 @@ trait WithDatastoreHandlerMethods
 
         $results = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
 
-        $result = (array) Arr::first($results);
+        $result = (array)Arr::first($results);
 
         return Arr::get($result, 'count', 0);
     }
@@ -420,7 +427,7 @@ trait WithDatastoreHandlerMethods
             $this->serviceProvider->queryBuilder->offset($offset);
         }
 
-        if($orderBy){
+        if ($orderBy) {
             $this->serviceProvider->queryBuilder->orderBy($orderBy, $order);
         }
 
@@ -443,7 +450,7 @@ trait WithDatastoreHandlerMethods
             $this->serviceProvider->queryBuilder->offset($offset);
         }
 
-        if($orderBy){
+        if ($orderBy) {
             $this->serviceProvider->queryBuilder->orderBy($orderBy, $order);
         }
 
