@@ -68,7 +68,11 @@ trait WithDatastoreHandlerMethods
 
         $this->serviceProvider->queryBuilder->count('*', 'count');
 
-        $results = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
+        try {
+            $results = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
+        }catch(RecordNotFoundException $e){
+            return 0;
+        }
 
         $result = (array)Arr::first($results);
 
@@ -81,7 +85,11 @@ trait WithDatastoreHandlerMethods
 
         $this->serviceProvider->queryBuilder->count('*', 'count');
 
+        try{
         $results = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
+        }catch(RecordNotFoundException $e){
+            return 0;
+        }
 
         $result = (array)Arr::first($results);
 
