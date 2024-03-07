@@ -12,14 +12,14 @@ final class Column
 	/**
 	 * @param string   $name
 	 * @param string   $type
-	 * @param int|null $length
+	 * @param array|null $typeArgs
 	 * @param          ...$attributes
 	 */
-    public function __construct(string $name, string $type, ?int $length = null, ...$attributes)
+    public function __construct(string $name, string $type, ?array $typeArgs = null, ...$attributes)
     {
         $this->name = $name;
         $this->type = $type;
-        $this->length = $length;
+        $this->length = $typeArgs;
         $this->attributes = $attributes;
     }
 
@@ -46,9 +46,9 @@ final class Column
     /**
      * Returns the length limitation on the item, or null if not set.
      *
-     * @return ?int
+     * @return ?array
      */
-    public function getLength(): ?int
+    public function getTypeArgs(): ?array
     {
         return $this->length;
     }
