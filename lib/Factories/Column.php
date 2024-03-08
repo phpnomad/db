@@ -6,7 +6,7 @@ final class Column
 {
     protected string $name;
     protected string $type;
-    protected ?int $length = null;
+    protected ?array $typeArgs = null;
     protected array $attributes = [];
 
 	/**
@@ -19,7 +19,7 @@ final class Column
     {
         $this->name = $name;
         $this->type = $type;
-        $this->length = $typeArgs;
+        $this->typeArgs = $typeArgs;
         $this->attributes = $attributes;
     }
 
@@ -50,7 +50,7 @@ final class Column
      */
     public function getTypeArgs(): ?array
     {
-        return $this->length;
+        return $this->typeArgs;
     }
 
     /**
