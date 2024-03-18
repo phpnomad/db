@@ -344,8 +344,8 @@ trait WithDatastoreHandlerMethods
                 $this->findFromCompound($ids);
 
                 $identity = Arr::process($ids)
-                    ->map(fn($item, $key) => $item . ' => ' . $key)
-                    ->setSeparator(',')
+                    ->each(fn($item, $key) => $key . ' => ' . $item)
+                    ->setSeparator(', ')
                     ->toString();
 
                 throw new DuplicateEntryException('The specified item identified as ' . $identity . ' already exists.');
