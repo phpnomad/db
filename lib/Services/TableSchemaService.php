@@ -73,7 +73,7 @@ class TableSchemaService
      * Gets the unique columns in the specified table.
      *
      * @param TableInterface $table
-     * @return Column[]
+     * @return string[][]
      */
     public function getUniqueColumns(TableInterface $table): array
     {
@@ -84,15 +84,10 @@ class TableSchemaService
                 ->equals('type', 'UNIQUE')
                 ->filter();
 
-            $columns = Arr::reduce(
+            return Arr::map(
                 $uniqueIndices,
-                fn (array $acc, Index $index) => array_merge($acc, $index->getColumns()),
-                []
+                fn (Index $index) => $index->getColumns()
             );
-
-            return (new ListFilter($table->getColumns()))
-                ->in('name', ...$columns)
-                ->filter();
         });
     }
 

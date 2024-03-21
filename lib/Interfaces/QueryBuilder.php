@@ -25,48 +25,12 @@ interface QueryBuilder extends HasUsableTable
     public function from(Table $table);
 
     /**
-     * Creates, or overrides the where clause with a compound statement.
+     * Creates, or overrides the where clause builder used in this query.
      *
-     * @param array $fields The field name
-     * @param string $operand The operand to use in the clause
-     * @param array<scalar> $valueSet The expected value, or multiple values
-     * @param array<scalar>[] $valueSet Optional. Additional values for operands that accept multiple values.
+     * @param ?ClauseBuilder $clauseBuilder The clause builder to use in this query, or null to remove the builder.
      * @return $this
      */
-    public function compoundWhere(array $fields, array $valueSet, array ...$valueSets);
-
-    /**
-     * Creates, or overrides the where clause.
-     *
-     * @param string $field The field name
-     * @param string $operand The operand to use in the clause
-     * @param scalar $value The expected value, or multiple values
-     * @param (int|float|string)[] $values Optional. Additional values for operands that accept multiple values.
-     * @return $this
-     */
-    public function where(string $field, string $operand, $value, ...$values);
-
-    /**
-     * appends an AND statement to the where clause
-     *
-     * @param string $field The field name
-     * @param string $operand The operand to use in the clause
-     * @param scalar $value The expected value, or multiple values
-     * @param (int|float|string)[] $values Optional. Additional values for operands that accept multiple values.
-     * @return $this
-     */
-    public function andWhere(string $field, string $operand, $value, ...$values);
-
-    /**
-     * appends a OR statement to the where clause
-     *
-     * @param string $field The field name
-     * @param string $operand The operand to use in the clause
-     * @param scalar $value The expected value, or multiple values
-     * @param (int|float|string)[] $values Optional. Additional values for operands that accept multiple values.
-     * @return $this
-     */
-    public function orWhere(string $field, string $operand, $value, ...$values);
+    public function where(?ClauseBuilder $clauseBuilder);
 
     /**
      * Adds, or overrides the LEFT JOIN clause.

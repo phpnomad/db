@@ -44,33 +44,46 @@ trait WithDatastoreHandlerMethods
     }
 
     /** @inheritDoc */
-    public function andWhere(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): array
+    public function where(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): array
     {
-        $this->buildAndConditions($conditions, $limit, $offset, $orderBy, $order);
+        $this->initiateQuery($limit, $offset, $orderBy, $order)->buildConditions($conditions);
         $ids = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
 
         return $this->getModels($ids);
     }
 
     /** @inheritDoc */
-    public function orWhere(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): array
+    public function andWhere(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): array
     {
-        $this->buildOrConditions($conditions, $limit, $offset, $orderBy, $order);
-
-        $ids = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
-
-        return $this->getModels($ids);
+        return $this->where([
+            [
+                'type' => 'AND',
+                'clauses' => $conditions
+            ],
+        ], $limit, $offset, $orderBy, $order);
     }
 
-    public function countAndWhere(array $conditions): int
+    /** @inheritDoc */
+    public function orWhere(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): array
     {
-        $this->buildAndConditions($conditions);
+        return $this->where([
+            [
+                'type' => 'OR',
+                'clauses' => $conditions
+            ]
+        ], $limit, $offset, $orderBy, $order);
+    }
+
+    /** @inheritDoc */
+    public function countWhere(array $conditions): int
+    {
+        $this->initiateQuery()->buildConditions($conditions);
 
         $this->serviceProvider->queryBuilder->count('*', 'count');
 
         try {
             $results = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
-        }catch(RecordNotFoundException $e){
+        } catch (RecordNotFoundException $e) {
             return 0;
         }
 
@@ -79,24 +92,29 @@ trait WithDatastoreHandlerMethods
         return Arr::get($result, 'count', 0);
     }
 
+    /** @inheritDoc */
+    public function countAndWhere(array $conditions): int
+    {
+        return $this->countWhere([
+            [
+                'type' => 'AND',
+                'clauses' => $conditions
+            ]
+        ]);
+    }
+
+    /** @inheritDoc */
     public function countOrWhere(array $conditions): int
     {
-        $this->buildOrConditions($conditions);
-
-        $this->serviceProvider->queryBuilder->count('*', 'count');
-
-        try{
-        $results = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
-        }catch(RecordNotFoundException $e){
-            return 0;
-        }
-
-        $result = (array)Arr::first($results);
-
-        return Arr::get($result, 'count', 0);
+        return $this->countWhere([
+            [
+                'type' => 'OR',
+                'clauses' => $conditions
+            ]
+        ]);
     }
 
-
+    /** @inheritDoc */
     public function findBy(string $field, $value): DataModel
     {
         return Arr::get($this->andWhere([['column' => $field, 'operator' => '=', 'value' => $value]], 1), 0);
@@ -146,32 +164,77 @@ trait WithDatastoreHandlerMethods
     }
 
     /**
+     * @return $this
+     */
+    protected function initiateQuery(?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC')
+    {
+        $this->serviceProvider->clauseBuilder->useTable($this->table);
+
+        $this->serviceProvider->queryBuilder
+            ->reset()
+            ->from($this->table)
+            ->select(...$this->table->getFieldsForIdentity());
+
+        if ($limit) {
+            $this->serviceProvider->queryBuilder->limit($limit);
+        }
+
+        if ($offset) {
+            $this->serviceProvider->queryBuilder->offset($offset);
+        }
+
+        if ($orderBy) {
+            $this->serviceProvider->queryBuilder->orderBy($orderBy, $order);
+        }
+
+        return $this;
+    }
+
+    /**
      * Takes the given array of conditions and adds it to the query builder as a where statement.
      *
-     * @param array $conditions
-     * @param string $whereType
-     * @return void
+     * @param array $groups
+     * @return $this
      */
-    protected function buildConditions(array $conditions, string $whereType = 'and')
+    protected function buildConditions(array $groups)
     {
-        $firstCondition = array_shift($conditions);
-        $column = Arr::get($firstCondition, 'column');
-        $operator = Arr::get($firstCondition, 'operator');
-        $value = Arr::get($firstCondition, 'value');
+        foreach ($groups as $group) {
+            $clauses = Arr::get($group, 'clauses', []);
+            $groupClauseBuilder = (clone $this->serviceProvider->clauseBuilder)->reset()->useTable($this->table);
+            $type = strtoupper(Arr::get($group, 'type'));
+            $firstClause = array_shift($clauses);
+            $column = Arr::get($firstClause, 'column');
+            $operator = Arr::get($firstClause, 'operator');
+            $value = Arr::get($firstClause, 'value');
 
-        $this->serviceProvider->queryBuilder->where($column, $operator, $value);
+            $groupClauseBuilder->where($column, $operator, $value);
 
-        foreach ($conditions as $condition) {
-            $column = Arr::get($condition, 'column');
-            $operator = Arr::get($condition, 'operator');
-            $value = Arr::get($condition, 'value');
+            foreach ($clauses as $clause) {
+                $column = Arr::get($clause, 'column');
+                $operator = Arr::get($clause, 'operator');
+                $value = Arr::get($clause, 'value');
 
-            if ($whereType === 'and') {
-                $this->serviceProvider->queryBuilder->andWhere($column, $operator, $value);
+                if($type === 'OR'){
+                    $groupClauseBuilder->orWhere($column, $operator, $value);
+                }else{
+                    $groupClauseBuilder->andWhere($column, $operator, $value);
+                }
+            }
+
+            $type = strtoupper(Arr::get($group, 'type', 'AND'));
+            $type = in_array($type, ['AND', 'OR']) ? $type : 'AND';
+
+            $groupType = strtoupper(Arr::get($group, 'groupType', 'and'));
+
+            if ($groupType === 'OR') {
+                $this->serviceProvider->clauseBuilder->orGroup($type, $groupClauseBuilder);
             } else {
-                $this->serviceProvider->queryBuilder->orWhere($column, $operator, $value);
+                $this->serviceProvider->clauseBuilder->andGroup($type, $groupClauseBuilder);
             }
         }
+
+        $this->serviceProvider->queryBuilder->where($this->serviceProvider->clauseBuilder);
+        return $this;
     }
 
     /**
@@ -255,15 +318,17 @@ trait WithDatastoreHandlerMethods
 
         if (!empty($idsToQuery)) {
             try {
+                $clauseBuilder = (clone $this->serviceProvider->clauseBuilder)->reset()->useTable($this->table);
                 // Get the things that aren't in the cache.
                 $data = $this->serviceProvider->queryStrategy->query(
                     $this->serviceProvider->queryBuilder
                         ->from($this->table)
                         ->select('*')
-                        ->compoundWhere($this->table->getFieldsForIdentity(), ...$idsToQuery)
+                        ->where($clauseBuilder->andWhere($this->table->getFieldsForIdentity(), 'IN', ...$idsToQuery))
                 );
             } catch (DatastoreErrorException $e) {
                 $this->serviceProvider->loggerStrategy->logException($e, 'Could not get by ID');
+                return [];
             }
 
             // Cache those items.
@@ -290,11 +355,12 @@ trait WithDatastoreHandlerMethods
             Operation::Read,
             $this->getCacheContextForItem($ids),
             function () use ($ids) {
+                $clauseBuilder = (clone $this->serviceProvider->clauseBuilder)->reset()->useTable($this->table);
                 $items = $this->serviceProvider->queryStrategy->query(
                     $this->serviceProvider->queryBuilder
                         ->select('*')
                         ->from($this->table)
-                        ->compoundWhere($this->table->getFieldsForIdentity(), $ids)
+                        ->where($clauseBuilder->andWhere($this->table->getFieldsForIdentity(), 'IN', ...$ids))
                         ->limit(1)
                 );
 
@@ -366,31 +432,51 @@ trait WithDatastoreHandlerMethods
     }
 
     /**
-     * Looks up records that already have records in the specified columns.
+     * Looks up records to check if a record with the specified unique columns already exists.
      *
      * @param array $data
-     * @return DataModel[] list of existing items.
+     * @return DataModel[] List of existing items that match the unique constraints.
      * @throws DatastoreErrorException
      * @throws RecordNotFoundException
      */
     protected function getDuplicates(array $data): array
     {
-        $uniqueColumns = $this->tableSchemaService->getUniqueColumns($this->table);
-        $where = [];
+        $uniqueColumnGroups = $this->tableSchemaService->getUniqueColumns($this->table);
+        $groups = [];
 
-        foreach ($uniqueColumns as $uniqueColumn) {
-            $search = $data[$uniqueColumn->getName()];
-            if (isset($search)) {
-                $where[] = ['column' => $uniqueColumn->getName(), 'operator' => '=', 'value' => $search];
+        foreach ($uniqueColumnGroups as $uniqueColumns) {
+            $clauses = [];
+            foreach ($uniqueColumns as $columnName) {
+                if (isset($data[$columnName])) {
+                    $clauses[] = [
+                        'column' => $columnName,
+                        'operator' => '=',
+                        'value' => $data[$columnName]
+                    ];
+                } else {
+                    // If any column in a unique index (compound key) does not have data provided, skip this group
+                    $clauses = [];
+                    break;
+                }
+            }
+
+            // Only add this group to the query if it has conditions for all columns in the unique index
+            if (!empty($clauses)) {
+                $groups[] = [
+                    'type' => 'AND',
+                    'groupType' => 'OR',
+                    'clauses' => $clauses
+                ];
             }
         }
 
-        if (empty($where)) {
+        if(empty($groups)){
             return [];
         }
 
-        return $this->orWhere($where);
+        return $this->where($groups); // Assuming where method is adapted to handle groups
     }
+
 
     /**
      * @param array $data
@@ -418,52 +504,6 @@ trait WithDatastoreHandlerMethods
 
         if (!empty($duplicates)) {
             throw new DuplicateEntryException('Database operation stopped early because duplicate entries were detected.');
-        }
-    }
-
-    protected function buildOrConditions(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): void
-    {
-        $this->serviceProvider->queryBuilder
-            ->from($this->table)
-            ->select(...$this->table->getFieldsForIdentity());
-
-        if ($limit) {
-            $this->serviceProvider->queryBuilder->limit($limit);
-        }
-
-        if ($offset) {
-            $this->serviceProvider->queryBuilder->offset($offset);
-        }
-
-        if ($orderBy) {
-            $this->serviceProvider->queryBuilder->orderBy($orderBy, $order);
-        }
-
-        if (!empty($conditions)) {
-            $this->buildConditions($conditions, 'or');
-        }
-    }
-
-    protected function buildAndConditions(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): void
-    {
-        $this->serviceProvider->queryBuilder
-            ->from($this->table)
-            ->select(...$this->table->getFieldsForIdentity());
-
-        if ($limit) {
-            $this->serviceProvider->queryBuilder->limit($limit);
-        }
-
-        if ($offset) {
-            $this->serviceProvider->queryBuilder->offset($offset);
-        }
-
-        if ($orderBy) {
-            $this->serviceProvider->queryBuilder->orderBy($orderBy, $order);
-        }
-
-        if (!empty($conditions)) {
-            $this->buildConditions($conditions);
         }
     }
 }
