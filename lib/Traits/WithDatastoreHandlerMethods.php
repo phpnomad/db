@@ -233,7 +233,10 @@ trait WithDatastoreHandlerMethods
             }
         }
 
-        $this->serviceProvider->queryBuilder->where($this->serviceProvider->clauseBuilder);
+        if(!empty($groups)) {
+            $this->serviceProvider->queryBuilder->where($this->serviceProvider->clauseBuilder);
+        }
+
         return $this;
     }
 
@@ -327,7 +330,7 @@ trait WithDatastoreHandlerMethods
                         ->where($clauseBuilder->andWhere($this->table->getFieldsForIdentity(), 'IN', ...$idsToQuery))
                 );
             } catch (DatastoreErrorException $e) {
-                $this->serviceProvider->loggerStrategy->logException($e, 'Could not get by ID');
+                $this->serviceProvider->loggerStrategy->logException($e, 'Could not get by IDs');
                 return [];
             }
 
