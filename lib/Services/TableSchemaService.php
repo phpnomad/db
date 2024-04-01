@@ -99,7 +99,18 @@ class TableSchemaService
      */
     public function getJunctionColumnNameFromTable(TableInterface $table): string
     {
-        // Get the primary columns of the given table.
+        $primaryColumn = $this->getPrimaryColumnNameForTable($table);
+
+        return $table->getSingularUnprefixedName() . ucfirst($primaryColumn->getName());
+    }
+
+    /**
+     * @param TableInterface $table
+     * @return mixed
+     * @throws ColumnNotFoundException
+     */
+    public function getPrimaryColumnNameForTable(TableInterface $table): Column
+    {
         $primaryColumns = $this->getPrimaryColumnsForTable($table);
 
         // If there's not exactly one primary column, throw an exception.
@@ -107,7 +118,7 @@ class TableSchemaService
             throw new ColumnNotFoundException('Junction Tables must have exactly one primary key column.');
         }
 
-        return $table->getSingularUnprefixedName() . ucfirst(Arr::first($primaryColumns)->getName());
+        return Arr::first($primaryColumns);
     }
 
     /**

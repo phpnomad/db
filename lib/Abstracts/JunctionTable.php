@@ -12,6 +12,8 @@ use PHPNomad\Database\Interfaces\HasGlobalDatabasePrefix;
 use PHPNomad\Database\Interfaces\HasLocalDatabasePrefix;
 use PHPNomad\Database\Interfaces\Table as TableInterface;
 use PHPNomad\Database\Services\TableSchemaService;
+use PHPNomad\Logger\Enums\LoggerLevel;
+use PHPNomad\Logger\Interfaces\LoggerStrategy;
 use PHPNomad\Utils\Helpers\Arr;
 
 abstract class JunctionTable extends Table
@@ -20,6 +22,10 @@ abstract class JunctionTable extends Table
 
     protected Table $rightTable;
     protected Table $leftTable;
+    /**
+     * @var mixed|null
+     */
+    protected LoggerStrategy $logger;
 
     public function __construct(
         HasLocalDatabasePrefix  $localPrefixProvider,
@@ -28,10 +34,12 @@ abstract class JunctionTable extends Table
         HasCollateProvider      $collateProvider,
         TableSchemaService      $tableSchemaService,
         Table                   $leftTable,
-        Table                   $rightTable
+        Table                   $rightTable,
+        LoggerStrategy $logger
     )
     {
         $args = func_get_args();
+        $this->logger = array_pop($args);
         $this->rightTable = array_pop($args);
         $this->leftTable = array_pop($args);
         parent::__construct(...$args);
@@ -130,28 +138,24 @@ abstract class JunctionTable extends Table
      * Builds a foreign key using the provided tables.
      *
      * @param string $columnName
-     * @param TableInterface $references
+     * @param TableInterface $primaryTable
      * @return Index
+     * @throws ColumnNotFoundException
      */
-    protected function buildForeignKeyFor(string $columnName, TableInterface $references): Index
+    protected function buildForeignKeyFor(string $columnName, TableInterface $primaryTable): Index
     {
-        $primaryColumns = $this->tableSchemaService->getPrimaryColumnsForTable($references);
-
-        // Find the corresponding primary column by the column name
-        $primaryColumn = Arr::find(
-            $primaryColumns,
-            fn(Column $column) => $column->getName() === $columnName
-        );
-
-        if ($primaryColumn === null) {
-            throw new ColumnNotFoundException("Primary key column with name: $columnName does not exist.");
+        try {
+            // Find the corresponding primary column by the column name
+            $primaryColumn = $this->tableSchemaService->getPrimaryColumnNameForTable($primaryTable);
+        }catch(ColumnNotFoundException $e){
+            $this->logger->logException($e, '', [], LoggerLevel::Emergency);
+            throw $e;
         }
-
         return new Index(
             [$columnName],
             null,
             'FOREIGN KEY',
-            "REFERENCES {$references->getName()}({$primaryColumn->getName()})"
+            "REFERENCES {$primaryTable->getName()}({$primaryColumn->getName()})"
         );
     }
 
