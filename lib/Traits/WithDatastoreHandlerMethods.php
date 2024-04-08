@@ -46,10 +46,14 @@ trait WithDatastoreHandlerMethods
     /** @inheritDoc */
     public function where(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): array
     {
-        $this->initiateQuery($limit, $offset, $orderBy, $order)->buildConditions($conditions);
-        $ids = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
+        try {
+            $this->initiateQuery($limit, $offset, $orderBy, $order)->buildConditions($conditions);
+            $ids = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
 
-        return $this->getModels($ids);
+            return $this->getModels($ids);
+        }catch(RecordNotFoundException $e){
+            return [];
+        }
     }
 
     /** @inheritDoc */
@@ -117,7 +121,13 @@ trait WithDatastoreHandlerMethods
     /** @inheritDoc */
     public function findBy(string $field, $value): DataModel
     {
-        return Arr::get($this->andWhere([['column' => $field, 'operator' => '=', 'value' => $value]], 1), 0);
+        $result = $this->andWhere([['column' => $field, 'operator' => '=', 'value' => $value]], 1);
+
+        if(empty($result)){
+            throw new RecordNotFoundException("Could not find a record where $field equals $value");
+        }
+
+        return Arr::get($result, 0);
     }
 
     /** @inheritDoc */
@@ -205,9 +215,9 @@ trait WithDatastoreHandlerMethods
             $firstClause = array_shift($clauses);
             $column = Arr::get($firstClause, 'column');
             $operator = Arr::get($firstClause, 'operator');
-            $value = Arr::get($firstClause, 'value');
+            $value = Arr::wrap(Arr::get($firstClause, 'value'));
 
-            $groupClauseBuilder->where($column, $operator, $value);
+            $groupClauseBuilder->where($column, $operator, ...$value);
 
             foreach ($clauses as $clause) {
                 $column = Arr::get($clause, 'column');
@@ -215,9 +225,9 @@ trait WithDatastoreHandlerMethods
                 $value = Arr::get($clause, 'value');
 
                 if($type === 'OR'){
-                    $groupClauseBuilder->orWhere($column, $operator, $value);
+                    $groupClauseBuilder->orWhere($column, $operator, ...Arr::wrap($value));
                 }else{
-                    $groupClauseBuilder->andWhere($column, $operator, $value);
+                    $groupClauseBuilder->andWhere($column, $operator, ...Arr::wrap($value));
                 }
             }
 

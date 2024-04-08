@@ -23,6 +23,12 @@ abstract class IdentifiableDatabaseDatastoreHandler implements Datastore, Datast
     }
 
     /** @inheritDoc */
+    public function findMultiple(array $ids): array
+    {
+        return $this->andWhere([['column' => 'id', 'operator' => 'IN', 'value' => $ids]]);
+    }
+
+    /** @inheritDoc */
     public function delete($id): void
     {
         $this->deleteWhere([['column' => 'id', 'operator' => '=', 'value' => $id]]);

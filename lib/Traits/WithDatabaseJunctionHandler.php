@@ -105,6 +105,6 @@ trait WithDatabaseJunctionHandler
         $context = $this->getContextForResource($resource);
         $ids = Arr::pluck($this->getIdsFromResource($resource, $id, $limit, $offset), $context->getJunctionFieldName());
 
-        return $context->getDatastore()->andWhere([['column' => 'id', 'operator' => 'IN', 'value' => $ids]]);
+        return $context->getDatastore()->findMultiple($ids);
     }
 }
