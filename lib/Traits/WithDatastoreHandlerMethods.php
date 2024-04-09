@@ -147,6 +147,10 @@ trait WithDatastoreHandlerMethods
 
         $result = Arr::get($this->getModels([$ids]), 0);
 
+        if(!$result){
+            throw new DatastoreErrorException('Failed to create the record');
+        }
+
         Event::broadcast(new RecordCreated($result));
 
         return $result;
@@ -373,7 +377,7 @@ trait WithDatastoreHandlerMethods
                     $this->serviceProvider->queryBuilder
                         ->select('*')
                         ->from($this->table)
-                        ->where($clauseBuilder->andWhere($this->table->getFieldsForIdentity(), 'IN', ...$ids))
+                        ->where($clauseBuilder->andWhere($this->table->getFieldsForIdentity(), 'IN', $ids))
                         ->limit(1)
                 );
 
