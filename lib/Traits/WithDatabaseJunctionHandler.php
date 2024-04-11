@@ -6,6 +6,7 @@ namespace PHPNomad\Database\Traits;
 
 use InvalidArgumentException;
 use PHPNomad\Database\Exceptions\RecordNotFoundException;
+use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
 use PHPNomad\Datastore\Exceptions\DuplicateEntryException;
 use PHPNomad\Datastore\Interfaces\JunctionContextProvider;
 use PHPNomad\Utils\Helpers\Arr;
@@ -77,9 +78,9 @@ trait WithDatabaseJunctionHandler
             $this->middleProvider->getDatastore()->andWhere([
                 ['column' => $binding->getJunctionFieldName(), 'operator' => '=', 'value' => $bindingId],
                 ['column' => $context->getJunctionFieldName(), 'operator' => '=', 'value' => $id]
-            ],                                              1);
+            ], 1);
             throw new DuplicateEntryException('The specified binding already exists');
-        }catch(RecordNotFoundException $e){
+        } catch (RecordNotFoundException $e) {
             $this->middleProvider->getDatastore()->create([
                 $binding->getJunctionFieldName() => $bindingId,
                 $context->getJunctionFieldName() => $id
@@ -106,5 +107,17 @@ trait WithDatabaseJunctionHandler
         $ids = Arr::pluck($this->getIdsFromResource($resource, $id, $limit, $offset), $context->getJunctionFieldName());
 
         return $context->getDatastore()->findMultiple($ids);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getCountFromResource(string $resource, int $id): int
+    {
+        $context = $this->getContextForResource($resource);
+
+        return $this->middleProvider->getDatastore()->countAndWhere([
+            ['column' => $context->getJunctionFieldName(), 'operator' => '=', 'value' => $id]
+        ]);
     }
 }
