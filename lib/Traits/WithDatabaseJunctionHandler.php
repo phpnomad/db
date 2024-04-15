@@ -6,7 +6,6 @@ namespace PHPNomad\Database\Traits;
 
 use InvalidArgumentException;
 use PHPNomad\Database\Exceptions\RecordNotFoundException;
-use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
 use PHPNomad\Datastore\Exceptions\DuplicateEntryException;
 use PHPNomad\Datastore\Interfaces\JunctionContextProvider;
 use PHPNomad\Utils\Helpers\Arr;
@@ -105,6 +104,10 @@ trait WithDatabaseJunctionHandler
     {
         $context = $this->getContextForResource($resource);
         $ids = Arr::pluck($this->getIdsFromResource($resource, $id, $limit, $offset), $context->getJunctionFieldName());
+
+        if (empty($ids)) {
+            return [];
+        }
 
         return $context->getDatastore()->findMultiple($ids);
     }
