@@ -73,18 +73,19 @@ trait WithDatabaseJunctionHandler
         $context = $this->getContextForResource($resource);
         $binding = $this->getOppositeContext($context);
 
-        try {
-            $this->middleProvider->getDatastore()->andWhere([
+            $found = $this->middleProvider->getDatastore()->andWhere([
                 ['column' => $binding->getJunctionFieldName(), 'operator' => '=', 'value' => $bindingId],
                 ['column' => $context->getJunctionFieldName(), 'operator' => '=', 'value' => $id]
             ], 1);
-            throw new DuplicateEntryException('The specified binding already exists');
-        } catch (RecordNotFoundException $e) {
-            $this->middleProvider->getDatastore()->create([
-                $binding->getJunctionFieldName() => $bindingId,
-                $context->getJunctionFieldName() => $id
-            ]);
-        }
+
+            if(empty($found)) {
+                $this->middleProvider->getDatastore()->create([
+                    $binding->getJunctionFieldName() => $bindingId,
+                    $context->getJunctionFieldName() => $id
+                ]);
+            }else{
+                throw new DuplicateEntryException('The specified binding already exists');
+            }
     }
 
     /** @inheritDoc */

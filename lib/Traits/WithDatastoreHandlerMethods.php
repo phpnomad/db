@@ -216,34 +216,36 @@ trait WithDatastoreHandlerMethods
             $clauses = Arr::get($group, 'clauses', []);
             $groupClauseBuilder = (clone $this->serviceProvider->clauseBuilder)->reset()->useTable($this->table);
             $type = strtoupper(Arr::get($group, 'type'));
-            $firstClause = array_shift($clauses);
-            $column = Arr::get($firstClause, 'column');
-            $operator = Arr::get($firstClause, 'operator');
-            $value = Arr::wrap(Arr::get($firstClause, 'value'));
+            if($clauses) {
+                $firstClause = array_shift($clauses);
+                $column = Arr::get($firstClause, 'column');
+                $operator = Arr::get($firstClause, 'operator');
+                $value = Arr::wrap(Arr::get($firstClause, 'value'));
 
-            $groupClauseBuilder->where($column, $operator, ...$value);
+                $groupClauseBuilder->where($column, $operator, ...$value);
 
-            foreach ($clauses as $clause) {
-                $column = Arr::get($clause, 'column');
-                $operator = Arr::get($clause, 'operator');
-                $value = Arr::get($clause, 'value');
+                foreach ($clauses as $clause) {
+                    $column = Arr::get($clause, 'column');
+                    $operator = Arr::get($clause, 'operator');
+                    $value = Arr::get($clause, 'value');
 
-                if($type === 'OR'){
-                    $groupClauseBuilder->orWhere($column, $operator, ...Arr::wrap($value));
-                }else{
-                    $groupClauseBuilder->andWhere($column, $operator, ...Arr::wrap($value));
+                    if ($type === 'OR') {
+                        $groupClauseBuilder->orWhere($column, $operator, ...Arr::wrap($value));
+                    } else {
+                        $groupClauseBuilder->andWhere($column, $operator, ...Arr::wrap($value));
+                    }
                 }
-            }
 
-            $type = strtoupper(Arr::get($group, 'type', 'AND'));
-            $type = in_array($type, ['AND', 'OR']) ? $type : 'AND';
+                $type = strtoupper(Arr::get($group, 'type', 'AND'));
+                $type = in_array($type, ['AND', 'OR']) ? $type : 'AND';
 
-            $groupType = strtoupper(Arr::get($group, 'groupType', 'and'));
+                $groupType = strtoupper(Arr::get($group, 'groupType', 'and'));
 
-            if ($groupType === 'OR') {
-                $this->serviceProvider->clauseBuilder->orGroup($type, $groupClauseBuilder);
-            } else {
-                $this->serviceProvider->clauseBuilder->andGroup($type, $groupClauseBuilder);
+                if ($groupType === 'OR') {
+                    $this->serviceProvider->clauseBuilder->orGroup($type, $groupClauseBuilder);
+                } else {
+                    $this->serviceProvider->clauseBuilder->andGroup($type, $groupClauseBuilder);
+                }
             }
         }
 
