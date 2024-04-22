@@ -81,7 +81,13 @@ trait WithDatastoreHandlerMethods
     /** @inheritDoc */
     public function countWhere(array $conditions): int
     {
-        $this->initiateQuery()->buildConditions($conditions);
+        $this->initiateQuery(
+            null,
+            null,
+            null,
+            'ASC',
+            [],
+        )->buildConditions($conditions);
 
         $this->serviceProvider->queryBuilder->count('*', 'count');
 
@@ -180,14 +186,19 @@ trait WithDatastoreHandlerMethods
     /**
      * @return $this
      */
-    protected function initiateQuery(?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC')
+    protected function initiateQuery(?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC', array $select = null)
     {
         $this->serviceProvider->clauseBuilder->useTable($this->table);
+        $select = $select === null ? $this->table->getFieldsForIdentity() : $select;
+
 
         $this->serviceProvider->queryBuilder
             ->reset()
-            ->from($this->table)
-            ->select(...$this->table->getFieldsForIdentity());
+            ->from($this->table);
+
+        if(!empty($select)){
+            $this->serviceProvider->queryBuilder->select(...$select);
+        }
 
         if ($limit) {
             $this->serviceProvider->queryBuilder->limit($limit);
