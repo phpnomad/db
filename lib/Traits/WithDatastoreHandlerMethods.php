@@ -231,7 +231,7 @@ trait WithDatastoreHandlerMethods
                 $firstClause = array_shift($clauses);
                 $column = Arr::get($firstClause, 'column');
                 $operator = Arr::get($firstClause, 'operator');
-                $value = Arr::wrap(Arr::get($firstClause, 'value'));
+                $value = array_values(Arr::wrap(Arr::get($firstClause, 'value', [])));
 
                 $groupClauseBuilder->where($column, $operator, ...$value);
 
