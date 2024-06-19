@@ -44,10 +44,10 @@ trait WithDatastoreHandlerMethods
     }
 
     /** @inheritDoc */
-    public function where(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): array
+    public function where(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC', $groupOperator = 'AND'): array
     {
         try {
-            $this->initiateQuery($limit, $offset, $orderBy, $order)->buildConditions($conditions);
+            $this->initiateQuery($limit, $offset, $orderBy, $order)->buildConditions($conditions, $groupOperator);
             $ids = $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
 
             return $this->getModels($ids);
@@ -79,7 +79,7 @@ trait WithDatastoreHandlerMethods
     }
 
     /** @inheritDoc */
-    public function countWhere(array $conditions): int
+    public function countWhere(array $conditions, string $parentGroupOperator = 'AND'): int
     {
         $this->initiateQuery(
             null,
@@ -87,7 +87,7 @@ trait WithDatastoreHandlerMethods
             null,
             'ASC',
             [],
-        )->buildConditions($conditions);
+        )->buildConditions($conditions, $parentGroupOperator);
 
         $this->serviceProvider->queryBuilder->count('*', 'count');
 
@@ -221,7 +221,7 @@ trait WithDatastoreHandlerMethods
      * @param array $groups
      * @return $this
      */
-    protected function buildConditions(array $groups)
+    protected function buildConditions(array $groups, string $parentOperator = 'AND')
     {
         foreach ($groups as $group) {
             $clauses = Arr::get($group, 'clauses', []);
@@ -250,9 +250,7 @@ trait WithDatastoreHandlerMethods
                 $type = strtoupper(Arr::get($group, 'type', 'AND'));
                 $type = in_array($type, ['AND', 'OR']) ? $type : 'AND';
 
-                $groupType = strtoupper(Arr::get($group, 'groupType', 'and'));
-
-                if ($groupType === 'OR') {
+                if ($parentOperator === 'OR') {
                     $this->serviceProvider->clauseBuilder->orGroup($type, $groupClauseBuilder);
                 } else {
                     $this->serviceProvider->clauseBuilder->andGroup($type, $groupClauseBuilder);
@@ -312,7 +310,7 @@ trait WithDatastoreHandlerMethods
      * @return array
      * @throws DatastoreErrorException
      */
-    public function findIds(array $conditions, ?int $limit = null, ?int $offset = null): array
+    public function findIds(array $conditions, ?int $limit = null, ?int $offset = null, string $parentGroupOperator = 'AND'): array
     {
         $this->serviceProvider->queryBuilder
             ->from($this->table)
@@ -327,7 +325,7 @@ trait WithDatastoreHandlerMethods
             $this->serviceProvider->queryBuilder->offset($offset);
         }
 
-        $this->buildConditions($conditions);
+        $this->buildConditions($conditions, $parentGroupOperator);
 
         return $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
     }
