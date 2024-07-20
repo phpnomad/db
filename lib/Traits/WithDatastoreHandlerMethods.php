@@ -386,11 +386,16 @@ trait WithDatastoreHandlerMethods
             $this->getCacheContextForItem($ids),
             function () use ($ids) {
                 $clauseBuilder = (clone $this->serviceProvider->clauseBuilder)->reset()->useTable($this->table);
+
+                foreach($ids as $key => $id){
+                    $clauseBuilder->andWhere($key, '=', $id);
+                }
+
                 $items = $this->serviceProvider->queryStrategy->query(
                     $this->serviceProvider->queryBuilder
                         ->select('*')
                         ->from($this->table)
-                        ->where($clauseBuilder->andWhere($this->table->getFieldsForIdentity(), 'IN', $ids))
+                        ->where($clauseBuilder)
                         ->limit(1)
                 );
 
