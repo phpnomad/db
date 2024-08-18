@@ -3,8 +3,6 @@
 namespace PHPNomad\Database\Interfaces;
 
 use PHPNomad\Database\Exceptions\TableCreateFailedException;
-use PHPNomad\Database\Exceptions\TableDropFailedException;
-use PHPNomad\Database\Exceptions\TableNotFoundException;
 
 interface TableCreateStrategy {
     /**
