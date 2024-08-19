@@ -151,7 +151,7 @@ trait WithDatastoreHandlerMethods
 
         $ids = $this->serviceProvider->queryStrategy->insert($this->table, $attributes);
 
-        $result = Arr::get($this->getModels([$ids]), 0);
+        $result = Arr::first($this->getModels([$ids]));
 
         if(!$result){
             throw new DatastoreErrorException('Failed to create the record');
