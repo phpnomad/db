@@ -51,6 +51,6 @@ class RecordUpdated implements Event
 
 	public static function getId() : string
 	{
-		return 'record_created';
+		return 'record_updated';
 	}
 }
