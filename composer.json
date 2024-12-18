@@ -8,40 +8,6 @@
     "scripts": {
         "php-cs-fixer": "php-cs-fixer fix"
     },
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "git@github.com:phpnomad/utils.git"
-        },
-        {
-            "type": "vcs",
-            "url": "git@github.com:phpnomad/datastore.git"
-        },
-        {
-            "type": "vcs",
-            "url": "git@github.com:phpnomad/event.git"
-        },
-        {
-            "type": "vcs",
-            "url": "https://github.com/phpnomad/cache.git"
-        },
-        {
-            "type": "vcs",
-            "url": "git@github.com:phpnomad/singleton.git"
-        },
-        {
-            "type": "vcs",
-            "url": "git@github.com:phpnomad/facade.git"
-        },
-        {
-            "type": "vcs",
-            "url": "git@github.com:phpnomad/logger.git"
-        },
-        {
-            "type": "vcs",
-            "url": "git@github.com:phpnomad/tests.git"
-        }
-    ],
     "autoload": {
         "psr-4": {
             "PHPNomad\\Database\\": "lib/"
@@ -59,13 +25,13 @@
         }
     ],
     "require": {
-        "phpnomad/utils": "dev-main",
-        "phpnomad/cache": "dev-main",
-        "phpnomad/datastore": "dev-main",
-        "phpnomad/facade": "dev-main",
-        "phpnomad/singleton": "dev-main",
-        "phpnomad/event": "dev-main",
-        "phpnomad/logger": "dev-main"
+        "phpnomad/utils": "^1.0",
+        "phpnomad/cache": "^1.0",
+        "phpnomad/datastore": "^1.0",
+        "phpnomad/facade": "^1.0",
+        "phpnomad/singleton": "^1.0",
+        "phpnomad/event": "^1.0",
+        "phpnomad/logger": "^1.0"
     },
     "require-dev": {
         "phpnomad/tests": "^0.1.0"
