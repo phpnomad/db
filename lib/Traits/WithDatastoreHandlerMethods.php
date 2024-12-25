@@ -7,7 +7,7 @@ use PHPNomad\Core\Facades\Event;
 use PHPNomad\Database\Events\RecordCreated;
 use PHPNomad\Database\Events\RecordDeleted;
 use PHPNomad\Database\Events\RecordUpdated;
-use PHPNomad\Database\Exceptions\RecordNotFoundException;
+use PHPNomad\Datastore\Exceptions\RecordNotFoundException;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;

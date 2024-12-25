@@ -2,8 +2,6 @@
 
 namespace PHPNomad\Database\Events;
 
-use PHPNomad\Database\Interfaces\Table;
-use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Events\Interfaces\Event;
 
 class RecordUpdated implements Event

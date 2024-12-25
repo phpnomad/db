@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f91c9bce2c1b4a396dab13e94fc3e81a",
+    "content-hash": "82c18ac809a42470981c6c8490012d7a",
     "packages": [
         {
             "name": "phpnomad/cache",
@@ -53,20 +53,20 @@
         },
         {
             "name": "phpnomad/datastore",
-            "version": "1.0.0",
+            "version": "2.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpnomad/datastore.git",
-                "reference": "6bf7919e0849fd4d514d3659a917df65388a6b05"
+                "reference": "ce9e87c0d448ad1132d6058a125074845a14aa2d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpnomad/datastore/zipball/6bf7919e0849fd4d514d3659a917df65388a6b05",
-                "reference": "6bf7919e0849fd4d514d3659a917df65388a6b05",
+                "url": "https://api.github.com/repos/phpnomad/datastore/zipball/ce9e87c0d448ad1132d6058a125074845a14aa2d",
+                "reference": "ce9e87c0d448ad1132d6058a125074845a14aa2d",
                 "shasum": ""
             },
             "require-dev": {
-                "phpnomad/tests": "^0.1.0"
+                "phpnomad/tests": "^0.1.0 || ^0.3.0"
             },
             "type": "library",
             "autoload": {
@@ -87,9 +87,9 @@
             "homepage": "https://github.com/phpnomad/core",
             "support": {
                 "issues": "https://github.com/phpnomad/datastore/issues",
-                "source": "https://github.com/phpnomad/datastore/tree/1.0.0"
+                "source": "https://github.com/phpnomad/datastore/tree/2.0.0"
             },
-            "time": "2024-12-18T17:06:26+00:00"
+            "time": "2024-12-25T18:54:08+00:00"
         },
         {
             "name": "phpnomad/enum-polyfill",
@@ -4974,10 +4974,10 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {},
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
-    "platform-dev": [],
+    "platform": {},
+    "platform-dev": {},
     "plugin-api-version": "2.6.0"
 }
