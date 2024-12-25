@@ -2,7 +2,7 @@
 
 namespace PHPNomad\Database\Interfaces;
 
-use PHPNomad\Database\Exceptions\RecordNotFoundException;
+use PHPNomad\Datastore\Exceptions\RecordNotFoundException;
 use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
 
 interface QueryStrategy

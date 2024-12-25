@@ -5,7 +5,6 @@ namespace PHPNomad\Database\Traits;
 namespace PHPNomad\Database\Traits;
 
 use InvalidArgumentException;
-use PHPNomad\Database\Exceptions\RecordNotFoundException;
 use PHPNomad\Datastore\Exceptions\DuplicateEntryException;
 use PHPNomad\Datastore\Interfaces\JunctionContextProvider;
 use PHPNomad\Utils\Helpers\Arr;

@@ -3,11 +3,7 @@
 namespace PHPNomad\Database\Traits;
 
 use PHPNomad\Cache\Enums\Operation;
-use PHPNomad\Core\Facades\Event;
-use PHPNomad\Database\Events\RecordCreated;
-use PHPNomad\Database\Events\RecordDeleted;
-use PHPNomad\Database\Events\RecordUpdated;
-use PHPNomad\Database\Exceptions\RecordNotFoundException;
+use PHPNomad\Datastore\Exceptions\RecordNotFoundException;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
@@ -157,8 +153,6 @@ trait WithDatastoreHandlerMethods
             throw new DatastoreErrorException('Failed to create the record');
         }
 
-        Event::broadcast(new RecordCreated($result));
-
         return $result;
     }
 
@@ -178,8 +172,6 @@ trait WithDatastoreHandlerMethods
 
             $this->serviceProvider->queryStrategy->delete($this->table, $identity);
             $this->serviceProvider->cacheableService->delete($this->getCacheContextForItem($identity));
-
-            Event::broadcast(new RecordDeleted($this->model, $identity));
         }
     }
 
@@ -418,8 +410,6 @@ trait WithDatastoreHandlerMethods
 
         $this->serviceProvider->queryStrategy->update($this->table, $ids, $attributes);
         $this->serviceProvider->cacheableService->delete($this->getCacheContextForItem($ids));
-
-        Event::broadcast(new RecordUpdated($this->model, $ids, $attributes));
     }
 
     /**
