@@ -1,6 +1,7 @@
 {
     "name": "phpnomad/db",
     "description": "",
+    "version": "2.0.0",
     "type": "library",
     "homepage": "https://github.com/phpnomad/core",
     "readme": "README.md",
