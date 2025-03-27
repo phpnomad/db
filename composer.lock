@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d7706b5c7ec555b54b39004f3f284d90",
+    "content-hash": "56242739688cc1dcbb5b6e6f4f44e486",
     "packages": [
         {
             "name": "phpnomad/cache",
@@ -53,16 +53,16 @@
         },
         {
             "name": "phpnomad/datastore",
-            "version": "2.0.0",
+            "version": "2.0.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpnomad/datastore.git",
-                "reference": "261897be5d3eb737b8d4db4ab235f87dc6da2fcb"
+                "reference": "af603fb6cfc5cbf7e531083ca842a5309ee4c194"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpnomad/datastore/zipball/261897be5d3eb737b8d4db4ab235f87dc6da2fcb",
-                "reference": "261897be5d3eb737b8d4db4ab235f87dc6da2fcb",
+                "url": "https://api.github.com/repos/phpnomad/datastore/zipball/af603fb6cfc5cbf7e531083ca842a5309ee4c194",
+                "reference": "af603fb6cfc5cbf7e531083ca842a5309ee4c194",
                 "shasum": ""
             },
             "require-dev": {
@@ -87,9 +87,9 @@
             "homepage": "https://github.com/phpnomad/core",
             "support": {
                 "issues": "https://github.com/phpnomad/datastore/issues",
-                "source": "https://github.com/phpnomad/datastore/tree/2.0.0"
+                "source": "https://github.com/phpnomad/datastore/tree/2.0.2"
             },
-            "time": "2024-12-25T20:10:21+00:00"
+            "time": "2025-03-26T17:17:49+00:00"
         },
         {
             "name": "phpnomad/enum-polyfill",
