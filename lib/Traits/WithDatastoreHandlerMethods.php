@@ -3,6 +3,9 @@
 namespace PHPNomad\Database\Traits;
 
 use PHPNomad\Cache\Enums\Operation;
+use PHPNomad\Datastore\Events\RecordCreated;
+use PHPNomad\Datastore\Events\RecordDeleted;
+use PHPNomad\Datastore\Events\RecordUpdated;
 use PHPNomad\Datastore\Exceptions\RecordNotFoundException;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
@@ -149,6 +152,8 @@ trait WithDatastoreHandlerMethods
 
         $result = Arr::first($this->getModels([$ids]));
 
+        $this->serviceProvider->eventStrategy->broadcast(new RecordCreated($result));
+
         if(!$result){
             throw new DatastoreErrorException('Failed to create the record');
         }
@@ -172,6 +177,7 @@ trait WithDatastoreHandlerMethods
 
             $this->serviceProvider->queryStrategy->delete($this->table, $identity);
             $this->serviceProvider->cacheableService->delete($this->getCacheContextForItem($identity));
+            $this->serviceProvider->eventStrategy->broadcast(new RecordDeleted($item::class, $identity));
         }
     }
 
@@ -405,11 +411,12 @@ trait WithDatastoreHandlerMethods
     /** @inheritDoc */
     public function updateCompound($ids, array $attributes): void
     {
-        $this->findFromCompound($ids);
+        $record = $this->findFromCompound($ids);
         $this->maybeThrowForDuplicateUniqueFields($attributes, $ids);
 
         $this->serviceProvider->queryStrategy->update($this->table, $ids, $attributes);
         $this->serviceProvider->cacheableService->delete($this->getCacheContextForItem($ids));
+        $this->serviceProvider->eventStrategy->broadcast(new RecordUpdated($record::class, $ids, $attributes));
     }
 
     /**
