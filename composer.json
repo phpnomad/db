@@ -32,7 +32,7 @@
         "phpnomad/logger": "^1.0"
     },
     "require-dev": {
-        "phpnomad/tests": "^0.1.0 || ^0.3.0"
+        "phpnomad/tests": "^0.1.0 || ^0.3.0 || ^0.4.0"
     },
     "config": {
         "allow-plugins": {
