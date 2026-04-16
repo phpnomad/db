@@ -27,6 +27,7 @@ use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\TestCase;
 use PHPNomad\Database\Traits\WithDatastoreHandlerMethods;
 use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
+use PHPNomad\Datastore\Exceptions\RecordNotFoundException;
 use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Datastore\Interfaces\HasSingleIntIdentity;
 use PHPNomad\Datastore\Interfaces\ModelAdapter;
@@ -88,6 +89,51 @@ class WithDatastoreHandlerMethodsTest extends TestCase
 
         $handler->create(['name' => 'Example']);
     }
+
+    public function testFindFromCompoundIncludesTableAndIdentityWhenRecordIsMissing(): void
+    {
+        $queryStrategy = $this->createMock(QueryStrategy::class);
+        $queryStrategy->expects($this->once())
+            ->method('query')
+            ->willReturn([]);
+
+        $loggerStrategy = $this->createMock(LoggerStrategy::class);
+        $eventStrategy = $this->createMock(EventStrategy::class);
+
+        $cacheableService = $this->createMock(CacheableService::class);
+        $cacheableService->expects($this->once())
+            ->method('getWithCache')
+            ->willReturnCallback(fn(string $operation, array $context, callable $callback) => $callback());
+
+        $table = $this->createMock(Table::class);
+        $table->method('getName')->willReturn('test_records');
+
+        $tableSchemaService = $this->createMock(TableSchemaService::class);
+        $modelAdapter = $this->createMock(ModelAdapter::class);
+
+        $serviceProvider = new DatabaseServiceProvider(
+            $loggerStrategy,
+            $queryStrategy,
+            new DummyQueryBuilder(),
+            new DummyClauseBuilder(),
+            $cacheableService,
+            $eventStrategy
+        );
+
+        $handler = new DummyDatastoreHandler(
+            $serviceProvider,
+            $table,
+            $tableSchemaService,
+            TestModel::class,
+            $modelAdapter
+        );
+
+        $this->expectException(RecordNotFoundException::class);
+        $this->expectExceptionMessage('Record not found in table "test_records"');
+        $this->expectExceptionMessage('"id":123');
+
+        $handler->findByIdentity(['id' => 123]);
+    }
 }
 
 class DummyDatastoreHandler
@@ -106,6 +152,11 @@ class DummyDatastoreHandler
         $this->tableSchemaService = $tableSchemaService;
         $this->model = $model;
         $this->modelAdapter = $modelAdapter;
+    }
+
+    public function findByIdentity(array $ids)
+    {
+        return $this->findFromCompound($ids);
     }
 }
 
