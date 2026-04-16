@@ -150,13 +150,13 @@ trait WithDatastoreHandlerMethods
 
         $ids = $this->serviceProvider->queryStrategy->insert($this->table, $attributes);
 
-        $result = Arr::first($this->getModels([$ids]));
-
-        $this->serviceProvider->eventStrategy->broadcast(new RecordCreated($result));
+        $result = Arr::first($this->getModels([$ids], false));
 
         if(!$result){
             throw new DatastoreErrorException('Failed to create the record');
         }
+
+        $this->serviceProvider->eventStrategy->broadcast(new RecordCreated($result));
 
         return $result;
     }
@@ -334,9 +334,10 @@ trait WithDatastoreHandlerMethods
      * Gets the models from the specified list of IDs.
      *
      * @param array<string, int>[] $ids
+     * @param bool $suppressDatastoreErrors When true, logs and degrades query failures to an empty list.
      * @return array
      */
-    protected function getModels(array $ids): array
+    protected function getModels(array $ids, bool $suppressDatastoreErrors = true): array
     {
         // Filter out the items that are currently in the cache.
         $idsToQuery = Arr::filter(
@@ -355,6 +356,10 @@ trait WithDatastoreHandlerMethods
                         ->where($clauseBuilder->andWhere($this->table->getFieldsForIdentity(), 'IN', ...$idsToQuery))
                 );
             } catch (DatastoreErrorException $e) {
+                if (!$suppressDatastoreErrors) {
+                    throw $e;
+                }
+
                 $this->serviceProvider->loggerStrategy->logException($e, 'Could not get by IDs');
                 return [];
             }
