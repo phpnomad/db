@@ -152,11 +152,11 @@ trait WithDatastoreHandlerMethods
 
         $result = Arr::first($this->getModels([$ids]));
 
-        $this->serviceProvider->eventStrategy->broadcast(new RecordCreated($result));
-
         if(!$result){
             throw new DatastoreErrorException('Failed to create the record');
         }
+
+        $this->serviceProvider->eventStrategy->broadcast(new RecordCreated($result));
 
         return $result;
     }
@@ -345,19 +345,14 @@ trait WithDatastoreHandlerMethods
         );
 
         if (!empty($idsToQuery)) {
-            try {
-                $clauseBuilder = (clone $this->serviceProvider->clauseBuilder)->reset()->useTable($this->table);
-                // Get the things that aren't in the cache.
-                $data = $this->serviceProvider->queryStrategy->query(
-                    $this->serviceProvider->queryBuilder
-                        ->from($this->table)
-                        ->select('*')
-                        ->where($clauseBuilder->andWhere($this->table->getFieldsForIdentity(), 'IN', ...$idsToQuery))
-                );
-            } catch (DatastoreErrorException $e) {
-                $this->serviceProvider->loggerStrategy->logException($e, 'Could not get by IDs');
-                return [];
-            }
+            $clauseBuilder = (clone $this->serviceProvider->clauseBuilder)->reset()->useTable($this->table);
+            // Get the things that aren't in the cache.
+            $data = $this->serviceProvider->queryStrategy->query(
+                $this->serviceProvider->queryBuilder
+                    ->from($this->table)
+                    ->select('*')
+                    ->where($clauseBuilder->andWhere($this->table->getFieldsForIdentity(), 'IN', ...$idsToQuery))
+            );
 
             // Cache those items.
             $this->cacheItems($this->hydrateItems($data));
@@ -400,7 +395,11 @@ trait WithDatastoreHandlerMethods
                 $item = Arr::get($items, 0);
 
                 if (!$item) {
-                    throw new RecordNotFoundException('Record not found using the provided identity');
+                    throw new RecordNotFoundException(sprintf(
+                        'Record not found in table "%s" using identity %s.',
+                        $this->table->getName(),
+                        $this->encodeExceptionContext($ids)
+                    ));
                 }
 
                 return $this->modelAdapter->toModel($item);
@@ -537,5 +536,15 @@ trait WithDatastoreHandlerMethods
         if (!empty($duplicates)) {
             throw new DuplicateEntryException('Database operation stopped early because duplicate entries were detected.');
         }
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    protected function encodeExceptionContext(array $context): string
+    {
+        $encoded = json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        return $encoded === false ? '[unserializable context]' : $encoded;
     }
 }
