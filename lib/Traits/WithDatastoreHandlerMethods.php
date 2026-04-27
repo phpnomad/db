@@ -149,16 +149,25 @@ trait WithDatastoreHandlerMethods
         $this->maybeThrowForDuplicateUniqueFields($attributes);
 
         $ids = $this->serviceProvider->queryStrategy->insert($this->table, $attributes);
-
-        $result = Arr::first($this->getModels([$ids]));
-
-        if(!$result){
-            throw new DatastoreErrorException('Failed to create the record');
-        }
+        $result = $this->getCreatedModelFromInsertedAttributes($attributes, $ids);
 
         $this->serviceProvider->eventStrategy->broadcast(new RecordCreated($result));
 
         return $result;
+    }
+
+    /**
+     * Builds the newly-created model from the inserted attributes and resolved
+     * identity, matching WordPress' pattern of trusting the insert identity
+     * instead of immediately querying the database again.
+     *
+     * @param array<string, mixed> $attributes
+     * @param array<string, int> $ids
+     * @return DataModel
+     */
+    protected function getCreatedModelFromInsertedAttributes(array $attributes, array $ids): DataModel
+    {
+        return $this->modelAdapter->toModel(array_merge($attributes, $ids));
     }
 
     /**

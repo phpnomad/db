@@ -26,6 +26,7 @@ use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\TestCase;
 use PHPNomad\Database\Traits\WithDatastoreHandlerMethods;
+use PHPNomad\Datastore\Events\RecordCreated;
 use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
 use PHPNomad\Datastore\Exceptions\RecordNotFoundException;
 use PHPNomad\Datastore\Interfaces\DataModel;
@@ -36,15 +37,140 @@ use PHPNomad\Logger\Interfaces\LoggerStrategy;
 
 class WithDatastoreHandlerMethodsTest extends TestCase
 {
-    public function testCreateRethrowsDatastoreErrorsFromPostInsertReread(): void
+    public function testCreateHydratesCreatedModelFromInsertedAttributesWithoutReadback(): void
+    {
+        $createdModel = new TestModel(123);
+
+        $queryStrategy = $this->createMock(QueryStrategy::class);
+        $queryStrategy->expects($this->once())
+            ->method('insert')
+            ->with($this->anything(), ['name' => 'Example'])
+            ->willReturn(['id' => 123]);
+        $queryStrategy->expects($this->never())
+            ->method('query');
+
+        $loggerStrategy = $this->createMock(LoggerStrategy::class);
+        $loggerStrategy->expects($this->never())
+            ->method('logException');
+
+        $eventStrategy = $this->createMock(EventStrategy::class);
+        $eventStrategy->expects($this->once())
+            ->method('broadcast')
+            ->with($this->callback(
+                fn($event) => $event instanceof RecordCreated && $event->getRecord() === $createdModel
+            ));
+
+        $cacheableService = $this->createMock(CacheableService::class);
+        $cacheableService->expects($this->never())
+            ->method('exists');
+        $cacheableService->expects($this->never())
+            ->method('set');
+        $cacheableService->expects($this->never())
+            ->method('getWithCache');
+
+        $table = $this->createMock(Table::class);
+        $table->method('getFieldsForIdentity')->willReturn(['id']);
+
+        $tableSchemaService = $this->createMock(TableSchemaService::class);
+        $tableSchemaService->method('getUniqueColumns')->willReturn([]);
+
+        $modelAdapter = $this->createMock(ModelAdapter::class);
+        $modelAdapter->expects($this->once())
+            ->method('toModel')
+            ->with(['name' => 'Example', 'id' => 123])
+            ->willReturn($createdModel);
+
+        $serviceProvider = new DatabaseServiceProvider(
+            $loggerStrategy,
+            $queryStrategy,
+            new DummyQueryBuilder(),
+            new DummyClauseBuilder(),
+            $cacheableService,
+            $eventStrategy
+        );
+
+        $handler = new DummyDatastoreHandler(
+            $serviceProvider,
+            $table,
+            $tableSchemaService,
+            TestModel::class,
+            $modelAdapter
+        );
+
+        $this->assertSame($createdModel, $handler->create(['name' => 'Example']));
+    }
+
+    public function testCreateRemovesProvidedAutoIncrementIdentityBeforeInsertAndUsesResolvedIdentity(): void
+    {
+        $createdModel = new TestModel(123);
+
+        $queryStrategy = $this->createMock(QueryStrategy::class);
+        $queryStrategy->expects($this->once())
+            ->method('insert')
+            ->with($this->anything(), ['name' => 'Example'])
+            ->willReturn(['id' => 123]);
+        $queryStrategy->expects($this->never())
+            ->method('query');
+
+        $loggerStrategy = $this->createMock(LoggerStrategy::class);
+        $loggerStrategy->expects($this->never())
+            ->method('logException');
+
+        $eventStrategy = $this->createMock(EventStrategy::class);
+        $eventStrategy->expects($this->once())
+            ->method('broadcast')
+            ->with($this->callback(
+                fn($event) => $event instanceof RecordCreated && $event->getRecord() === $createdModel
+            ));
+
+        $cacheableService = $this->createMock(CacheableService::class);
+        $cacheableService->expects($this->never())
+            ->method('exists');
+        $cacheableService->expects($this->never())
+            ->method('set');
+        $cacheableService->expects($this->never())
+            ->method('getWithCache');
+
+        $table = $this->createMock(Table::class);
+        $table->method('getFieldsForIdentity')->willReturn(['id']);
+
+        $tableSchemaService = $this->createMock(TableSchemaService::class);
+        $tableSchemaService->method('getUniqueColumns')->willReturn([]);
+
+        $modelAdapter = $this->createMock(ModelAdapter::class);
+        $modelAdapter->expects($this->once())
+            ->method('toModel')
+            ->with(['name' => 'Example', 'id' => 123])
+            ->willReturn($createdModel);
+
+        $serviceProvider = new DatabaseServiceProvider(
+            $loggerStrategy,
+            $queryStrategy,
+            new DummyQueryBuilder(),
+            new DummyClauseBuilder(),
+            $cacheableService,
+            $eventStrategy
+        );
+
+        $handler = new DummyDatastoreHandler(
+            $serviceProvider,
+            $table,
+            $tableSchemaService,
+            TestModel::class,
+            $modelAdapter
+        );
+
+        $this->assertSame($createdModel, $handler->create(['id' => 999, 'name' => 'Example']));
+    }
+
+    public function testCreateRethrowsDatastoreErrorsFromInsert(): void
     {
         $queryStrategy = $this->createMock(QueryStrategy::class);
         $queryStrategy->expects($this->once())
             ->method('insert')
-            ->willReturn(['id' => 123]);
-        $queryStrategy->expects($this->once())
-            ->method('query')
-            ->willThrowException(new DatastoreErrorException('Replica read failed'));
+            ->willThrowException(new DatastoreErrorException('Insert failed'));
+        $queryStrategy->expects($this->never())
+            ->method('query');
 
         $loggerStrategy = $this->createMock(LoggerStrategy::class);
         $loggerStrategy->expects($this->never())
@@ -55,9 +181,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             ->method('broadcast');
 
         $cacheableService = $this->createMock(CacheableService::class);
-        $cacheableService->expects($this->once())
-            ->method('exists')
-            ->willReturn(false);
+        $cacheableService->expects($this->never())
+            ->method('exists');
 
         $table = $this->createMock(Table::class);
         $table->method('getFieldsForIdentity')->willReturn(['id']);
@@ -85,7 +210,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         );
 
         $this->expectException(DatastoreErrorException::class);
-        $this->expectExceptionMessage('Replica read failed');
+        $this->expectExceptionMessage('Insert failed');
 
         $handler->create(['name' => 'Example']);
     }
