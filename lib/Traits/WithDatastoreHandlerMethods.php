@@ -3,6 +3,8 @@
 namespace PHPNomad\Database\Traits;
 
 use PHPNomad\Cache\Enums\Operation;
+use PHPNomad\Database\Interfaces\ConsistentReadQueryStrategy;
+use PHPNomad\Database\Interfaces\QueryBuilder;
 use PHPNomad\Datastore\Events\RecordCreated;
 use PHPNomad\Datastore\Events\RecordDeleted;
 use PHPNomad\Datastore\Events\RecordUpdated;
@@ -150,7 +152,7 @@ trait WithDatastoreHandlerMethods
 
         $ids = $this->serviceProvider->queryStrategy->insert($this->table, $attributes);
 
-        $result = Arr::first($this->getModels([$ids]));
+        $result = Arr::first($this->getModels([$ids], true));
 
         if(!$result){
             throw new DatastoreErrorException('Failed to create the record');
@@ -334,25 +336,28 @@ trait WithDatastoreHandlerMethods
      * Gets the models from the specified list of IDs.
      *
      * @param array<string, int>[] $ids
+     * @param bool $consistent Whether the read must see preceding writes.
      * @return array
      */
-    protected function getModels(array $ids): array
+    protected function getModels(array $ids, bool $consistent = false): array
     {
         // Filter out the items that are currently in the cache.
-        $idsToQuery = Arr::filter(
-            $ids,
-            fn(array $ids) => !$this->serviceProvider->cacheableService->exists($this->getCacheContextForItem($ids))
-        );
+        $idsToQuery = $consistent
+            ? $ids
+            : Arr::filter(
+                $ids,
+                fn(array $ids) => !$this->serviceProvider->cacheableService->exists($this->getCacheContextForItem($ids))
+            );
 
         if (!empty($idsToQuery)) {
             $clauseBuilder = (clone $this->serviceProvider->clauseBuilder)->reset()->useTable($this->table);
             // Get the things that aren't in the cache.
-            $data = $this->serviceProvider->queryStrategy->query(
-                $this->serviceProvider->queryBuilder
-                    ->from($this->table)
-                    ->select('*')
-                    ->where($clauseBuilder->andWhere($this->table->getFieldsForIdentity(), 'IN', ...$idsToQuery))
-            );
+            $queryBuilder = $this->serviceProvider->queryBuilder
+                ->from($this->table)
+                ->select('*')
+                ->where($clauseBuilder->andWhere($this->table->getFieldsForIdentity(), 'IN', ...$idsToQuery));
+
+            $data = $this->queryModels($queryBuilder, $consistent);
 
             // Cache those items.
             $this->cacheItems($this->hydrateItems($data));
@@ -360,6 +365,23 @@ trait WithDatastoreHandlerMethods
 
         // Now, use the cache to get all the posts in the proper order.
         return Arr::map($ids, fn(array $id) => $this->findFromCompound($id));
+    }
+
+    /**
+     * Queries model rows, optionally using a write-consistent read strategy.
+     *
+     * @param QueryBuilder $queryBuilder
+     * @param bool $consistent
+     * @return array
+     * @throws DatastoreErrorException
+     */
+    protected function queryModels(QueryBuilder $queryBuilder, bool $consistent): array
+    {
+        if ($consistent && $this->serviceProvider->queryStrategy instanceof ConsistentReadQueryStrategy) {
+            return $this->serviceProvider->queryStrategy->queryConsistently($queryBuilder);
+        }
+
+        return $this->serviceProvider->queryStrategy->query($queryBuilder);
     }
 
     /**
@@ -415,6 +437,7 @@ trait WithDatastoreHandlerMethods
 
         $this->serviceProvider->queryStrategy->update($this->table, $ids, $attributes);
         $this->serviceProvider->cacheableService->delete($this->getCacheContextForItem($ids));
+        $this->getModels([$ids], true);
         $this->serviceProvider->eventStrategy->broadcast(new RecordUpdated($record::class, $ids, $attributes));
     }
 

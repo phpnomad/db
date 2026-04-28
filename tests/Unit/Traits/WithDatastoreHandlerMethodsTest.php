@@ -19,6 +19,7 @@ namespace PHPNomad\Database\Tests\Unit\Traits {
 
 use PHPNomad\Cache\Services\CacheableService;
 use PHPNomad\Database\Interfaces\ClauseBuilder;
+use PHPNomad\Database\Interfaces\ConsistentReadQueryStrategy;
 use PHPNomad\Database\Interfaces\QueryBuilder;
 use PHPNomad\Database\Interfaces\QueryStrategy;
 use PHPNomad\Database\Interfaces\Table;
@@ -36,6 +37,64 @@ use PHPNomad\Logger\Interfaces\LoggerStrategy;
 
 class WithDatastoreHandlerMethodsTest extends TestCase
 {
+    public function testCreateUsesConsistentReadStrategyForPostInsertHydration(): void
+    {
+        $queryStrategy = new ConsistentQueryStrategyStub();
+
+        $loggerStrategy = $this->createMock(LoggerStrategy::class);
+
+        $eventStrategy = $this->createMock(EventStrategy::class);
+        $eventStrategy->expects($this->once())
+            ->method('broadcast');
+
+        $createdModel = new TestModel(123);
+
+        $cacheableService = $this->createMock(CacheableService::class);
+        $cacheableService->expects($this->never())
+            ->method('exists');
+        $cacheableService->expects($this->once())
+            ->method('set')
+            ->with(['identities' => ['id' => 123], 'type' => TestModel::class], $createdModel);
+        $cacheableService->expects($this->once())
+            ->method('getWithCache')
+            ->willReturn($createdModel);
+
+        $table = $this->createMock(Table::class);
+        $table->method('getFieldsForIdentity')->willReturn(['id']);
+
+        $tableSchemaService = $this->createMock(TableSchemaService::class);
+        $tableSchemaService->method('getUniqueColumns')->willReturn([]);
+
+        $modelAdapter = $this->createMock(ModelAdapter::class);
+        $modelAdapter->expects($this->once())
+            ->method('toModel')
+            ->with(['id' => 123, 'name' => 'Example'])
+            ->willReturn($createdModel);
+
+        $serviceProvider = new DatabaseServiceProvider(
+            $loggerStrategy,
+            $queryStrategy,
+            new DummyQueryBuilder(),
+            new DummyClauseBuilder(),
+            $cacheableService,
+            $eventStrategy
+        );
+
+        $handler = new DummyDatastoreHandler(
+            $serviceProvider,
+            $table,
+            $tableSchemaService,
+            TestModel::class,
+            $modelAdapter
+        );
+
+        $result = $handler->create(['name' => 'Example']);
+
+        $this->assertSame($createdModel, $result);
+        $this->assertSame(0, $queryStrategy->queryCalls);
+        $this->assertSame(1, $queryStrategy->consistentQueryCalls);
+    }
+
     public function testCreateRethrowsDatastoreErrorsFromPostInsertReread(): void
     {
         $queryStrategy = $this->createMock(QueryStrategy::class);
@@ -55,9 +114,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             ->method('broadcast');
 
         $cacheableService = $this->createMock(CacheableService::class);
-        $cacheableService->expects($this->once())
-            ->method('exists')
-            ->willReturn(false);
+        $cacheableService->expects($this->never())
+            ->method('exists');
 
         $table = $this->createMock(Table::class);
         $table->method('getFieldsForIdentity')->willReturn(['id']);
@@ -133,6 +191,44 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $this->expectExceptionMessage('"id":123');
 
         $handler->findByIdentity(['id' => 123]);
+    }
+}
+
+class ConsistentQueryStrategyStub implements QueryStrategy, ConsistentReadQueryStrategy
+{
+    public int $queryCalls = 0;
+    public int $consistentQueryCalls = 0;
+
+    public function query(QueryBuilder $builder): array
+    {
+        $this->queryCalls++;
+
+        throw new RecordNotFoundException('Stale reader did not return the inserted row.');
+    }
+
+    public function queryConsistently(QueryBuilder $builder): array
+    {
+        $this->consistentQueryCalls++;
+
+        return [['id' => 123, 'name' => 'Example']];
+    }
+
+    public function insert(Table $table, array $data): array
+    {
+        return ['id' => 123];
+    }
+
+    public function delete(Table $table, array $ids): void
+    {
+    }
+
+    public function update(Table $table, array $ids, array $data): void
+    {
+    }
+
+    public function estimatedCount(Table $table): int
+    {
+        return 0;
     }
 }
 
