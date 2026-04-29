@@ -148,17 +148,48 @@ trait WithDatastoreHandlerMethods
 
         $this->maybeThrowForDuplicateUniqueFields($attributes);
 
+        // Apply PHP-side defaults so the values that land in the DB also land
+        // in the in-memory model we hand back. This eliminates the post-insert
+        // read-back, which is the operation that races read-replicas behind a
+        // write/read-split router (ProxySQL, MaxScale, Aurora, etc.).
+        $attributes = $this->applyPhpDefaults($attributes);
+
         $ids = $this->serviceProvider->queryStrategy->insert($this->table, $attributes);
 
-        $result = Arr::first($this->getModels([$ids]));
+        $result = $this->modelAdapter->toModel(Arr::merge($attributes, $ids));
 
-        if(!$result){
-            throw new DatastoreErrorException('Failed to create the record');
-        }
+        // Pre-warm the cache so subsequent reads of this record don't have to
+        // round-trip the DB at all. Same key the framework's getModels() flow
+        // would have written, so existing read paths transparently pick it up.
+        $this->cacheItems([$result]);
 
         $this->serviceProvider->eventStrategy->broadcast(new RecordCreated($result));
 
         return $result;
+    }
+
+    /**
+     * Fills in PHP-side defaults for any column the table declares with a
+     * `phpDefault` callable that wasn't already supplied by the caller.
+     *
+     * @param array<string, mixed> $attributes
+     * @return array<string, mixed>
+     */
+    protected function applyPhpDefaults(array $attributes): array
+    {
+        foreach ($this->table->getColumns() as $column) {
+            $name = $column->getName();
+            if (array_key_exists($name, $attributes)) {
+                continue;
+            }
+            $default = $column->getPhpDefault();
+            if ($default === null) {
+                continue;
+            }
+            $attributes[$name] = $default();
+        }
+
+        return $attributes;
     }
 
     /**
