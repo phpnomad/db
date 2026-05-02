@@ -62,7 +62,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $cacheableService->expects($this->never())->method('exists');
         $cacheableService->expects($this->once())
             ->method('set')
-            ->with(['identities' => ['id' => 123], 'type' => TestModel::class], $createdModel);
+            ->with(['identities' => ['id' => '123'], 'type' => TestModel::class], $createdModel);
 
         $table = $this->createMock(Table::class);
         $table->method('getFieldsForIdentity')->willReturn(['id']);
@@ -207,6 +207,101 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $handler->create(['createdAt' => 'caller-provided']);
     }
 
+    public function testCacheContextIsTypeStableAcrossIntAndStringIdentities(): void
+    {
+        // Regression: MySQL returns identity columns as strings, but hydrated
+        // models hold them as ints. Without normalization, the same record
+        // produces two distinct cache entries and updateCompound() only
+        // invalidates one of them — leaving the other to serve stale reads.
+        $loggerStrategy = $this->createMock(LoggerStrategy::class);
+        $eventStrategy = $this->createMock(EventStrategy::class);
+        $queryStrategy = $this->createMock(QueryStrategy::class);
+        $cacheableService = $this->createMock(CacheableService::class);
+        $table = $this->createMock(Table::class);
+        $tableSchemaService = $this->createMock(TableSchemaService::class);
+        $modelAdapter = $this->createMock(ModelAdapter::class);
+
+        $serviceProvider = new DatabaseServiceProvider(
+            $loggerStrategy,
+            $queryStrategy,
+            new DummyQueryBuilder(),
+            new DummyClauseBuilder(),
+            $cacheableService,
+            $eventStrategy
+        );
+
+        $handler = new DummyDatastoreHandler(
+            $serviceProvider,
+            $table,
+            $tableSchemaService,
+            TestModel::class,
+            $modelAdapter
+        );
+
+        $intContext = $handler->exposeCacheContext(['id' => 123]);
+        $stringContext = $handler->exposeCacheContext(['id' => '123']);
+
+        $this->assertSame($intContext, $stringContext);
+    }
+
+    public function testUpdateCompoundInvalidatesCacheRegardlessOfIdentityType(): void
+    {
+        // Drives the actual stale-read scenario end-to-end: cacheItems writes
+        // with int identity (from the hydrated model), updateCompound is called
+        // with the string identity that came back from queryStrategy->query()
+        // — both must hit the same cache key for the invalidation to land.
+        $loggerStrategy = $this->createMock(LoggerStrategy::class);
+        $eventStrategy = $this->createMock(EventStrategy::class);
+        $queryStrategy = $this->createMock(QueryStrategy::class);
+
+        $deletedKeys = [];
+        $cacheableService = $this->createMock(CacheableService::class);
+        $cacheableService->method('getWithCache')
+            ->willReturnCallback(fn(string $operation, array $context, callable $callback) => $callback());
+        $cacheableService->expects($this->once())
+            ->method('delete')
+            ->willReturnCallback(function (array $context) use (&$deletedKeys) {
+                $deletedKeys[] = $context;
+            });
+
+        // findFromCompound() runs first inside updateCompound() to load the
+        // existing record; return one row so the update path proceeds.
+        $queryStrategy->method('query')->willReturn([['id' => 42, 'name' => 'old']]);
+
+        $table = $this->createMock(Table::class);
+        $table->method('getName')->willReturn('test_records');
+        $tableSchemaService = $this->createMock(TableSchemaService::class);
+        $tableSchemaService->method('getUniqueColumns')->willReturn([]);
+        $modelAdapter = $this->createMock(ModelAdapter::class);
+        $modelAdapter->method('toModel')->willReturn(new TestModel(42));
+
+        $serviceProvider = new DatabaseServiceProvider(
+            $loggerStrategy,
+            $queryStrategy,
+            new DummyQueryBuilder(),
+            new DummyClauseBuilder(),
+            $cacheableService,
+            $eventStrategy
+        );
+
+        $handler = new DummyDatastoreHandler(
+            $serviceProvider,
+            $table,
+            $tableSchemaService,
+            TestModel::class,
+            $modelAdapter
+        );
+
+        // String identity (the shape MySQL returns).
+        $handler->updateCompound(['id' => '42'], ['name' => 'new']);
+
+        // The deleted cache context must match what cacheItems wrote earlier,
+        // which used the int identity from the hydrated model.
+        $expected = $handler->exposeCacheContext(['id' => 42]);
+        $this->assertCount(1, $deletedKeys);
+        $this->assertSame($expected, $deletedKeys[0]);
+    }
+
     public function testFindFromCompoundIncludesTableAndIdentityWhenRecordIsMissing(): void
     {
         $queryStrategy = $this->createMock(QueryStrategy::class);
@@ -274,6 +369,11 @@ class DummyDatastoreHandler
     public function findByIdentity(array $ids)
     {
         return $this->findFromCompound($ids);
+    }
+
+    public function exposeCacheContext(array $ids): array
+    {
+        return $this->getCacheContextForItem($ids);
     }
 }
 

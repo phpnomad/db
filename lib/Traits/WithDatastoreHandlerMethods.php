@@ -299,12 +299,24 @@ trait WithDatastoreHandlerMethods
     /**
      * Gets the cache context for the given ID.
      *
-     * @param array<string, int> $identities list of identities keyed by the field name for the identity.
+     * Scalar identity values are normalized to strings so that an int identity
+     * coming from a hydrated model and a string identity coming back from the
+     * query strategy (MySQL returns identity columns as strings) hash to the
+     * same cache key. Without this, the same record produces two cache entries
+     * — one keyed by int, one by string — and updateCompound() only invalidates
+     * one of them, leaving the other to serve stale reads.
+     *
+     * @param array<string, int|string> $identities list of identities keyed by the field name for the identity.
      * @return array
      */
     protected function getCacheContextForItem(array $identities): array
     {
-        return ['identities' => Arr::merge($identities), 'type' => $this->model];
+        $normalized = [];
+        foreach ($identities as $key => $value) {
+            $normalized[$key] = is_scalar($value) ? (string) $value : $value;
+        }
+
+        return ['identities' => Arr::merge($normalized), 'type' => $this->model];
     }
 
     /**
