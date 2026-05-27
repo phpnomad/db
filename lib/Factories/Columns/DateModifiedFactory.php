@@ -2,15 +2,19 @@
 
 namespace PHPNomad\Database\Factories\Columns;
 
-use DateTimeImmutable;
+use PHPNomad\Chrono\Interfaces\ClockStrategy;
 use PHPNomad\Database\Factories\Column;
 use PHPNomad\Database\Interfaces\CanConvertToColumn;
 
 class DateModifiedFactory implements CanConvertToColumn
 {
+    public function __construct(protected ClockStrategy $clock)
+    {
+    }
+
     public function toColumn(): Column
     {
         return (new Column('dateModified', 'TIMESTAMP', null, 'NOT NULL DEFAULT CURRENT_TIMESTAMP'))
-            ->withPhpDefault(static fn (): string => (new DateTimeImmutable())->format('Y-m-d H:i:s'));
+            ->withPhpDefault(fn (): string => $this->clock->now()->format('Y-m-d H:i:s'));
     }
 }
