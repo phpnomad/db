@@ -495,19 +495,49 @@ trait WithDatastoreHandlerMethods
             return [];
         }
 
-        $clauseBuilder = (clone $this->serviceProvider->clauseBuilder)->reset()->useTable($this->table);
+        // Same fields, different ORDER: the cache context is order-sensitive,
+        // so reorder to table order locally — no query needed.
+        if (count($ids) === count($identityFields)
+            && array_diff(array_keys($ids), $identityFields) === []
+        ) {
+            $reordered = [];
+            foreach ($identityFields as $field) {
+                $reordered[$field] = $ids[$field];
+            }
 
-        foreach ($ids as $key => $id) {
-            $clauseBuilder->andWhere($key, '=', $id);
+            return [$reordered];
         }
 
-        $rows = $this->serviceProvider->queryStrategy->query(
-            $this->serviceProvider->queryBuilder
-                ->select(...$identityFields)
-                ->from($this->table)
-                ->where($clauseBuilder)
-                ->limit(1)
-        );
+        // Genuinely different key: resolve the identity from the database.
+        // Invalidation is best-effort — a resolution failure must degrade to
+        // a possibly-stale cache entry, never break the write itself.
+        try {
+            $clauseBuilder = (clone $this->serviceProvider->clauseBuilder)->reset()->useTable($this->table);
+
+            foreach ($ids as $key => $id) {
+                $clauseBuilder->andWhere($key, '=', $id);
+            }
+
+            // from() BEFORE select(): the builder prefixes selected columns
+            // with the CURRENT table's alias, which is stale until from()
+            // runs — the same call order every read path in this trait uses.
+            $rows = $this->serviceProvider->queryStrategy->query(
+                $this->serviceProvider->queryBuilder
+                    ->from($this->table)
+                    ->select(...$identityFields)
+                    ->where($clauseBuilder)
+                    ->limit(1)
+            );
+        } catch (RecordNotFoundException $e) {
+            return [];
+        } catch (\Throwable $e) {
+            $this->serviceProvider->loggerStrategy->warning(
+                'Cache-invalidation identity resolution failed; a stale cache entry may persist until TTL: ' . $e->getMessage(),
+                ['table' => $this->table->getName()]
+            );
+
+            return [];
+        }
 
         // Project to identity fields regardless of what the query strategy
         // returned — the cache context must contain identity values only.
