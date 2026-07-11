@@ -456,9 +456,64 @@ trait WithDatastoreHandlerMethods
         $record = $this->findFromCompound($ids);
         $this->maybeThrowForDuplicateUniqueFields($attributes, $ids);
 
+        // Resolve the row's table identity (primary columns) BEFORE the
+        // update, while the row still matches $ids. where()/getModels()
+        // hydration caches each row under its table identity, so an update
+        // keyed on a compound business key (e.g. a config's
+        // type/subtype/configKey) must invalidate that entry too — deleting
+        // only the caller-provided context leaves the identity-keyed entry
+        // serving stale reads until TTL.
+        $identities = $this->resolveTableIdentitiesForUpdate($ids);
+
         $this->serviceProvider->queryStrategy->update($this->table, $ids, $attributes);
         $this->serviceProvider->cacheableService->delete($this->getCacheContextForItem($ids));
+
+        foreach ($identities as $identity) {
+            $this->serviceProvider->cacheableService->delete($this->getCacheContextForItem($identity));
+        }
+
         $this->serviceProvider->eventStrategy->broadcast(new RecordUpdated($record::class, $ids, $attributes));
+    }
+
+    /**
+     * Resolves the table-identity (primary column) values for rows matching
+     * the given compound key — the identity arrays the where()/getModels()
+     * read path keys its cache entries on.
+     *
+     * @param array<string, int|string> $ids
+     * @return array<int, array<string, int|string>>
+     * @throws DatastoreErrorException
+     */
+    protected function resolveTableIdentitiesForUpdate(array $ids): array
+    {
+        $identityFields = $this->table->getFieldsForIdentity();
+
+        // Nothing to resolve when the table defines no identity fields, or
+        // when the caller's key IS the table identity (the standard
+        // update-by-id path) — the direct context deletion already covers it.
+        if (empty($identityFields) || array_keys($ids) === $identityFields) {
+            return [];
+        }
+
+        $clauseBuilder = (clone $this->serviceProvider->clauseBuilder)->reset()->useTable($this->table);
+
+        foreach ($ids as $key => $id) {
+            $clauseBuilder->andWhere($key, '=', $id);
+        }
+
+        $rows = $this->serviceProvider->queryStrategy->query(
+            $this->serviceProvider->queryBuilder
+                ->select(...$identityFields)
+                ->from($this->table)
+                ->where($clauseBuilder)
+                ->limit(1)
+        );
+
+        // Project to identity fields regardless of what the query strategy
+        // returned — the cache context must contain identity values only.
+        $identityFlip = array_flip($identityFields);
+
+        return array_map(fn(array $row) => array_intersect_key($row, $identityFlip), $rows);
     }
 
     /**

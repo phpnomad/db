@@ -302,6 +302,65 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $this->assertSame($expected, $deletedKeys[0]);
     }
 
+    public function testUpdateByCompoundBusinessKeyInvalidatesIdentityKeyedEntry(): void
+    {
+        // where()/getModels() hydration caches rows under the TABLE identity.
+        // An update keyed on a compound business key (e.g. a config's
+        // type/subtype/configKey) must invalidate that identity-keyed entry
+        // too, or reads keep serving the pre-update row until TTL.
+        $loggerStrategy = $this->createMock(LoggerStrategy::class);
+        $eventStrategy = $this->createMock(EventStrategy::class);
+        $queryStrategy = $this->createMock(QueryStrategy::class);
+
+        $deletedKeys = [];
+        $cacheableService = $this->createMock(CacheableService::class);
+        $cacheableService->method('getWithCache')
+            ->willReturnCallback(fn(string $operation, array $context, callable $callback) => $callback());
+        $cacheableService->expects($this->exactly(2))
+            ->method('delete')
+            ->willReturnCallback(function (array $context) use (&$deletedKeys) {
+                $deletedKeys[] = $context;
+            });
+
+        // Serves both findFromCompound (full row) and the identity resolution
+        // (identity columns only) — the identity value is what matters.
+        $queryStrategy->method('query')->willReturn([['id' => 42, 'configKey' => 'rate', 'value' => 'old']]);
+
+        $table = $this->createMock(Table::class);
+        $table->method('getName')->willReturn('test_records');
+        $table->method('getFieldsForIdentity')->willReturn(['id']);
+
+        $tableSchemaService = $this->createMock(TableSchemaService::class);
+        $tableSchemaService->method('getUniqueColumns')->willReturn([]);
+        $modelAdapter = $this->createMock(ModelAdapter::class);
+        $modelAdapter->method('toModel')->willReturn(new TestModel(42));
+
+        $serviceProvider = new DatabaseServiceProvider(
+            $loggerStrategy,
+            $queryStrategy,
+            new DummyQueryBuilder(),
+            new DummyClauseBuilder(),
+            $cacheableService,
+            $eventStrategy
+        );
+
+        $handler = new DummyDatastoreHandler(
+            $serviceProvider,
+            $table,
+            $tableSchemaService,
+            TestModel::class,
+            $modelAdapter
+        );
+
+        $handler->updateCompound(['configKey' => 'rate'], ['value' => 'new']);
+
+        $this->assertCount(2, $deletedKeys);
+        // First deletion: the caller-provided compound context (existing behavior).
+        $this->assertSame($handler->exposeCacheContext(['configKey' => 'rate']), $deletedKeys[0]);
+        // Second deletion: the row's identity context — the key hydrated reads cache under.
+        $this->assertSame($handler->exposeCacheContext(['id' => 42]), $deletedKeys[1]);
+    }
+
     public function testFindFromCompoundIncludesTableAndIdentityWhenRecordIsMissing(): void
     {
         $queryStrategy = $this->createMock(QueryStrategy::class);
