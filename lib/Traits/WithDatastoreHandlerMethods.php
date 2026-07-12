@@ -32,6 +32,10 @@ trait WithDatastoreHandlerMethods
      * @var class-string<DataModel>
      */
     protected string $model;
+
+    /**
+     * @var ModelAdapter<DataModel>
+     */
     protected ModelAdapter $modelAdapter;
     protected ?RowCacheContextAdapter $rowCacheContextAdapter = null;
 
@@ -40,7 +44,7 @@ trait WithDatastoreHandlerMethods
      */
     public function getEstimatedCount(): int
     {
-        return $this->readTableValueThrough(function () {
+        return (int) $this->readTableValueThrough(function () {
             return $this->serviceProvider->queryStrategy->estimatedCount($this->table);
         });
     }
@@ -95,11 +99,7 @@ trait WithDatastoreHandlerMethods
         ], $limit, $offset, $orderBy, $order);
     }
 
-    /**
-     * @inheritDoc
-     *
-     * @param array<int, array<string, mixed>> $conditions
-     */
+    /** @inheritDoc */
     public function countWhere(array $conditions): int
     {
         $this->initiateQuery(
@@ -161,12 +161,13 @@ trait WithDatastoreHandlerMethods
     public function findBy(string $field, $value): DataModel
     {
         $result = $this->andWhere([['column' => $field, 'operator' => '=', 'value' => $value]], 1);
+        $model = $result[0] ?? null;
 
-        if(empty($result)){
-            throw new RecordNotFoundException("Could not find a record where $field equals $value");
+        if (!$model instanceof DataModel) {
+            throw new RecordNotFoundException(sprintf('Could not find a record where %s equals %s.', $field, $this->encodeExceptionContext(['value' => $value])));
         }
 
-        return Arr::get($result, 0);
+        return $model;
     }
 
     /**
@@ -245,7 +246,6 @@ trait WithDatastoreHandlerMethods
      * Each deleted row broadcasts a RecordDeleted carrying its raw identity
      * row; no matching rows is a silent no-op.
      *
-     * @param array<int, array<string, mixed>> $conditions
      * @return void
      * @throws DatastoreErrorException
      */
@@ -503,20 +503,22 @@ trait WithDatastoreHandlerMethods
             return RowCacheContextAdapter::EPHEMERAL_GENERATION_PREFIX . $this->mintGenerationToken();
         }
 
-        if (!$this->cacheContext()->isValidGeneration($token)) {
-            $token = $this->mintGenerationToken();
+        if (is_string($token) && $this->cacheContext()->isValidGeneration($token)) {
+            return $token;
+        }
 
-            try {
-                $this->serviceProvider->cacheableService->set($context, $token);
-            } catch (Throwable $e) {
-                // Cache down: every operation mints its own token, so keys
-                // never match and reads fall through to the database —
-                // caching degrades to disabled instead of breaking reads.
-                $this->serviceProvider->loggerStrategy->warning(
-                    'Could not persist a table generation token — caching is effectively disabled until the cache recovers.',
-                    ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
-                );
-            }
+        $token = $this->mintGenerationToken();
+
+        try {
+            $this->serviceProvider->cacheableService->set($context, $token);
+        } catch (Throwable $e) {
+            // Cache down: every operation mints its own token, so keys
+            // never match and reads fall through to the database —
+            // caching degrades to disabled instead of breaking reads.
+            $this->serviceProvider->loggerStrategy->warning(
+                'Could not persist a table generation token — caching is effectively disabled until the cache recovers.',
+                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
+            );
         }
 
         return $token;
@@ -907,7 +909,20 @@ trait WithDatastoreHandlerMethods
         if ($this->cacheContext()->isTableIdentity($ids)) {
             $identity = $this->deriveRowIdentity($ids);
 
-            return $this->readRowThrough($identity, $generation, fn () => $this->queryRowAndModel($ids)[1]);
+            if ($identity !== null) {
+                $model = $this->readRowThrough($identity, $generation, fn () => $this->queryRowAndModel($ids)[1]);
+
+                // A cached value that is not a model (a poisoned or
+                // old-format entry) must never be served — fall through to
+                // the database.
+                if ($model instanceof DataModel) {
+                    return $model;
+                }
+            }
+
+            [, $freshModel] = $this->queryRowAndModel($ids);
+
+            return $freshModel;
         }
 
         // Business-key lookup: resolve through an alias entry so the row is
@@ -988,9 +1003,9 @@ trait WithDatastoreHandlerMethods
                 ->limit(1)
         );
 
-        $item = Arr::get($items, 0);
+        $item = $items[0] ?? null;
 
-        if (!$item) {
+        if (!is_array($item) || $item === []) {
             throw new RecordNotFoundException(sprintf(
                 'Record not found in table "%s" using lookup key %s.',
                 $this->table->getName(),
@@ -1240,7 +1255,9 @@ trait WithDatastoreHandlerMethods
 
             if ($updateTableIdentity !== null || $updateModelIdentity !== null) {
                 $duplicates = Arr::filter($duplicates, function (CanIdentify $existingItem) use ($updateTableIdentity, $updateModelIdentity) {
-                    $existingTableIdentity = $this->deriveRowIdentity($this->modelAdapter->toArray($existingItem));
+                    $existingTableIdentity = $existingItem instanceof DataModel
+                        ? $this->deriveRowIdentity($this->modelAdapter->toArray($existingItem))
+                        : null;
 
                     if ($existingTableIdentity !== null && $updateTableIdentity !== null) {
                         return !Arr::containsSameData($existingTableIdentity, $updateTableIdentity);

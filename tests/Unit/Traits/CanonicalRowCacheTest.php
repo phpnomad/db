@@ -555,14 +555,17 @@ class CanonicalRowCacheTest extends TestCase
         return $flaky;
     }
 
-    public function testCreateSurvivesCacheWriteFailureAndStillBroadcasts(): void
+    /**
+     * @dataProvider generationModes
+     */
+    public function testCreateSurvivesCacheWriteFailureAndStillBroadcasts(bool $useGenerations): void
     {
         $flaky = $this->useFlakyCache();
         $events = new RecordingEventStrategy();
         $logger = $this->createMock(LoggerStrategy::class);
         $logger->expects($this->atLeastOnce())->method('error');
 
-        $handler = $this->makeHandler(['id'], 'test_records', true, $logger, $events);
+        $handler = $this->makeHandler(['id'], 'test_records', $useGenerations, $logger, $events);
 
         $flaky->failWrites = true;
 
@@ -573,14 +576,17 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertCount(1, $events->ofType(RecordCreated::class), 'A cache outage suppressed RecordCreated for a committed insert.');
     }
 
-    public function testUpdateCompoundSurvivesCacheWriteFailureAndStillBroadcasts(): void
+    /**
+     * @dataProvider generationModes
+     */
+    public function testUpdateCompoundSurvivesCacheWriteFailureAndStillBroadcasts(bool $useGenerations): void
     {
         $flaky = $this->useFlakyCache();
         $events = new RecordingEventStrategy();
         $logger = $this->createMock(LoggerStrategy::class);
         $logger->expects($this->atLeastOnce())->method('error');
 
-        $handler = $this->makeHandler(['id'], 'test_records', true, $logger, $events);
+        $handler = $this->makeHandler(['id'], 'test_records', $useGenerations, $logger, $events);
 
         // Prime the row while the cache is healthy so the pre-read hits.
         $this->queryStrategy->queueQueryResult([['id' => '7', 'status' => 'active']]);
@@ -594,14 +600,17 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertCount(1, $events->ofType(RecordUpdated::class), 'A cache outage suppressed RecordUpdated for a committed update.');
     }
 
-    public function testDeleteWhereSurvivesCacheWriteFailureAndStillBroadcasts(): void
+    /**
+     * @dataProvider generationModes
+     */
+    public function testDeleteWhereSurvivesCacheWriteFailureAndStillBroadcasts(bool $useGenerations): void
     {
         $flaky = $this->useFlakyCache();
         $events = new RecordingEventStrategy();
         $logger = $this->createMock(LoggerStrategy::class);
         $logger->expects($this->atLeastOnce())->method('error');
 
-        $handler = $this->makeHandler(['id'], 'test_records', true, $logger, $events);
+        $handler = $this->makeHandler(['id'], 'test_records', $useGenerations, $logger, $events);
 
         // Prime a generation token while the cache is healthy.
         $this->queryStrategy->queueQueryResult([['id' => '7', 'status' => 'doomed']]);
@@ -835,6 +844,10 @@ class CanonicalRowCacheTest extends TestCase
             $this->assertArrayHasKey($key, $this->cacheStrategy->store, 'A read blip clobbered a healthy cache entry.');
         }
 
+        // And nothing NEW was written: stores no-op under ephemeral tokens,
+        // so a blip cannot fill the cache with unreachable entries.
+        $this->assertCount(count($storeBefore), $this->cacheStrategy->store, 'An ephemeral-token read wrote unreachable cache entries.');
+
         $served = $handler->findByCompound(['id' => '7']);
         $this->assertSame('active', $served->get('status'));
     }
@@ -949,6 +962,40 @@ class CanonicalRowCacheTest extends TestCase
 
         $this->assertSame('7', $model->get('id'));
         $this->assertSame(2, $this->queryStrategy->queryCount, 'A partially verifiable alias was trusted on a generation-disabled table.');
+    }
+
+    public function testUnverifiableAliasLookupIsTrustedWithGenerations(): void
+    {
+        // With generations on, the bump covers rotation — an unverifiable
+        // alias (adapter exposes nothing) is trusted and served query-free.
+        $handler = $this->makeHandler(['id'], 'test_records', true, null, null, new HidingModelAdapter());
+
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $handler->findByCompound(['keyHash' => 'abc']);
+
+        $before = $this->queryStrategy->queryCount;
+        $model = $handler->findByCompound(['keyHash' => 'abc']);
+
+        $this->assertSame('7', $model->get('id'));
+        $this->assertSame($before, $this->queryStrategy->queryCount, 'An unverifiable alias was re-resolved despite generation coverage.');
+    }
+
+    public function testMalformedAliasValueIsNeverDereferencedAsAnIdentity(): void
+    {
+        // Old-format or corrupted alias entries (anything that is not a
+        // valid table identity) must fall through to the database.
+        $handler = $this->makeHandler(['id'], 'test_records', true);
+
+        // Establish a token so the poisoned slot matches what reads probe.
+        $this->queryStrategy->queueQueryResult([['id' => '1', 'status' => 'seed']]);
+        $handler->findByCompound(['id' => '1']);
+
+        $this->cacheableService->set($this->probeAliasContext(['keyHash' => 'abc']), 'not-an-identity');
+
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $model = $handler->findByCompound(['keyHash' => 'abc']);
+
+        $this->assertSame('7', $model->get('id'));
     }
 
 }

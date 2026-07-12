@@ -159,39 +159,71 @@ class RowCacheContextAdapterTest extends TestCase
         $this->assertNull($adapter->matchesLookup(new IdentityRowModel(['id' => 7, 'keyHash' => 'abc']), ['keyHash' => 'abc']));
     }
 
-    public function testWithGenerationFoldsTheTokenOnlyWhenEnabledAndPresent(): void
+    public function testGenerationKeyedContextsCarryTheSnapshot(): void
     {
-        $generational = $this->makeAdapter(['id'], true);
-        $plain = $this->makeAdapter(['id'], false);
-
         $this->assertSame(
             ['type' => IdentityRowModel::class, 'gen' => 'token-1'],
-            $generational->tableContext('token-1')
-        );
-        try {
-            $generational->tableContext(null);
-            $this->fail('A generation-keyed table accepted an unkeyed context.');
-        } catch (\InvalidArgumentException $e) {
-            $this->assertStringContainsString('generation snapshot is required', $e->getMessage());
-        }
-        $this->assertSame(
-            ['type' => IdentityRowModel::class],
-            $plain->tableContext('token-1'),
-            'Generation-disabled tables never carry tokens.'
+            $this->makeAdapter(['id'], true)->tableContext('token-1')
         );
     }
 
-    public function testEphemeralTokensAreRecognizedAndDistinct(): void
+    public function testGenerationKeyedTablesRefuseUnkeyedContexts(): void
     {
-        // The adapter owns token FORMATS; the datastore handler owns token
-        // creation.
-        $adapter = $this->makeAdapter(['id'], true);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('generation snapshot is required');
 
-        $this->assertTrue($adapter->isEphemeralGeneration(RowCacheContextAdapter::EPHEMERAL_GENERATION_PREFIX . 'abc123'));
-        $this->assertFalse($adapter->isEphemeralGeneration('abc123'));
-        $this->assertFalse($adapter->isEphemeralGeneration(null));
-        $this->assertTrue($adapter->isValidGeneration('abc123'));
-        $this->assertFalse($adapter->isValidGeneration(''));
-        $this->assertFalse($adapter->isValidGeneration(null));
+        $this->makeAdapter(['id'], true)->tableContext(null);
+    }
+
+    public function testGenerationDisabledTablesNeverCarryTokens(): void
+    {
+        $this->assertSame(
+            ['type' => IdentityRowModel::class],
+            $this->makeAdapter(['id'], false)->tableContext('token-1')
+        );
+    }
+
+    /**
+     * The adapter owns token FORMATS; the datastore handler owns creation.
+     *
+     * @return array<string, array{0: string|null, 1: bool}>
+     */
+    public static function generationTokenShapes(): array
+    {
+        return [
+            'ephemeral-prefixed token' => ['ephemeral-abc123', true],
+            'plain token' => ['abc123', false],
+            'no token' => [null, false],
+        ];
+    }
+
+    /**
+     * @dataProvider generationTokenShapes
+     */
+    public function testEphemeralTokensAreRecognizedByPrefix(?string $token, bool $expected): void
+    {
+        $this->assertSame($expected, $this->makeAdapter(['id'], true)->isEphemeralGeneration($token));
+    }
+
+    /**
+     * @return array<string, array{0: mixed, 1: bool}>
+     */
+    public static function tokenValidityShapes(): array
+    {
+        return [
+            'non-empty string' => ['abc123', true],
+            'empty string' => ['', false],
+            'null' => [null, false],
+        ];
+    }
+
+    /**
+     * @dataProvider tokenValidityShapes
+     *
+     * @param mixed $token
+     */
+    public function testTokenValidityRequiresANonEmptyString($token, bool $expected): void
+    {
+        $this->assertSame($expected, $this->makeAdapter(['id'], true)->isValidGeneration($token));
     }
 }
