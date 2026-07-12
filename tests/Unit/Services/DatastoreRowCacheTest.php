@@ -7,6 +7,9 @@ use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Tests\Doubles\ArrayCacheStrategy;
 use PHPNomad\Database\Tests\Doubles\ExposedRowCache;
 use PHPNomad\Database\Tests\Doubles\FlakyCacheStrategy;
+use PHPNomad\Database\Tests\Doubles\HidingModelAdapter;
+use PHPNomad\Database\Tests\Doubles\IdentityRowModel;
+use PHPNomad\Database\Tests\Doubles\IdentityRowModelAdapter;
 use PHPNomad\Database\Tests\Doubles\NullEventStrategy;
 use PHPNomad\Database\Tests\Doubles\SerializingCachePolicy;
 use PHPNomad\Database\Tests\TestCase;
@@ -50,8 +53,8 @@ class DatastoreRowCacheTest extends TestCase
             $this->cacheableService,
             $logger ?? $this->createMock(LoggerStrategy::class),
             $table,
-            RowModel::class,
-            $adapter ?? new RowModelAdapter(),
+            IdentityRowModel::class,
+            $adapter ?? new IdentityRowModelAdapter(),
             $useGenerations
         );
     }
@@ -166,7 +169,7 @@ class DatastoreRowCacheTest extends TestCase
     {
         $rowCache = $this->makeRowCache(['id']);
 
-        $this->assertSame($expected, $rowCache->matchesLookup(new RowModel($modelRow), $lookup));
+        $this->assertSame($expected, $rowCache->matchesLookup(new IdentityRowModel($modelRow), $lookup));
     }
 
     public function testMatchesLookupTreatsUnverifiableFieldAsStaleWithoutGenerations(): void
@@ -179,7 +182,7 @@ class DatastoreRowCacheTest extends TestCase
         $rowCache = $this->makeRowCache(['id'], false, $logger, new HidingModelAdapter());
 
         $this->assertFalse(
-            $rowCache->matchesLookup(new RowModel(['id' => 7, 'keyHash' => 'abc']), ['keyHash' => 'abc']),
+            $rowCache->matchesLookup(new IdentityRowModel(['id' => 7, 'keyHash' => 'abc']), ['keyHash' => 'abc']),
             'An unverifiable lookup passed on a generation-disabled table — read-time verification is its only rotation defense.'
         );
     }
@@ -189,7 +192,7 @@ class DatastoreRowCacheTest extends TestCase
         $rowCache = $this->makeRowCache(['id'], true, null, new HidingModelAdapter());
 
         $this->assertTrue(
-            $rowCache->matchesLookup(new RowModel(['id' => 7, 'keyHash' => 'abc']), ['keyHash' => 'abc'])
+            $rowCache->matchesLookup(new IdentityRowModel(['id' => 7, 'keyHash' => 'abc']), ['keyHash' => 'abc'])
         );
     }
     /**
@@ -230,51 +233,14 @@ class DatastoreRowCacheTest extends TestCase
         $this->assertNull($rowCache->invalidateAfterWrite());
     }
 
+    public function testInvalidateAfterWriteReturnsAFreshTokenWhenHealthy(): void
+    {
+        // The contrast that makes the failure-case null meaningful: with a
+        // healthy cache and generations on, a write yields the new token.
+        $rowCache = $this->makeRowCache(['id'], true);
+
+        $this->assertNotNull($rowCache->invalidateAfterWrite());
+    }
+
 }
 
-class RowModel implements DataModel
-{
-    public function __construct(private array $row = [])
-    {
-    }
-
-    public function toRow(): array
-    {
-        return $this->row;
-    }
-
-    public function getIdentity(): array
-    {
-        return ['id' => $this->row['id'] ?? null];
-    }
-}
-
-class RowModelAdapter implements ModelAdapter
-{
-    public function toModel(array $array): DataModel
-    {
-        return new RowModel($array);
-    }
-
-    public function toArray(DataModel $model): array
-    {
-        return $model instanceof RowModel ? $model->toRow() : [];
-    }
-}
-
-/**
- * Adapter that exposes nothing — the narrow-serialization case lookup
- * verification has to survive.
- */
-class HidingModelAdapter implements ModelAdapter
-{
-    public function toModel(array $array): DataModel
-    {
-        return new RowModel($array);
-    }
-
-    public function toArray(DataModel $model): array
-    {
-        return [];
-    }
-}

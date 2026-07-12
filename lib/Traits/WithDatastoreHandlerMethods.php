@@ -160,8 +160,9 @@ trait WithDatastoreHandlerMethods
         $row = Arr::merge($attributes, $ids);
         $result = $this->modelAdapter->toModel($row);
 
-        // The insert is committed: the bump below is best-effort and must
-        // not fail the create or suppress RecordCreated. There is
+        // The insert is committed: the post-write invalidation below (a
+        // generation bump, or a set-level delete for opted-out tables) is
+        // best-effort and must not fail the create or suppress RecordCreated. There is
         // deliberately NO cache pre-warm: a model hydrated from write
         // attributes carries request-typed scalars instead of column types
         // (#29), and a pre-warm keyed under create's own post-insert bump
@@ -222,7 +223,8 @@ trait WithDatastoreHandlerMethods
 
         // Alias entries pointing at deleted rows are left to self-heal: the
         // row read they resolve to misses and falls through to the database.
-        // The finally block guarantees the generation bump lands even when a
+        // The finally block guarantees the post-write invalidation (bump, or
+        // set-level delete for opted-out tables) lands even when a
         // later row's SQL delete throws — rows already deleted (and
         // broadcast) must not leave set-level caches serving stale data.
         try {
@@ -357,7 +359,10 @@ trait WithDatastoreHandlerMethods
     /**
      * Lazily builds the per-table row-cache collaborator that owns every
      * cache context this trait uses (canonical row identities, alias
-     * entries, generation tokens).
+     * entries, generation tokens). Lazy `??=` instead of constructor
+     * injection because a trait cannot extend its consumer's constructor,
+     * and the factory needs $table/$model/$modelAdapter, which consumers
+     * set after construction.
      *
      * @see \PHPNomad\Database\Interfaces\RowCache
      */
@@ -456,13 +461,12 @@ trait WithDatastoreHandlerMethods
             // one list read into 1+N database queries.
             foreach ($data as $row) {
                 $model = $this->modelAdapter->toModel($row);
-                $identity = $this->rowCache()->rowIdentity($row);
+                $key = $this->rowCache()->identityKey($row);
 
-                if ($identity !== null) {
-                    $hydrated[serialize($identity)] = $model;
+                if ($key !== null) {
+                    $hydrated[$key] = $model;
+                    $this->rowCache()->storeRow($row, $model, $generation);
                 }
-
-                $this->rowCache()->storeRow($row, $model, $generation);
             }
         }
 
@@ -470,8 +474,7 @@ trait WithDatastoreHandlerMethods
         // served directly; only ids skipped as already-cached consult the
         // cache (falling through to the database on a miss).
         return Arr::map($ids, function (array $id) use ($hydrated, $generation) {
-            $identity = $this->rowCache()->rowIdentity($id);
-            $key = $identity === null ? null : serialize($identity);
+            $key = $this->rowCache()->identityKey($id);
 
             if ($key !== null && array_key_exists($key, $hydrated)) {
                 return $hydrated[$key];
@@ -594,12 +597,6 @@ trait WithDatastoreHandlerMethods
         // RecordNotFoundException before any write when the record is gone.
         $record = $this->findFromCompound($ids, $generation);
 
-        // Self-matches are filtered by the pre-read MODEL's identity, not
-        // the caller's key: a business-key caller re-sending the record's
-        // own unique values must not trip a spurious duplicate error just
-        // because their lookup key never equals a model identity.
-        $this->maybeThrowForDuplicateUniqueFields($attributes, $record->getIdentity());
-
         $identity = $this->resolveTableIdentity($ids, $generation);
 
         if ($identity === null) {
@@ -615,12 +612,22 @@ trait WithDatastoreHandlerMethods
             ));
         }
 
-        // The SQL update targets the RESOLVED table identity: updateCompound's
-        // contract is "update THE record this key identifies" (the pre-read
-        // is limit(1) and one RecordUpdated fires), so a non-unique business
-        // key must never fan the write out to rows the invalidation below
-        // never saw.
-        $this->serviceProvider->queryStrategy->update($this->table, $identity, $attributes);
+        // Self-matches in the duplicate scan are filtered by TABLE identity
+        // (falling back to model identity only when an adapter cannot expose
+        // one): model identities can be shared by distinct rows, and a true
+        // duplicate must not hide behind one.
+        $this->maybeThrowForDuplicateUniqueFields($attributes, $identity, $record->getIdentity());
+
+        // The SQL update targets the RESOLVED table identity AND the
+        // caller's own lookup fields: the identity pins exactly one row (no
+        // non-unique-business-key fan-out), and keeping the caller's fields
+        // in the WHERE re-conditions the write on the key they asked for —
+        // a concurrent rotation between resolution and UPDATE makes this a
+        // no-op instead of updating a row that no longer carries the key.
+        // (QueryStrategy::update() returns void, so a no-op write still
+        // broadcasts; documented as a known limitation.)
+        $conditions = $this->rowCache()->isTableIdentity($ids) ? $identity : Arr::merge($ids, $identity);
+        $this->serviceProvider->queryStrategy->update($this->table, $conditions, $attributes);
 
         // The DB write is committed: the invalidation below is best-effort
         // (RowCache mutations swallow-and-log cache failures) and runs under
@@ -774,23 +781,38 @@ trait WithDatastoreHandlerMethods
 
 
     /**
+     * Guards unique-column groups. When updating, the record being updated
+     * is filtered out of the duplicate scan by TABLE identity — model
+     * identities can be a subset of the table's and therefore shared across
+     * distinct rows, so a model-identity self-match could hide a true
+     * duplicate. The model-identity comparison is only the fallback for
+     * adapters that cannot expose the table identity (that fallback CAN
+     * shadow a duplicate sharing the model identity; such adapters trade
+     * that for not tripping spurious self-duplicates).
+     *
      * @param array $data
-     * @param array|null $updateIdentity
+     * @param array|null $updateTableIdentity Canonical identity of the record being updated.
+     * @param array|null $updateModelIdentity Model identity of the record being updated.
      * @return void
      * @throws DuplicateEntryException
      * @throws DatastoreErrorException
      */
-    protected function maybeThrowForDuplicateUniqueFields(array $data, ?array $updateIdentity = null): void
+    protected function maybeThrowForDuplicateUniqueFields(array $data, ?array $updateTableIdentity = null, ?array $updateModelIdentity = null): void
     {
         try {
             $duplicates = $this->getDuplicates($data);
 
-            // If an identity is provided, filter out items that have the provided identity.
-            if (!is_null($updateIdentity)) {
-                $duplicates = Arr::filter(
-                    $duplicates,
-                    fn(CanIdentify $existingItem) => !Arr::containsSameData($existingItem->getIdentity(), $updateIdentity)
-                );
+            if ($updateTableIdentity !== null || $updateModelIdentity !== null) {
+                $duplicates = Arr::filter($duplicates, function (CanIdentify $existingItem) use ($updateTableIdentity, $updateModelIdentity) {
+                    $existingTableIdentity = $this->rowCache()->rowIdentity($this->modelAdapter->toArray($existingItem));
+
+                    if ($existingTableIdentity !== null && $updateTableIdentity !== null) {
+                        return !Arr::containsSameData($existingTableIdentity, $updateTableIdentity);
+                    }
+
+                    return $updateModelIdentity === null
+                        || !Arr::containsSameData($existingItem->getIdentity(), $updateModelIdentity);
+                });
             }
         } catch (RecordNotFoundException $e) {
             // Bail if no records were found.

@@ -44,6 +44,16 @@ interface RowCache
     public function rowIdentity(array $row): ?array;
 
     /**
+     * Opaque equality key for a row's canonical identity — two rows are the
+     * same record exactly when their identity keys match. Consumers use this
+     * for local dedupe so identity equality stays defined in one place.
+     *
+     * @param array<string, mixed> $row
+     * @return string|null Null when the row cannot produce a full identity.
+     */
+    public function identityKey(array $row): ?string;
+
+    /**
      * Reads the identity an alias entry points at, validated against the
      * table's identity shape. Null on miss or malformed value.
      *
@@ -160,6 +170,12 @@ interface RowCache
      * Takes the generation snapshot an operation should key its contexts
      * under — once, before any database query. Null when generations are
      * disabled.
+     *
+     * Failure is NOT a miss here: a missing token may be minted and
+     * persisted, but a token that could not be READ must yield an ephemeral
+     * token that is never persisted — persisting on a read blip would let
+     * every reader clobber a healthy token and wholesale-invalidate the
+     * table cache.
      */
     public function snapshotGeneration(): ?string;
 }

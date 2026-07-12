@@ -28,7 +28,7 @@ use Throwable;
 class DatastoreRowCache implements RowCache
 {
     protected CacheableService $cacheableService;
-    protected LoggerStrategy $logger;
+    protected LoggerStrategy $loggerStrategy;
     protected Table $table;
 
     /**
@@ -43,14 +43,14 @@ class DatastoreRowCache implements RowCache
      */
     public function __construct(
         CacheableService $cacheableService,
-        LoggerStrategy $logger,
+        LoggerStrategy $loggerStrategy,
         Table $table,
         string $model,
         ModelAdapter $modelAdapter,
         bool $useGenerations = true
     ) {
         $this->cacheableService = $cacheableService;
-        $this->logger = $logger;
+        $this->loggerStrategy = $loggerStrategy;
         $this->table = $table;
         $this->model = $model;
         $this->modelAdapter = $modelAdapter;
@@ -91,7 +91,7 @@ class DatastoreRowCache implements RowCache
 
         foreach ($identityFields as $field) {
             if (!array_key_exists($field, $row)) {
-                $this->logger->warning(
+                $this->loggerStrategy->warning(
                     'Cannot derive a canonical cache identity — row is missing an identity field.',
                     ['table' => $this->table->getName(), 'missingField' => $field, 'rowFields' => array_keys($row)]
                 );
@@ -103,6 +103,14 @@ class DatastoreRowCache implements RowCache
         }
 
         return $this->stringifyScalars($identity);
+    }
+
+        /** @inheritDoc */
+    public function identityKey(array $row): ?string
+    {
+        $identity = $this->rowIdentity($row);
+
+        return $identity === null ? null : serialize($identity);
     }
 
     /**
@@ -173,7 +181,7 @@ class DatastoreRowCache implements RowCache
         try {
             $this->cacheableService->set($context, $model);
         } catch (Throwable $e) {
-            $this->logger->warning(
+            $this->loggerStrategy->warning(
                 'Could not cache a row — the next read will hit the database.',
                 ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
             );
@@ -186,7 +194,7 @@ class DatastoreRowCache implements RowCache
         try {
             $this->cacheableService->set($this->aliasContext($ids, $generation), $identity);
         } catch (Throwable $e) {
-            $this->logger->warning(
+            $this->loggerStrategy->warning(
                 'Could not cache an alias — the next lookup will re-resolve from the database.',
                 ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
             );
@@ -199,7 +207,7 @@ class DatastoreRowCache implements RowCache
         try {
             $this->cacheableService->delete($this->identityContext($identity, $generation));
         } catch (Throwable $e) {
-            $this->logger->error(
+            $this->loggerStrategy->error(
                 'Could not delete a cached row — it may serve stale data until the generation bump or TTL.',
                 ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
             );
@@ -212,7 +220,7 @@ class DatastoreRowCache implements RowCache
         try {
             $this->cacheableService->delete($this->aliasContext($ids, $generation));
         } catch (Throwable $e) {
-            $this->logger->error(
+            $this->loggerStrategy->error(
                 'Could not delete a cached alias — it may serve a stale identity until the generation bump or TTL.',
                 ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
             );
@@ -268,7 +276,7 @@ class DatastoreRowCache implements RowCache
             return $this->cacheableService->getWithCache(Operation::Read, $context, $capturing);
         } catch (Throwable $e) {
             if ($resolved) {
-                $this->logger->warning(
+                $this->loggerStrategy->warning(
                     'Cache store failed after a successful load — serving the loaded value uncached.',
                     ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
                 );
@@ -280,7 +288,7 @@ class DatastoreRowCache implements RowCache
                 throw $e;
             }
 
-            $this->logger->warning(
+            $this->loggerStrategy->warning(
                 'Cache read failed — loading directly from the fallback.',
                 ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
             );
@@ -303,7 +311,7 @@ class DatastoreRowCache implements RowCache
         } catch (Throwable $e) {
             // A probe failure reads as uncached — the caller falls through
             // to the database.
-            $this->logger->warning(
+            $this->loggerStrategy->warning(
                 'Row cache probe failed — treating the row as uncached.',
                 ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
             );
@@ -345,7 +353,7 @@ class DatastoreRowCache implements RowCache
                     continue;
                 }
 
-                $this->logger->warning(
+                $this->loggerStrategy->warning(
                     'Alias lookup field could not be verified — the model adapter does not expose it; treating the alias as stale.',
                     ['table' => $this->table->getName(), 'field' => $field]
                 );
@@ -380,7 +388,7 @@ class DatastoreRowCache implements RowCache
 
             return $this->bumpGeneration();
         } catch (Throwable $e) {
-            $this->logger->error(
+            $this->loggerStrategy->error(
                 'Post-write cache invalidation failed — cached rows may serve stale data until TTL.',
                 ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
             );
@@ -400,7 +408,7 @@ class DatastoreRowCache implements RowCache
             // A cache-layer failure reads as a miss: every alias caller has
             // a database fallback, so a throwing backend degrades to
             // uncached instead of breaking the lookup.
-            $this->logger->warning(
+            $this->loggerStrategy->warning(
                 'Alias cache read failed — treating the alias as missing.',
                 ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
             );
@@ -488,7 +496,7 @@ class DatastoreRowCache implements RowCache
             // operation only, WITHOUT persisting it: if reads blip while
             // writes still work, persisting would let every reader clobber
             // a healthy token and wholesale-invalidate the table cache.
-            $this->logger->warning(
+            $this->loggerStrategy->warning(
                 'Generation token read failed — using an ephemeral token for this operation.',
                 ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
             );
@@ -505,7 +513,7 @@ class DatastoreRowCache implements RowCache
                 // Cache down: every operation mints its own token, so keys
                 // never match and reads fall through to the database —
                 // caching degrades to disabled instead of breaking reads.
-                $this->logger->warning(
+                $this->loggerStrategy->warning(
                     'Could not persist a table generation token — caching is effectively disabled until the cache recovers.',
                     ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
                 );

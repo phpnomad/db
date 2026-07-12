@@ -19,17 +19,17 @@ use PHPNomad\Logger\Interfaces\LoggerStrategy;
 class DatastoreRowCacheFactory implements RowCacheFactory
 {
     protected CacheableService $cacheableService;
-    protected LoggerStrategy $logger;
+    protected LoggerStrategy $loggerStrategy;
 
-    public function __construct(CacheableService $cacheableService, LoggerStrategy $logger)
+    public function __construct(CacheableService $cacheableService, LoggerStrategy $loggerStrategy)
     {
         $this->cacheableService = $cacheableService;
-        $this->logger = $logger;
+        $this->loggerStrategy = $loggerStrategy;
     }
 
     /** @inheritDoc */
-    public function make(Table $table, string $model, ModelAdapter $adapter, bool $useGenerations = true): RowCache
+    public function make(Table $table, string $model, ModelAdapter $modelAdapter, bool $useGenerations = true): RowCache
     {
-        return new DatastoreRowCache($this->cacheableService, $this->logger, $table, $model, $adapter, $useGenerations);
+        return new DatastoreRowCache($this->cacheableService, $this->loggerStrategy, $table, $model, $modelAdapter, $useGenerations);
     }
 }

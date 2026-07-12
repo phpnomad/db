@@ -17,9 +17,12 @@ class DatabaseServiceProvider
 
     /**
      * Kept on the bundle as an extension surface for downstream handlers
-     * with caching needs beyond row caching — the package's own datastore
-     * flows no longer touch it directly (everything routes through the
-     * RowCache built by $rowCacheFactory).
+     * with caching needs beyond row caching. All row and alias caching in
+     * the package's datastore flows routes through the RowCache built by
+     * $rowCacheFactory (schema lookups cache separately via
+     * TableSchemaService) — never cache rows or aliases against this
+     * directly; build or extend a RowCache instead, or invalidation cannot
+     * name your keys.
      */
     public CacheableService $cacheableService;
 

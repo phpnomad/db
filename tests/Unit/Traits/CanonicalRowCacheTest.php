@@ -10,6 +10,9 @@ use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\Doubles\ArrayCacheStrategy;
 use PHPNomad\Database\Tests\Doubles\ExposedRowCache;
 use PHPNomad\Database\Tests\Doubles\FlakyCacheStrategy;
+use PHPNomad\Database\Tests\Doubles\HidingModelAdapter;
+use PHPNomad\Database\Tests\Doubles\IdentityRowModel;
+use PHPNomad\Database\Tests\Doubles\IdentityRowModelAdapter;
 use PHPNomad\Database\Tests\Doubles\NoopClauseBuilder;
 use PHPNomad\Database\Tests\Doubles\NoopQueryBuilder;
 use PHPNomad\Database\Tests\Doubles\NullEventStrategy;
@@ -21,6 +24,7 @@ use PHPNomad\Database\Traits\WithDatastoreHandlerMethods;
 use PHPNomad\Datastore\Events\RecordCreated;
 use PHPNomad\Datastore\Events\RecordDeleted;
 use PHPNomad\Datastore\Events\RecordUpdated;
+use PHPNomad\Datastore\Exceptions\DuplicateEntryException;
 use PHPNomad\Datastore\Exceptions\RecordNotFoundException;
 use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Datastore\Interfaces\ModelAdapter;
@@ -100,13 +104,13 @@ class CanonicalRowCacheTest extends TestCase
             new DatastoreRowCacheFactory($this->cacheableService, $logger)
         );
 
-        $adapter = $adapter ?? new ArrayModelAdapter();
+        $adapter = $adapter ?? new IdentityRowModelAdapter();
 
         $this->prober = new ExposedRowCache(
             $this->cacheableService,
             $logger,
             $table,
-            AttrModel::class,
+            IdentityRowModel::class,
             $adapter,
             $useGenerations
         );
@@ -115,7 +119,7 @@ class CanonicalRowCacheTest extends TestCase
             $serviceProvider,
             $table,
             $tableSchemaService,
-            AttrModel::class,
+            IdentityRowModel::class,
             $adapter,
             $useGenerations
         );
@@ -156,11 +160,15 @@ class CanonicalRowCacheTest extends TestCase
             $this->cacheableService->exists($this->prober->exposeRowContext(['orgId' => 1, 'id' => 42])),
             'Row is not cached under its canonical table-identity context.'
         );
-        // …and NOT under the model's own (subset) identity.
+        // …and NOT under the model's own (subset) identity. The probed shape
+        // mirrors the pre-PR key vocabulary as regression documentation; the
+        // exact entry count below is the general guard — one row entry plus
+        // the generation token when generations are on.
         $this->assertFalse(
-            $this->cacheableService->exists(['type' => AttrModel::class, 'identities' => ['id' => '42']]),
+            $this->cacheableService->exists(['type' => IdentityRowModel::class, 'identities' => ['id' => '42']]),
             'Row leaked a cache entry keyed by the MODEL identity.'
         );
+        $this->assertCount($useGenerations ? 2 : 1, $this->cacheStrategy->store, 'Unexpected cache entries beyond the row (and generation token).');
 
         // A second identical read: findIds queries again (list SQL is not
         // cached), but the row itself is served from cache — no SELECT *.
@@ -188,11 +196,12 @@ class CanonicalRowCacheTest extends TestCase
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
         $handler->updateCompound(['keyHash' => 'abc'], ['status' => 'revoked']);
 
-        // The SQL update targets the RESOLVED identity, not the business
-        // key - updateCompound's contract is a single record, and a
-        // non-unique business key must not fan the write out past what the
-        // invalidation saw.
-        $this->assertSame([['id' => '7'], ['status' => 'revoked']], $this->queryStrategy->updates[0]);
+        // The SQL update targets the RESOLVED identity pinned together with
+        // the caller's business key: the identity prevents non-unique-key
+        // fan-out, and keeping the key in the WHERE turns a concurrent
+        // rotation into a no-op instead of updating a row that no longer
+        // carries the key.
+        $this->assertSame([['keyHash' => 'abc', 'id' => '7'], ['status' => 'revoked']], $this->queryStrategy->updates[0]);
         $this->assertFalse(
             $this->cacheableService->exists($this->prober->exposeRowContext(['id' => '7'])),
             'Business-key update left the canonical row entry to serve stale reads.'
@@ -433,7 +442,7 @@ class CanonicalRowCacheTest extends TestCase
         // values, no cache normalization in the event contract.
         $deletions = $events->ofType(RecordDeleted::class);
         $this->assertCount(1, $deletions);
-        $this->assertSame(AttrModel::class, $deletions[0]->getType());
+        $this->assertSame(IdentityRowModel::class, $deletions[0]->getType());
         $this->assertSame(['orgId' => '1', 'id' => '42'], $deletions[0]->getIdentity());
     }
 
@@ -554,7 +563,7 @@ class CanonicalRowCacheTest extends TestCase
         $logger = $this->createMock(LoggerStrategy::class);
         $logger->expects($this->atLeastOnce())->method('warning');
 
-        $handler = $this->makeHandler(['id'], 'test_records', false, $logger, null, new HidingAdapter());
+        $handler = $this->makeHandler(['id'], 'test_records', false, $logger, null, new HidingModelAdapter());
 
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
         $handler->findByCompound(['keyHash' => 'abc']);
@@ -678,10 +687,97 @@ class CanonicalRowCacheTest extends TestCase
 
         $handler->updateCompound(['keyHash' => 'abc'], ['keyHash' => 'abc', 'status' => 'revoked']);
 
-        $this->assertSame([['id' => '7'], ['keyHash' => 'abc', 'status' => 'revoked']], $this->queryStrategy->updates[0]);
+        $this->assertSame([['keyHash' => 'abc', 'id' => '7'], ['keyHash' => 'abc', 'status' => 'revoked']], $this->queryStrategy->updates[0]);
+    }
+
+    public function testReadsSurviveACacheThatFailsOnReads(): void
+    {
+        // Probe/read failures must degrade to database loads — never break
+        // the read. Covers readRow (canonical), the alias read, and the
+        // generation-token read in one lookup flow.
+        $flaky = $this->useFlakyCache();
+        $logger = $this->createMock(LoggerStrategy::class);
+        $logger->expects($this->atLeastOnce())->method('warning');
+
+        $handler = $this->makeHandler(['id'], 'test_records', true, $logger);
+
+        $flaky->failReads = true;
+
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $byKey = $handler->findByCompound(['keyHash' => 'abc']);
+
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $byId = $handler->findByCompound(['id' => '7']);
+
+        $this->assertSame('7', $byKey->get('id'));
+        $this->assertSame('active', $byId->get('status'));
+    }
+
+    public function testEstimatedCountSurvivesACacheThatFailsOnReads(): void
+    {
+        $flaky = $this->useFlakyCache();
+
+        $handler = $this->makeHandler(['id'], 'test_records', true);
+
+        $flaky->failReads = true;
+        $this->queryStrategy->estimatedCountValue = 9;
+
+        $this->assertSame(9, $handler->getEstimatedCount());
+    }
+
+    public function testGenerationReadBlipDoesNotClobberAHealthyToken(): void
+    {
+        // A read FAILURE mints an ephemeral token without persisting: when
+        // reads recover, the original token (and the entries keyed under it)
+        // must still be live.
+        $flaky = $this->useFlakyCache();
+
+        $handler = $this->makeHandler(['id'], 'test_records', true);
+
+        // Healthy read caches the row under the current token.
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'status' => 'active']]);
+        $handler->findByCompound(['id' => '7']);
+        $storeBefore = $this->cacheStrategy->store;
+
+        // During the blip, the read degrades to the database…
+        $flaky->failReads = true;
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'status' => 'active']]);
+        $handler->findByCompound(['id' => '7']);
+
+        // …and after recovery the original entries are untouched and served.
+        $flaky->failReads = false;
+        $flaky->failWrites = false;
+
+        foreach ($storeBefore as $key => $value) {
+            $this->assertArrayHasKey($key, $this->cacheStrategy->store, 'A read blip clobbered a healthy cache entry.');
+        }
+
+        $served = $handler->findByCompound(['id' => '7']);
+        $this->assertSame('active', $served->get('status'));
+    }
+
+    public function testDuplicateOnADifferentRowSharingTheModelIdentityIsStillCaught(): void
+    {
+        // Model identity (id only) is a SUBSET of the table identity
+        // (orgId + id): a duplicate on org 2's row must not hide behind
+        // sharing org 1's model identity.
+        $handler = $this->makeHandler(['orgId', 'id'], 'test_records', true, null, null, null, [['keyHash']]);
+
+        // Pre-read: org 1's row, resolved canonically.
+        $this->queryStrategy->queueQueryResult([['orgId' => '1', 'id' => '42', 'keyHash' => 'abc']]);
+        // Duplicate scan finds org 2's row carrying the same unique value —
+        // and the same MODEL identity (id 42).
+        $this->queryStrategy->queueQueryResult([['orgId' => '2', 'id' => '42']]);
+        $this->queryStrategy->queueQueryResult([['orgId' => '2', 'id' => '42', 'keyHash' => 'abc']]);
+
+        $this->expectException(DuplicateEntryException::class);
+
+        $handler->updateCompound(['orgId' => '1', 'id' => '42'], ['keyHash' => 'abc']);
     }
 
 }
+
+
 
 class CanonicalHandler
 {
@@ -713,62 +809,5 @@ class CanonicalHandler
     public function findByCompound(array $ids)
     {
         return $this->findFromCompound($ids);
-    }
-}
-
-/**
- * Model whose own identity is deliberately a SUBSET of the table identity
- * (like a model that omits a tenant column) — the trait must never key the
- * cache off it.
- */
-class AttrModel implements DataModel
-{
-    public function __construct(private array $row = [])
-    {
-    }
-
-    public function get(string $field)
-    {
-        return $this->row[$field] ?? null;
-    }
-
-    public function toRow(): array
-    {
-        return $this->row;
-    }
-
-    public function getIdentity(): array
-    {
-        return ['id' => $this->row['id'] ?? null];
-    }
-}
-
-class ArrayModelAdapter implements ModelAdapter
-{
-    public function toModel(array $array): DataModel
-    {
-        return new AttrModel($array);
-    }
-
-    public function toArray(DataModel $model): array
-    {
-        return $model instanceof AttrModel ? $model->toRow() : [];
-    }
-}
-
-/**
- * Adapter that exposes nothing — the narrow-serialization case alias
- * verification must treat as unverifiable.
- */
-class HidingAdapter implements ModelAdapter
-{
-    public function toModel(array $array): DataModel
-    {
-        return new AttrModel($array);
-    }
-
-    public function toArray(DataModel $model): array
-    {
-        return [];
     }
 }
