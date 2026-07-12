@@ -4,6 +4,7 @@ namespace PHPNomad\Database\Tests\Unit\Adapters;
 
 use PHPNomad\Database\Adapters\RowCacheContextAdapter;
 use PHPNomad\Database\Interfaces\Table;
+use PHPNomad\Database\Tests\Doubles\FieldHidingModelAdapter;
 use PHPNomad\Database\Tests\Doubles\HidingModelAdapter;
 use PHPNomad\Database\Tests\Doubles\IdentityRowModel;
 use PHPNomad\Database\Tests\Doubles\IdentityRowModelAdapter;
@@ -136,6 +137,19 @@ class RowCacheContextAdapterTest extends TestCase
         $this->assertSame($expected, $adapter->matchesLookup(new IdentityRowModel($modelRow), $lookup));
     }
 
+    public function testMatchesLookupIsNullWhenAnyFieldIsHidden(): void
+    {
+        // A field that cannot be checked is exactly the field a rotation may
+        // have changed: matching exposed fields must not upgrade a partially
+        // verifiable lookup to a verified match.
+        $adapter = $this->makeAdapter(['id'], false, new FieldHidingModelAdapter(['tenantId']));
+
+        $this->assertNull($adapter->matchesLookup(
+            new IdentityRowModel(['id' => 7, 'keyHash' => 'abc', 'tenantId' => 9]),
+            ['keyHash' => 'abc', 'tenantId' => 999999]
+        ));
+    }
+
     public function testMatchesLookupIsNullWhenNoFieldIsVerifiable(): void
     {
         // Tri-state: the adapter reports "unverifiable"; the datastore
@@ -154,11 +168,12 @@ class RowCacheContextAdapterTest extends TestCase
             ['type' => IdentityRowModel::class, 'gen' => 'token-1'],
             $generational->tableContext('token-1')
         );
-        $this->assertSame(
-            ['type' => IdentityRowModel::class],
-            $generational->tableContext(null),
-            'A null snapshot must not fetch or invent a token — the handler owns token I/O.'
-        );
+        try {
+            $generational->tableContext(null);
+            $this->fail('A generation-keyed table accepted an unkeyed context.');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString('generation snapshot is required', $e->getMessage());
+        }
         $this->assertSame(
             ['type' => IdentityRowModel::class],
             $plain->tableContext('token-1'),
@@ -168,10 +183,15 @@ class RowCacheContextAdapterTest extends TestCase
 
     public function testEphemeralTokensAreRecognizedAndDistinct(): void
     {
+        // The adapter owns token FORMATS; the datastore handler owns token
+        // creation.
         $adapter = $this->makeAdapter(['id'], true);
 
-        $this->assertTrue($adapter->isEphemeralGeneration($adapter->mintEphemeralGeneration()));
-        $this->assertFalse($adapter->isEphemeralGeneration($adapter->mintGeneration()));
+        $this->assertTrue($adapter->isEphemeralGeneration(RowCacheContextAdapter::EPHEMERAL_GENERATION_PREFIX . 'abc123'));
+        $this->assertFalse($adapter->isEphemeralGeneration('abc123'));
         $this->assertFalse($adapter->isEphemeralGeneration(null));
+        $this->assertTrue($adapter->isValidGeneration('abc123'));
+        $this->assertFalse($adapter->isValidGeneration(''));
+        $this->assertFalse($adapter->isValidGeneration(null));
     }
 }

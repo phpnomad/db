@@ -8,6 +8,7 @@ use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\Doubles\ArrayCacheStrategy;
 use PHPNomad\Database\Adapters\RowCacheContextAdapter;
+use PHPNomad\Database\Tests\Doubles\FieldHidingModelAdapter;
 use PHPNomad\Database\Tests\Doubles\FlakyCacheStrategy;
 use PHPNomad\Database\Tests\Doubles\HidingModelAdapter;
 use PHPNomad\Database\Tests\Doubles\IdentityRowModel;
@@ -923,6 +924,31 @@ class CanonicalRowCacheTest extends TestCase
         $handler->deleteWhere([['column' => 'status', 'operator' => '=', 'value' => 'doomed']]);
 
         $this->assertCount(2, $events->ofType(RecordDeleted::class), 'A throwing listener suppressed a sibling RecordDeleted.');
+    }
+
+    public function testPartiallyVerifiableAliasLookupIsNotTrustedWithoutGenerations(): void
+    {
+        // The adapter hides tenantId; keyHash matches. One hidden lookup
+        // field must be enough to distrust the alias on a
+        // generation-disabled table — the hidden field is exactly the one a
+        // rotation may have changed.
+        $logger = $this->createMock(LoggerStrategy::class);
+        $logger->expects($this->atLeastOnce())
+            ->method('warning')
+            ->with($this->stringContains('could not be verified'));
+
+        $handler = $this->makeHandler(['id'], 'test_records', false, $logger, null, new FieldHidingModelAdapter(['tenantId']));
+
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'tenantId' => '9', 'status' => 'active']]);
+        $handler->findByCompound(['keyHash' => 'abc', 'tenantId' => '9']);
+
+        // Second lookup re-resolves from the database instead of trusting
+        // the partially verifiable alias.
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'tenantId' => '9', 'status' => 'active']]);
+        $model = $handler->findByCompound(['keyHash' => 'abc', 'tenantId' => '9']);
+
+        $this->assertSame('7', $model->get('id'));
+        $this->assertSame(2, $this->queryStrategy->queryCount, 'A partially verifiable alias was trusted on a generation-disabled table.');
     }
 
 }

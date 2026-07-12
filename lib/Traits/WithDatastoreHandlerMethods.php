@@ -452,6 +452,15 @@ trait WithDatastoreHandlerMethods
     }
 
     /**
+     * Mints an opaque, unique generation token — creation lives with the
+     * orchestration; the adapter only knows token FORMATS.
+     */
+    protected function mintGenerationToken(): string
+    {
+        return bin2hex(random_bytes(8));
+    }
+
+    /**
      * Takes the generation snapshot an operation keys its contexts under —
      * once, before any database query. One snapshot per operation is both
      * the race fence (a stale write-back keyed pre-write can never collide
@@ -460,7 +469,7 @@ trait WithDatastoreHandlerMethods
      */
     protected function snapshotGeneration(): ?string
     {
-        return $this->shouldUseTableGenerations() ? $this->currentGeneration() : null;
+        return $this->cacheContext()->usesGenerations() ? $this->currentGeneration() : null;
     }
 
     /**
@@ -491,11 +500,11 @@ trait WithDatastoreHandlerMethods
                 ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
             );
 
-            return $this->cacheContext()->mintEphemeralGeneration();
+            return RowCacheContextAdapter::EPHEMERAL_GENERATION_PREFIX . $this->mintGenerationToken();
         }
 
-        if (!is_string($token) || $token === '') {
-            $token = $this->cacheContext()->mintGeneration();
+        if (!$this->cacheContext()->isValidGeneration($token)) {
+            $token = $this->mintGenerationToken();
 
             try {
                 $this->serviceProvider->cacheableService->set($context, $token);
@@ -527,13 +536,13 @@ trait WithDatastoreHandlerMethods
     protected function invalidateAfterWrite(): ?string
     {
         try {
-            if (!$this->shouldUseTableGenerations()) {
+            if (!$this->cacheContext()->usesGenerations()) {
                 $this->serviceProvider->cacheableService->delete($this->cacheContext()->tableContext(null));
 
                 return null;
             }
 
-            $token = $this->cacheContext()->mintGeneration();
+            $token = $this->mintGenerationToken();
             $this->serviceProvider->cacheableService->set($this->cacheContext()->generationContext(), $token);
 
             return $token;
@@ -922,7 +931,7 @@ trait WithDatastoreHandlerMethods
                     // fields. With generations on, the bump covers rotation
                     // and the alias can be trusted; without them this check
                     // is the ONLY rotation defense, so the alias is stale.
-                    if ($this->shouldUseTableGenerations()) {
+                    if ($this->cacheContext()->usesGenerations()) {
                         return $model;
                     }
 

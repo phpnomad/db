@@ -217,8 +217,17 @@ class RowCacheContextAdapter
      */
     public function withGeneration(array $context, ?string $generation): array
     {
-        if (!$this->useGenerations || $generation === null) {
+        if (!$this->useGenerations) {
             return $context;
+        }
+
+        if ($generation === null) {
+            // A generation-keyed table must never build an unkeyed context:
+            // no bump could ever orphan it, and it would collide with the
+            // generation-disabled shape. Failing loudly beats fail-open.
+            throw new \InvalidArgumentException(
+                'A generation snapshot is required to build cache contexts for a generation-keyed table.'
+            );
         }
 
         $context['gen'] = $generation;
@@ -227,22 +236,11 @@ class RowCacheContextAdapter
     }
 
     /**
-     * Mints an opaque, unique generation token.
+     * Prefix marking a token minted during a token-read outage. Entries
+     * keyed under such a token can never be read back, so every caching
+     * path skips them.
      */
-    public function mintGeneration(): string
-    {
-        return bin2hex(random_bytes(8));
-    }
-
-    /**
-     * Mints a token for a single operation during a token-read outage. The
-     * prefix marks it so every caching path skips: entries keyed under a
-     * token nobody can ever read back are pure garbage.
-     */
-    public function mintEphemeralGeneration(): string
-    {
-        return 'ephemeral-' . bin2hex(random_bytes(8));
-    }
+    public const EPHEMERAL_GENERATION_PREFIX = 'ephemeral-';
 
     /**
      * True when the snapshot was minted during a token-read outage and no
@@ -250,7 +248,17 @@ class RowCacheContextAdapter
      */
     public function isEphemeralGeneration(?string $generation): bool
     {
-        return $generation !== null && strpos($generation, 'ephemeral-') === 0;
+        return $generation !== null && strpos($generation, self::EPHEMERAL_GENERATION_PREFIX) === 0;
+    }
+
+    /**
+     * True when a stored value reads as a usable generation token.
+     *
+     * @param mixed $token
+     */
+    public function isValidGeneration($token): bool
+    {
+        return is_string($token) && $token !== '';
     }
 
     /**
@@ -258,10 +266,12 @@ class RowCacheContextAdapter
      * the guard against an alias whose business key was rotated out from
      * under it by an identity-keyed update.
      *
-     * Tri-state so the caller owns policy: true = verified match,
-     * false = verified mismatch, null = unverifiable (the model adapter
-     * exposes none of the lookup fields). Exceptions thrown by the model
-     * adapter are domain errors and propagate.
+     * Tri-state so the caller owns policy: true = every lookup field
+     * verified and matching, false = a verified field mismatched, null =
+     * not fully verifiable (the model adapter hides at least one lookup
+     * field — and a field that cannot be checked is exactly the field a
+     * rotation may have changed). Exceptions thrown by the model adapter
+     * are domain errors and propagate.
      *
      * @param DataModel $model
      * @param array<string, mixed> $ids The caller's lookup key.
@@ -290,7 +300,7 @@ class RowCacheContextAdapter
             }
         }
 
-        return $verified === 0 ? null : true;
+        return $verified === count($ids) ? true : null;
     }
 
     /**
