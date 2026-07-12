@@ -8,6 +8,7 @@ use PHPNomad\Database\Factories\DatastoreRowCacheFactory;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\Doubles\ArrayCacheStrategy;
+use PHPNomad\Database\Tests\Doubles\FlakyCacheStrategy;
 use PHPNomad\Database\Tests\Doubles\NoopClauseBuilder;
 use PHPNomad\Database\Tests\Doubles\NoopQueryBuilder;
 use PHPNomad\Database\Tests\Doubles\NullEventStrategy;
@@ -16,7 +17,9 @@ use PHPNomad\Database\Tests\Doubles\ScriptedQueryStrategy;
 use PHPNomad\Database\Tests\Doubles\SerializingCachePolicy;
 use PHPNomad\Database\Tests\TestCase;
 use PHPNomad\Database\Traits\WithDatastoreHandlerMethods;
+use PHPNomad\Datastore\Events\RecordCreated;
 use PHPNomad\Datastore\Events\RecordDeleted;
+use PHPNomad\Datastore\Events\RecordUpdated;
 use PHPNomad\Datastore\Exceptions\RecordNotFoundException;
 use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Datastore\Interfaces\ModelAdapter;
@@ -65,7 +68,8 @@ class CanonicalRowCacheTest extends TestCase
         string $tableName = 'test_records',
         bool $useGenerations = false,
         ?LoggerStrategy $logger = null,
-        ?EventStrategy $events = null
+        ?EventStrategy $events = null,
+        ?ModelAdapter $adapter = null
     ): CanonicalHandler {
         $table = $this->createMock(Table::class);
         $table->method('getName')->willReturn($tableName);
@@ -92,7 +96,7 @@ class CanonicalRowCacheTest extends TestCase
             $table,
             $tableSchemaService,
             AttrModel::class,
-            new ArrayModelAdapter(),
+            $adapter ?? new ArrayModelAdapter(),
             $useGenerations
         );
     }
@@ -164,7 +168,11 @@ class CanonicalRowCacheTest extends TestCase
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
         $handler->updateCompound(['keyHash' => 'abc'], ['status' => 'revoked']);
 
-        $this->assertSame([['keyHash' => 'abc'], ['status' => 'revoked']], $this->queryStrategy->updates[0]);
+        // The SQL update targets the RESOLVED identity, not the business
+        // key - updateCompound's contract is a single record, and a
+        // non-unique business key must not fan the write out past what the
+        // invalidation saw.
+        $this->assertSame([['id' => '7'], ['status' => 'revoked']], $this->queryStrategy->updates[0]);
         $this->assertFalse(
             $this->cacheableService->exists($handler->exposeRowContext(['id' => '7'])),
             'Business-key update left the canonical row entry to serve stale reads.'
@@ -196,12 +204,11 @@ class CanonicalRowCacheTest extends TestCase
     }
 
     /**
-     * @dataProvider generationModes
+     * Seeds keyHash abc → id 7, kills row 7 out from under the alias, and
+     * scripts the re-resolution to id 9 — the shared healing sequence.
      */
-    public function testStaleAliasSelfHeals(bool $useGenerations): void
+    private function healRotatedAlias(CanonicalHandler $handler): DataModel
     {
-        $handler = $this->makeHandler(['id'], 'test_records', $useGenerations);
-
         // Seed: keyHash abc → id 7.
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
         $handler->findByCompound(['keyHash' => 'abc']);
@@ -215,7 +222,17 @@ class CanonicalRowCacheTest extends TestCase
         // …so the alias is dropped and the business key re-resolves to id 9.
         $this->queryStrategy->queueQueryResult([['id' => '9', 'keyHash' => 'abc', 'status' => 'active']]);
 
-        $model = $handler->findByCompound(['keyHash' => 'abc']);
+        return $handler->findByCompound(['keyHash' => 'abc']);
+    }
+
+    /**
+     * @dataProvider generationModes
+     */
+    public function testStaleAliasSelfHeals(bool $useGenerations): void
+    {
+        $handler = $this->makeHandler(['id'], 'test_records', $useGenerations);
+
+        $model = $this->healRotatedAlias($handler);
 
         $this->assertSame('9', $model->get('id'), 'Stale alias did not self-heal.');
     }
@@ -227,15 +244,9 @@ class CanonicalRowCacheTest extends TestCase
     {
         $handler = $this->makeHandler(['id'], 'test_records', $useGenerations);
 
-        // Same healing sequence as testStaleAliasSelfHeals…
-        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
-        $handler->findByCompound(['keyHash' => 'abc']);
-        $this->cacheableService->delete($handler->exposeRowContext(['id' => '7']));
-        $this->queryStrategy->queueQueryResult([]);
-        $this->queryStrategy->queueQueryResult([['id' => '9', 'keyHash' => 'abc', 'status' => 'active']]);
-        $handler->findByCompound(['keyHash' => 'abc']);
+        $this->healRotatedAlias($handler);
 
-        // …then the healed alias must serve the follow-up lookup query-free.
+        // The healed alias must serve the follow-up lookup query-free.
         $before = $this->queryStrategy->queryCount;
         $handler->findByCompound(['keyHash' => 'abc']);
 
@@ -441,6 +452,101 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame($storeBefore, $this->cacheStrategy->store);
         $this->assertSame([], $this->queryStrategy->deletes);
     }
+    private function useFlakyCache(): FlakyCacheStrategy
+    {
+        $flaky = new FlakyCacheStrategy();
+        $this->cacheStrategy = $flaky;
+        $this->cacheableService = new CacheableService(
+            new NullEventStrategy(),
+            $flaky,
+            new SerializingCachePolicy()
+        );
+
+        return $flaky;
+    }
+
+    public function testCreateSurvivesCacheWriteFailureAndStillBroadcasts(): void
+    {
+        $flaky = $this->useFlakyCache();
+        $events = new RecordingEventStrategy();
+        $logger = $this->createMock(LoggerStrategy::class);
+        $logger->expects($this->atLeastOnce())->method('warning');
+
+        $handler = $this->makeHandler(['id'], 'test_records', true, $logger, $events);
+
+        $flaky->failWrites = true;
+
+        $created = $handler->create(['name' => 'survivor']);
+
+        $this->assertSame('survivor', $created->get('name'));
+        $this->assertCount(1, $events->ofType(RecordCreated::class), 'A cache outage suppressed RecordCreated for a committed insert.');
+    }
+
+    public function testUpdateCompoundSurvivesCacheWriteFailureAndStillBroadcasts(): void
+    {
+        $flaky = $this->useFlakyCache();
+        $events = new RecordingEventStrategy();
+        $logger = $this->createMock(LoggerStrategy::class);
+        $logger->expects($this->atLeastOnce())->method('error');
+
+        $handler = $this->makeHandler(['id'], 'test_records', true, $logger, $events);
+
+        // Prime the row while the cache is healthy so the pre-read hits.
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'status' => 'active']]);
+        $handler->findByCompound(['id' => '7']);
+
+        $flaky->failWrites = true;
+
+        $handler->updateCompound(['id' => '7'], ['status' => 'revoked']);
+
+        $this->assertCount(1, $this->queryStrategy->updates, 'The committed update was rolled back by a cache failure.');
+        $this->assertCount(1, $events->ofType(RecordUpdated::class), 'A cache outage suppressed RecordUpdated for a committed update.');
+    }
+
+    public function testDeleteWhereSurvivesCacheWriteFailureAndStillBroadcasts(): void
+    {
+        $flaky = $this->useFlakyCache();
+        $events = new RecordingEventStrategy();
+        $logger = $this->createMock(LoggerStrategy::class);
+        $logger->expects($this->atLeastOnce())->method('warning');
+
+        $handler = $this->makeHandler(['id'], 'test_records', true, $logger, $events);
+
+        // Prime a generation token while the cache is healthy.
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'status' => 'doomed']]);
+        $handler->findByCompound(['id' => '7']);
+
+        $flaky->failWrites = true;
+
+        $this->queryStrategy->queueQueryResult([['id' => '7']]);
+        $handler->deleteWhere([['column' => 'status', 'operator' => '=', 'value' => 'doomed']]);
+
+        $this->assertSame([['id' => '7']], $this->queryStrategy->deletes, 'A cache failure aborted the SQL delete.');
+        $this->assertCount(1, $events->ofType(RecordDeleted::class), 'A cache outage suppressed RecordDeleted for a committed delete.');
+    }
+
+    public function testUnverifiableAliasLookupFallsBackToTheDatabaseWithoutGenerations(): void
+    {
+        // The adapter exposes none of the lookup fields, so alias-resolved
+        // rows can't be verified. On a generation-disabled table the alias
+        // must not be trusted: every lookup re-resolves from the database.
+        $logger = $this->createMock(LoggerStrategy::class);
+        $logger->expects($this->atLeastOnce())->method('warning');
+
+        $handler = $this->makeHandler(['id'], 'test_records', false, $logger, null, new HidingAdapter());
+
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $handler->findByCompound(['keyHash' => 'abc']);
+
+        // Second lookup: alias hit, row hit, unverifiable, treated as
+        // stale, re-resolved from the database.
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $model = $handler->findByCompound(['keyHash' => 'abc']);
+
+        $this->assertSame('7', $model->get('id'));
+        $this->assertSame(2, $this->queryStrategy->queryCount, 'An unverifiable alias was trusted on a generation-disabled table.');
+    }
+
 }
 
 class CanonicalHandler
@@ -518,5 +624,22 @@ class ArrayModelAdapter implements ModelAdapter
     public function toArray(DataModel $model): array
     {
         return $model instanceof AttrModel ? $model->toRow() : [];
+    }
+}
+
+/**
+ * Adapter that exposes nothing — the narrow-serialization case alias
+ * verification must treat as unverifiable.
+ */
+class HidingAdapter implements ModelAdapter
+{
+    public function toModel(array $array): DataModel
+    {
+        return new AttrModel($array);
+    }
+
+    public function toArray(DataModel $model): array
+    {
+        return [];
     }
 }

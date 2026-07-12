@@ -2,7 +2,6 @@
 
 namespace PHPNomad\Database\Traits;
 
-use PHPNomad\Cache\Enums\Operation;
 use PHPNomad\Datastore\Events\RecordCreated;
 use PHPNomad\Datastore\Events\RecordDeleted;
 use PHPNomad\Datastore\Events\RecordUpdated;
@@ -39,10 +38,9 @@ trait WithDatastoreHandlerMethods
      */
     public function getEstimatedCount(): int
     {
-        return $this->serviceProvider->cacheableService
-            ->getWithCache(Operation::Read, $this->rowCache()->tableContext(), function () {
-                return $this->serviceProvider->queryStrategy->estimatedCount($this->table);
-            });
+        return $this->rowCache()->readTableValue(function () {
+            return $this->serviceProvider->queryStrategy->estimatedCount($this->table);
+        });
     }
 
     /** @inheritDoc */
@@ -166,17 +164,19 @@ trait WithDatastoreHandlerMethods
         // and must not fail the create or suppress RecordCreated. Bump
         // BEFORE pre-warming so the row entry lands under the new
         // generation and stays readable; set-level caches keyed under the
-        // old generation become unreachable.
-        try {
-            $generation = $this->rowCache()->invalidateAfterWrite();
+        // old generation become unreachable. Bump and pre-warm failures are
+        // logged separately — the first means stale set-level caches until
+        // TTL, the second only a missed warm-up.
+        $generation = $this->invalidateAfterWriteSafely();
 
+        try {
             // Pre-warm the cache so subsequent reads of this record don't
             // have to round-trip the DB at all. Same canonical key every
             // read path uses, so existing read paths transparently pick it up.
             $this->rowCache()->storeRow($row, $result, $generation);
         } catch (Throwable $e) {
-            $this->serviceProvider->loggerStrategy->error(
-                'Post-create cache maintenance failed — the row was created but not pre-warmed.',
+            $this->serviceProvider->loggerStrategy->warning(
+                'Post-create pre-warm failed — the row was created but the first read will hit the database.',
                 ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
             );
         }
@@ -403,9 +403,9 @@ trait WithDatastoreHandlerMethods
      * What opting out costs: the cache-aside read-back race is only
      * TTL-bounded (a slow reader can write a just-invalidated row back), and
      * set-level caches plus rotated aliases fall to precise handling
-     * (invalidateSetCachesWithoutGenerations() and the read-time lookup
-     * verification in findFromCompound()) instead of being orphaned
-     * wholesale by the bump.
+     * (RowCache::invalidateAfterWrite()'s set-level delete and the read-time
+     * RowCache::matchesLookup() verification in findFromCompound()) instead
+     * of being orphaned wholesale by the bump.
      */
     protected function shouldUseTableGenerations(): bool
     {
@@ -456,11 +456,7 @@ trait WithDatastoreHandlerMethods
         // Filter out the items that are currently in the cache.
         $idsToQuery = Arr::filter(
             $ids,
-            function (array $identityRow) use ($generation) {
-                $context = $this->rowCache()->rowContext($identityRow, $generation);
-
-                return $context === null || !$this->serviceProvider->cacheableService->exists($context);
-            }
+            fn (array $identityRow) => !$this->rowCache()->hasRow($identityRow, $generation)
         );
 
         if (!empty($idsToQuery)) {
@@ -601,7 +597,13 @@ trait WithDatastoreHandlerMethods
 
         $identity = $this->resolveTableIdentity($ids, $generation);
 
-        $this->serviceProvider->queryStrategy->update($this->table, $ids, $attributes);
+        // The SQL update targets the RESOLVED table identity when the
+        // pre-read could produce one: updateCompound's contract is "update
+        // THE record this key identifies" (the pre-read is limit(1) and one
+        // RecordUpdated fires), so a non-unique business key must not fan
+        // the write out to rows the invalidation below never saw. The
+        // caller's key is the fallback only when resolution failed.
+        $this->serviceProvider->queryStrategy->update($this->table, $identity ?? $ids, $attributes);
 
         // The DB write is committed: everything below is best-effort cache
         // maintenance, and a cache-layer failure must not turn the

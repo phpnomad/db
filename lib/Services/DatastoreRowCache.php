@@ -126,7 +126,7 @@ class DatastoreRowCache implements RowCache
      * @param array<string, mixed> $identity
      * @param string|null $generation Generation snapshot to key under; taken fresh when omitted.
      */
-    public function identityContext(array $identity, ?string $generation = null): array
+    protected function identityContext(array $identity, ?string $generation = null): array
     {
         return $this->withGeneration(['type' => $this->model, 'identities' => $identity], $generation);
     }
@@ -141,7 +141,7 @@ class DatastoreRowCache implements RowCache
      * @param array<string, mixed> $ids The caller's lookup key.
      * @param string|null $generation Generation snapshot to key under; taken fresh when omitted.
      */
-    public function aliasContext(array $ids, ?string $generation = null): array
+    protected function aliasContext(array $ids, ?string $generation = null): array
     {
         $normalized = $this->stringifyScalars($ids);
 
@@ -150,16 +150,20 @@ class DatastoreRowCache implements RowCache
         return $this->withGeneration(['type' => $this->model, 'alias' => $normalized], $generation);
     }
 
-    /** @inheritDoc */
-    public function tableContext(?string $generation = null): array
+    /**
+     * The set-level context for whole-table values.
+     *
+     * @param string|null $generation Generation snapshot; taken fresh when omitted.
+     */
+    protected function tableContext(?string $generation = null): array
     {
         return $this->withGeneration(['type' => $this->model], $generation);
     }
 
     /**
-     * Stores a row's model under its canonical row context. Skips silently
-     * (already logged by rowIdentity()) when the row cannot produce a full
-     * identity.
+     * Stores a row's model under its canonical row context. Skips without
+     * throwing (rowIdentity() logs the reason) when the row cannot produce a
+     * full identity.
      *
      * Read paths MUST pass the generation snapshot they took before querying
      * the database: taking a fresh token here would let a stale row land
@@ -197,8 +201,11 @@ class DatastoreRowCache implements RowCache
         $this->cacheableService->delete($this->aliasContext($ids, $generation));
     }
 
-    /** @inheritDoc */
-    public function deleteTableContext(): void
+    /**
+     * Deletes the set-level context. invalidateAfterWrite() calls this for
+     * generation-disabled tables, where no bump exists to orphan it.
+     */
+    protected function deleteTableContext(): void
     {
         $this->cacheableService->delete($this->tableContext());
     }
@@ -213,27 +220,49 @@ class DatastoreRowCache implements RowCache
         );
     }
 
+    /** @inheritDoc */
+    public function hasRow(array $identityRow, ?string $generation = null): bool
+    {
+        $context = $this->rowContext($identityRow, $generation);
+
+        return $context !== null && $this->cacheableService->exists($context);
+    }
+
+    /** @inheritDoc */
+    public function readTableValue(callable $fallback)
+    {
+        return $this->cacheableService->getWithCache(Operation::Read, $this->tableContext(), $fallback);
+    }
+
     /**
      * @inheritDoc
      *
-     * Fields the adapter does not expose are skipped — they cannot be
-     * verified, and models with narrower serialization should not lose
-     * alias caching over it. But when generations are disabled and NO field
-     * was verifiable, the alias is treated as stale (with a warning):
-     * read-time verification is the only rotation defense those tables have,
-     * and a vacuous pass would silently remove it.
+     * On generation-enabled tables, fields the adapter does not expose are
+     * skipped — the bump already covers rotation, and models with narrower
+     * serialization should not lose alias caching over it. On
+     * generation-disabled tables ANY unverifiable field fails verification
+     * (with a warning): this check is the only rotation defense those tables
+     * have, and a field that cannot be checked is exactly the field a
+     * rotation may have changed.
      */
     public function matchesLookup(DataModel $model, array $ids): bool
     {
         $data = $this->modelAdapter->toArray($model);
-        $verified = 0;
 
         foreach ($ids as $field => $value) {
             if (!array_key_exists($field, $data)) {
-                continue;
+                if ($this->useGenerations) {
+                    continue;
+                }
+
+                $this->logger->warning(
+                    'Alias lookup field could not be verified — the model adapter does not expose it; treating the alias as stale.',
+                    ['table' => $this->table->getName(), 'field' => $field]
+                );
+
+                return false;
             }
 
-            $verified++;
             $actual = $data[$field];
 
             if (is_scalar($actual) && is_scalar($value)) {
@@ -243,15 +272,6 @@ class DatastoreRowCache implements RowCache
             } elseif ($actual !== $value) {
                 return false;
             }
-        }
-
-        if ($verified === 0 && !$this->useGenerations) {
-            $this->logger->warning(
-                'Alias lookup could not be verified — the model adapter exposes none of the lookup fields; treating the alias as stale.',
-                ['table' => $this->table->getName(), 'lookupFields' => array_keys($ids)]
-            );
-
-            return false;
         }
 
         return true;
@@ -269,14 +289,7 @@ class DatastoreRowCache implements RowCache
         return $this->bumpGeneration();
     }
 
-    /**
-     * Reads the identity an alias entry points at, validated against the
-     * table's identity shape. Null on miss, cache failure, or malformed value.
-     *
-     * @param array<string, mixed> $ids The caller's lookup key.
-     * @param string|null $generation Generation snapshot for the alias context.
-     * @return array<string, mixed>|null
-     */
+    /** @inheritDoc */
     public function resolveAliasedIdentity(array $ids, ?string $generation = null): ?array
     {
         try {
@@ -300,7 +313,7 @@ class DatastoreRowCache implements RowCache
      *
      * @see https://developer.wordpress.org/reference/functions/wp_cache_set_last_changed/ the pattern's origin
      */
-    public function withGeneration(array $context, ?string $generation = null): array
+    protected function withGeneration(array $context, ?string $generation = null): array
     {
         if (!$this->useGenerations) {
             return $context;
@@ -325,7 +338,7 @@ class DatastoreRowCache implements RowCache
      *                     writes (create()'s pre-warm) can key under it; null
      *                     when generations are disabled.
      */
-    public function bumpGeneration(): ?string
+    protected function bumpGeneration(): ?string
     {
         if (!$this->useGenerations) {
             return null;
@@ -370,7 +383,18 @@ class DatastoreRowCache implements RowCache
 
         if (!is_string($token) || $token === '') {
             $token = $this->mintGeneration();
-            $this->cacheableService->set($this->generationContext(), $token);
+
+            try {
+                $this->cacheableService->set($this->generationContext(), $token);
+            } catch (\Throwable $e) {
+                // Cache down: every operation mints its own token, so keys
+                // never match and reads fall through to the database —
+                // caching degrades to disabled instead of breaking reads.
+                $this->logger->warning(
+                    'Could not persist a table generation token — caching is effectively disabled until the cache recovers.',
+                    ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+                );
+            }
         }
 
         return $token;

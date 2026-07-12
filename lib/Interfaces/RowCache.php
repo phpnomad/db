@@ -7,9 +7,9 @@ use PHPNomad\Datastore\Interfaces\DataModel;
 /**
  * The cache-context contract for one table's datastore: canonical row
  * identities, alias entries, set-level contexts, and per-table generation
- * tokens. Every cache key a datastore reads or invalidates is built (and
- * every mutation performed) behind this contract, so writers can always name
- * the keys readers used.
+ * tokens. Every cache read and every mutation the datastore performs
+ * happens behind this contract — the consuming trait holds no cache access
+ * of its own — so writers can always name the keys readers used.
  *
  * @see \PHPNomad\Database\Services\DatastoreRowCache the default implementation
  */
@@ -41,31 +41,6 @@ interface RowCache
     public function rowContext(array $row, ?string $generation = null): ?array;
 
     /**
-     * Wraps an already-canonical identity in the row cache context.
-     *
-     * @param array<string, mixed> $identity
-     * @param string|null $generation Generation snapshot; taken fresh when omitted.
-     */
-    public function identityContext(array $identity, ?string $generation = null): array;
-
-    /**
-     * Builds the cache context for an alias entry (business-key lookup →
-     * canonical identity pointer).
-     *
-     * @param array<string, mixed> $ids
-     * @param string|null $generation Generation snapshot; taken fresh when omitted.
-     */
-    public function aliasContext(array $ids, ?string $generation = null): array;
-
-    /**
-     * The set-level context for whole-table values (estimatedCount and any
-     * future query caches).
-     *
-     * @param string|null $generation Generation snapshot; taken fresh when omitted.
-     */
-    public function tableContext(?string $generation = null): array;
-
-    /**
      * Reads the identity an alias entry points at, validated against the
      * table's identity shape. Null on miss or malformed value.
      *
@@ -88,11 +63,32 @@ interface RowCache
     public function readRow(array $identity, ?string $generation, callable $fallback);
 
     /**
+     * Whether a row entry exists for the given identity row. False when the
+     * row cannot produce a full identity (it can never have been cached).
+     *
+     * @param array<string, mixed> $identityRow
+     * @param string|null $generation Pre-query generation snapshot.
+     */
+    public function hasRow(array $identityRow, ?string $generation = null): bool;
+
+    /**
+     * Read-through for the table's set-level value (estimatedCount and any
+     * future whole-table caches): serves the cached value or runs the
+     * fallback and caches its result.
+     *
+     * @param callable $fallback Computes the value on miss; its result is cached.
+     * @return mixed
+     */
+    public function readTableValue(callable $fallback);
+
+    /**
      * True when the model still carries the caller's lookup values —
      * the guard against an alias whose business key was rotated out from
      * under it by an identity-keyed update. For generation-disabled tables
-     * an unverifiable lookup (no field exposed by the adapter) is treated
-     * as stale, because this check is their ONLY rotation defense.
+     * ANY lookup field the adapter cannot expose makes the lookup
+     * unverifiable and the alias is treated as stale, because this check is
+     * their ONLY rotation defense; generation-enabled tables skip
+     * unverifiable fields (the bump covers rotation).
      *
      * @param DataModel $model
      * @param array<string, mixed> $ids The caller's lookup key.
@@ -151,35 +147,11 @@ interface RowCache
     public function deleteAlias(array $ids, ?string $generation = null): void;
 
     /**
-     * Deletes the set-level context. Used by writes on generation-disabled
-     * tables, where no bump exists to orphan it.
-     */
-    public function deleteTableContext(): void;
-
-    /**
-     * Folds the current table generation into a cache context. The token is
-     * replaced on every write, which orphans all previously written contexts
-     * for the table at once — the transaction-free invalidation primitive
-     * the whole design leans on.
-     *
-     * @param array $context The context to fold the token into.
-     * @param string|null $generation Snapshot to fold in; fetched fresh when omitted.
-     */
-    public function withGeneration(array $context, ?string $generation = null): array;
-
-    /**
      * Takes the generation snapshot an operation should key its contexts
      * under — once, before any database query. Null when generations are
      * disabled.
      */
     public function snapshotGeneration(): ?string;
-
-    /**
-     * Replaces the table's generation token after a successful write.
-     *
-     * @return string|null The fresh token, or null when generations are disabled.
-     */
-    public function bumpGeneration(): ?string;
 
     /**
      * Whether contexts built by this service carry a generation token.
