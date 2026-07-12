@@ -7,6 +7,7 @@ use PHPNomad\Database\Interfaces\RowCache;
 use PHPNomad\Database\Interfaces\RowCacheFactory;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Services\DatastoreRowCache;
+use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Datastore\Interfaces\ModelAdapter;
 use PHPNomad\Logger\Interfaces\LoggerStrategy;
 
@@ -27,7 +28,11 @@ class DatastoreRowCacheFactory implements RowCacheFactory
         $this->loggerStrategy = $loggerStrategy;
     }
 
-    /** @inheritDoc */
+    /**
+     * @inheritDoc
+     *
+     * @param ModelAdapter<DataModel> $modelAdapter
+     */
     public function make(Table $table, string $model, ModelAdapter $modelAdapter, bool $useGenerations = true): RowCache
     {
         return new DatastoreRowCache($this->cacheableService, $this->loggerStrategy, $table, $model, $modelAdapter, $useGenerations);

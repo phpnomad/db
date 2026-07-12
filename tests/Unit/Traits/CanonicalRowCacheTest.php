@@ -133,7 +133,7 @@ class CanonicalRowCacheTest extends TestCase
      *
      * @return array<string, array{0: bool}>
      */
-    public function generationModes(): array
+    public static function generationModes(): array
     {
         return [
             'generations on (production default)' => [true],
@@ -142,7 +142,7 @@ class CanonicalRowCacheTest extends TestCase
     }
 
     /**
-     * @dataProvider generationModesWithRowEntryCounts
+     * @dataProvider generationModesWithRowAndTokenEntryCounts
      */
     public function testWhereCachesRowsUnderTableIdentityNotModelIdentity(bool $useGenerations, int $expectedEntries): void
     {
@@ -381,7 +381,7 @@ class CanonicalRowCacheTest extends TestCase
      *
      * @return array<string, array{0: bool, 1: int}>
      */
-    public function generationModesWithExpectedEntries(): array
+    public static function generationModesWithTokenOnlyEntryCounts(): array
     {
         return [
             'generations on (production default)' => [true, 1],
@@ -394,7 +394,7 @@ class CanonicalRowCacheTest extends TestCase
      *
      * @return array<string, array{0: bool, 1: int}>
      */
-    public function generationModesWithRowEntryCounts(): array
+    public static function generationModesWithRowAndTokenEntryCounts(): array
     {
         return [
             'generations on (production default)' => [true, 2],
@@ -403,7 +403,7 @@ class CanonicalRowCacheTest extends TestCase
     }
 
     /**
-     * @dataProvider generationModesWithExpectedEntries
+     * @dataProvider generationModesWithTokenOnlyEntryCounts
      */
     public function testRowMissingAnIdentityFieldIsNotCachedAndWarns(bool $useGenerations, int $expectedEntries): void
     {
@@ -464,7 +464,9 @@ class CanonicalRowCacheTest extends TestCase
     {
         $events = new RecordingEventStrategy();
         $logger = $this->createMock(LoggerStrategy::class);
-        $logger->expects($this->atLeastOnce())->method('warning');
+        $logger->expects($this->atLeastOnce())
+            ->method('warning')
+            ->with($this->stringContains('missing an identity field'));
 
         $handler = $this->makeHandler(['orgId', 'id'], 'test_records', false, $logger, $events);
 
@@ -709,7 +711,7 @@ class CanonicalRowCacheTest extends TestCase
     /**
      * @return array<string, array{0: array, 1: string, 2: string}>
      */
-    public function readOutageLookups(): array
+    public static function readOutageLookups(): array
     {
         return [
             'business-key lookup (alias + token reads)' => [['keyHash' => 'abc'], 'id', '7'],
@@ -779,7 +781,6 @@ class CanonicalRowCacheTest extends TestCase
 
         // …and after recovery the original entries are untouched and served.
         $flaky->failReads = false;
-        $flaky->failWrites = false;
 
         foreach ($storeBefore as $key => $value) {
             $this->assertArrayHasKey($key, $this->cacheStrategy->store, 'A read blip clobbered a healthy cache entry.');

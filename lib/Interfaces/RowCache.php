@@ -35,8 +35,7 @@ interface RowCache
 
     /**
      * Extracts the canonical identity from row data. Null (logged) when the
-     * row is missing an identity field, or (not logged) when the table
-     * declares no identity fields at all.
+     * row is missing an identity field.
      *
      * @param array<string, mixed> $row
      * @return array<string, mixed>|null Scalars stringified, table order.
@@ -73,7 +72,8 @@ interface RowCache
      * fallback's value when only the post-load store failed, and load
      * directly when the probe itself broke. Exceptions thrown BY the
      * fallback are domain errors (RecordNotFoundException) and must
-     * propagate untouched.
+     * propagate untouched. Under an ephemeral generation snapshot the cache
+     * is skipped entirely and the fallback serves the read.
      *
      * @param array<string, mixed> $identity Canonical identity (from rowIdentity()).
      * @param string|null $generation Pre-query generation snapshot.
@@ -109,7 +109,9 @@ interface RowCache
      * ANY lookup field the adapter cannot expose makes the lookup
      * unverifiable and the alias is treated as stale, because this check is
      * their ONLY rotation defense; generation-enabled tables skip
-     * unverifiable fields (the bump covers rotation).
+     * unverifiable fields (the bump covers rotation). Exceptions thrown by
+     * the model adapter are domain errors and propagate (the same carve-out
+     * readRow() makes for its fallback).
      *
      * @param DataModel $model
      * @param array<string, mixed> $ids The caller's lookup key.
@@ -136,28 +138,37 @@ interface RowCache
      * write's bump, landing a stale row under the new generation — the exact
      * race generations exist to close.
      *
+     * Stores MUST no-op under an ephemeral generation snapshot (minted
+     * during a token-read outage): such entries can never be read back.
+     *
      * @param array<string, mixed> $row
      * @param mixed $model
-     * @param string|null $generation Pre-query generation snapshot.
+     * @param string|null $generation Pre-query generation snapshot — REQUIRED
+     *                     (null only for generation-disabled tables): a token
+     *                     fetched at store time can postdate a concurrent
+     *                     write's bump, so the signature forces the caller to
+     *                     thread the snapshot it queried under.
      */
-    public function storeRow(array $row, $model, ?string $generation = null): void;
+    public function storeRow(array $row, $model, ?string $generation): void;
 
     /**
      * Stores an alias entry pointing a business key at a canonical identity.
+     *
+     * Stores MUST no-op under an ephemeral generation snapshot.
      *
      * @param array<string, mixed> $ids
      * @param array<string, mixed> $identity
      * @param string|null $generation Pre-query generation snapshot.
      */
-    public function storeAlias(array $ids, array $identity, ?string $generation = null): void;
+    public function storeAlias(array $ids, array $identity, ?string $generation): void;
 
     /**
      * Deletes the row entry for a canonical identity.
      *
      * @param array<string, mixed> $identity
-     * @param string|null $generation The generation readers wrote under.
+     * @param string|null $generation Pre-query generation snapshot.
      */
-    public function deleteRow(array $identity, ?string $generation = null): void;
+    public function deleteRow(array $identity, ?string $generation): void;
 
     /**
      * Deletes an alias entry.
@@ -165,7 +176,7 @@ interface RowCache
      * @param array<string, mixed> $ids
      * @param string|null $generation Pre-query generation snapshot.
      */
-    public function deleteAlias(array $ids, ?string $generation = null): void;
+    public function deleteAlias(array $ids, ?string $generation): void;
 
     /**
      * Takes the generation snapshot an operation should key its contexts

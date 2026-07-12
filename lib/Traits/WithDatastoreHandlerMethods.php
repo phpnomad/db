@@ -147,7 +147,7 @@ trait WithDatastoreHandlerMethods
             $this->maybeThrowForDuplicateIdentity($attributes, $fields);
         }
 
-        $this->maybeThrowForDuplicateUniqueFields($attributes);
+        $this->maybeThrowForDuplicateUniqueFieldsExcluding($attributes);
 
         // Apply PHP-side defaults so the values that land in the DB also land
         // in the in-memory model we hand back. This eliminates the post-insert
@@ -623,7 +623,7 @@ trait WithDatastoreHandlerMethods
         // (falling back to model identity only when an adapter cannot expose
         // one): model identities can be shared by distinct rows, and a true
         // duplicate must not hide behind one.
-        $this->maybeThrowForDuplicateUniqueFields($attributes, $this->rowCache()->rowIdentity($identity), $record->getIdentity());
+        $this->maybeThrowForDuplicateUniqueFieldsExcluding($attributes, $this->rowCache()->rowIdentity($identity), $record->getIdentity());
 
         // The SQL update targets the RESOLVED table identity AND the
         // caller's own lookup fields: the identity pins exactly one row (no
@@ -805,8 +805,11 @@ trait WithDatastoreHandlerMethods
 
 
     /**
-     * Guards unique-column groups. When updating, the record being updated
-     * is filtered out of the duplicate scan by TABLE identity — model
+     * Guards unique-column groups. (Renamed from
+     * maybeThrowForDuplicateUniqueFields when its second parameter changed
+     * meaning, so stale call sites fail loudly instead of silently filtering
+     * self-matches by the wrong identity.) When updating, the record being
+     * updated is filtered out of the duplicate scan by TABLE identity — model
      * identities can be a subset of the table's and therefore shared across
      * distinct rows, so a model-identity self-match could hide a true
      * duplicate. The model-identity comparison is only the fallback for
@@ -821,7 +824,7 @@ trait WithDatastoreHandlerMethods
      * @throws DuplicateEntryException
      * @throws DatastoreErrorException
      */
-    protected function maybeThrowForDuplicateUniqueFields(array $data, ?array $updateTableIdentity = null, ?array $updateModelIdentity = null): void
+    protected function maybeThrowForDuplicateUniqueFieldsExcluding(array $data, ?array $updateTableIdentity = null, ?array $updateModelIdentity = null): void
     {
         try {
             $duplicates = $this->getDuplicates($data);

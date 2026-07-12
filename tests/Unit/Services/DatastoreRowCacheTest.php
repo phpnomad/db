@@ -94,18 +94,10 @@ class DatastoreRowCacheTest extends TestCase
 
         $this->assertNull($rowCache->rowIdentity(['id' => 42]));
     }
-
-    public function testRowIdentityWithNoIdentityFieldsReturnsNull(): void
-    {
-        $rowCache = $this->makeRowCache([]);
-
-        $this->assertNull($rowCache->rowIdentity(['id' => 42]));
-    }
-
     /**
      * @return array<string, array{0: array, 1: bool}>
      */
-    public function identityShapes(): array
+    public static function identityShapes(): array
     {
         return [
             'exact identity' => [['orgId' => '1', 'id' => '42'], true],
@@ -143,7 +135,7 @@ class DatastoreRowCacheTest extends TestCase
     {
         $rowCache = $this->makeRowCache(['id']);
 
-        $rowCache->storeAlias(['keyHash' => 'abc'], ['id' => '7']);
+        $rowCache->storeAlias(['keyHash' => 'abc'], ['id' => '7'], null);
 
         $this->assertSame(['id' => '7'], $rowCache->resolveAliasedIdentity(['keyHash' => 'abc']));
     }
@@ -151,7 +143,7 @@ class DatastoreRowCacheTest extends TestCase
     /**
      * @return array<string, array{0: array, 1: array, 2: bool}>
      */
-    public function lookupComparisons(): array
+    public static function lookupComparisons(): array
     {
         return [
             'same-type match' => [['id' => 7, 'keyHash' => 'abc'], ['keyHash' => 'abc'], true],
@@ -198,7 +190,7 @@ class DatastoreRowCacheTest extends TestCase
     /**
      * @return array<string, array{0: bool}>
      */
-    public function generationModes(): array
+    public static function generationModes(): array
     {
         return [
             'generations on' => [true],
@@ -240,6 +232,22 @@ class DatastoreRowCacheTest extends TestCase
         $rowCache = $this->makeRowCache(['id'], true);
 
         $this->assertNotNull($rowCache->invalidateAfterWrite());
+    }
+
+    public function testEphemeralSnapshotSkipsCachingEntirely(): void
+    {
+        // Nothing keyed under an ephemeral token can ever be read back, so
+        // stores must no-op and read-throughs must go straight to their
+        // fallback without touching the cache.
+        $rowCache = $this->makeRowCache(['id'], true);
+
+        $rowCache->storeRow(['id' => '7', 'status' => 'active'], new IdentityRowModel(['id' => '7']), 'ephemeral-abc');
+        $rowCache->storeAlias(['keyHash' => 'abc'], ['id' => '7'], 'ephemeral-abc');
+
+        $served = $rowCache->readRow(['id' => '7'], 'ephemeral-abc', fn () => 'from-fallback');
+
+        $this->assertSame('from-fallback', $served);
+        $this->assertSame([], $this->cacheStrategy->store, 'An ephemeral snapshot produced cache entries nobody can ever read.');
     }
 
 }

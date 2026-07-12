@@ -35,11 +35,15 @@ class DatastoreRowCache implements RowCache
      * @var class-string<DataModel>
      */
     protected string $model;
+    /**
+     * @var ModelAdapter<DataModel>
+     */
     protected ModelAdapter $modelAdapter;
     protected bool $useGenerations;
 
     /**
      * @param class-string<DataModel> $model
+     * @param ModelAdapter<DataModel> $modelAdapter
      */
     public function __construct(
         CacheableService $cacheableService,
@@ -60,10 +64,10 @@ class DatastoreRowCache implements RowCache
     /** @inheritDoc */
     public function isTableIdentity(array $ids): bool
     {
+        // Table::getFieldsForIdentity() is contractually non-empty.
         $identityFields = $this->table->getFieldsForIdentity();
 
-        return !empty($identityFields)
-            && count($ids) === count($identityFields)
+        return count($ids) === count($identityFields)
             && !array_diff(array_keys($ids), $identityFields);
     }
 
@@ -82,10 +86,6 @@ class DatastoreRowCache implements RowCache
     public function rowIdentity(array $row): ?array
     {
         $identityFields = $this->table->getFieldsForIdentity();
-
-        if (empty($identityFields)) {
-            return null;
-        }
 
         $identity = [];
 
@@ -119,7 +119,7 @@ class DatastoreRowCache implements RowCache
      *
      * @param array<string, mixed> $row
      * @param string|null $generation Generation snapshot to key under; taken fresh when omitted.
-     * @return array|null Null when the row cannot produce a full identity.
+     * @return array<string, mixed>|null Null when the row cannot produce a full identity.
      */
     protected function rowContext(array $row, ?string $generation = null): ?array
     {
@@ -134,6 +134,7 @@ class DatastoreRowCache implements RowCache
      *
      * @param array<string, mixed> $identity
      * @param string|null $generation Generation snapshot to key under; taken fresh when omitted.
+     * @return array<string, mixed>
      */
     protected function identityContext(array $identity, ?string $generation = null): array
     {
@@ -149,6 +150,7 @@ class DatastoreRowCache implements RowCache
      *
      * @param array<string, mixed> $ids The caller's lookup key.
      * @param string|null $generation Generation snapshot to key under; taken fresh when omitted.
+     * @return array<string, mixed>
      */
     protected function aliasContext(array $ids, ?string $generation = null): array
     {
@@ -163,6 +165,7 @@ class DatastoreRowCache implements RowCache
      * The set-level context — one undiscriminated slot per table.
      *
      * @param string|null $generation Generation snapshot; taken fresh when omitted.
+     * @return array<string, mixed>
      */
     protected function tableContext(?string $generation = null): array
     {
@@ -170,7 +173,7 @@ class DatastoreRowCache implements RowCache
     }
 
     /** @inheritDoc */
-    public function storeRow(array $row, $model, ?string $generation = null): void
+    public function storeRow(array $row, $model, ?string $generation): void
     {
         if ($this->isEphemeralGeneration($generation)) {
             return;
@@ -193,7 +196,7 @@ class DatastoreRowCache implements RowCache
     }
 
     /** @inheritDoc */
-    public function storeAlias(array $ids, array $identity, ?string $generation = null): void
+    public function storeAlias(array $ids, array $identity, ?string $generation): void
     {
         if ($this->isEphemeralGeneration($generation)) {
             return;
@@ -210,7 +213,7 @@ class DatastoreRowCache implements RowCache
     }
 
     /** @inheritDoc */
-    public function deleteRow(array $identity, ?string $generation = null): void
+    public function deleteRow(array $identity, ?string $generation): void
     {
         try {
             $this->cacheableService->delete($this->identityContext($identity, $generation));
@@ -223,7 +226,7 @@ class DatastoreRowCache implements RowCache
     }
 
     /** @inheritDoc */
-    public function deleteAlias(array $ids, ?string $generation = null): void
+    public function deleteAlias(array $ids, ?string $generation): void
     {
         try {
             $this->cacheableService->delete($this->aliasContext($ids, $generation));
@@ -247,6 +250,13 @@ class DatastoreRowCache implements RowCache
     /** @inheritDoc */
     public function readRow(array $identity, ?string $generation, callable $fallback)
     {
+        if ($this->isEphemeralGeneration($generation)) {
+            // No key under an ephemeral token can ever be read back: skip
+            // the cache entirely — no guaranteed-miss round trip, and no
+            // unreachable garbage from the miss-path store.
+            return $fallback();
+        }
+
         return $this->guardedReadThrough($this->identityContext($identity, $generation), $fallback);
     }
 
@@ -262,7 +272,7 @@ class DatastoreRowCache implements RowCache
      *  - the cache probe threw before the fallback ran → load directly from
      *    the fallback.
      *
-     * @param array $context
+     * @param array<string, mixed> $context
      * @param callable $fallback
      * @return mixed
      */
@@ -337,7 +347,13 @@ class DatastoreRowCache implements RowCache
      */
     public function readTableValue(callable $fallback)
     {
-        return $this->guardedReadThrough($this->tableContext(), $fallback);
+        $generation = $this->snapshotGeneration();
+
+        if ($this->isEphemeralGeneration($generation)) {
+            return $fallback();
+        }
+
+        return $this->guardedReadThrough($this->tableContext($generation), $fallback);
     }
 
     /**
@@ -438,6 +454,8 @@ class DatastoreRowCache implements RowCache
      * @param string|null $generation Snapshot to fold in; fetched fresh when omitted.
      *
      * @see https://developer.wordpress.org/reference/functions/wp_cache_set_last_changed/ the pattern's origin
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
      */
     protected function withGeneration(array $context, ?string $generation = null): array
     {
@@ -536,6 +554,8 @@ class DatastoreRowCache implements RowCache
     /**
      * The context the generation token itself lives under. Never carries a
      * generation — it IS the generation.
+     *
+     * @return array<string, mixed>
      */
     protected function generationContext(): array
     {
@@ -552,9 +572,10 @@ class DatastoreRowCache implements RowCache
 
     /**
      * Mints a token for a single operation during a token-read outage. The
-     * prefix marks it so write-backs can skip: entries keyed under a token
-     * nobody else can ever read are pure garbage written at read-traffic
-     * rate.
+     * prefix marks it so every caching path skips: stores no-op and
+     * read-throughs go straight to their fallback, because entries keyed
+     * under a token nobody can ever read back are pure garbage written at
+     * read-traffic rate.
      */
     protected function mintEphemeralGeneration(): string
     {
