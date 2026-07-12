@@ -201,48 +201,6 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $this->assertSame($createdModel, $handler->create(['createdAt' => 'caller-provided']));
     }
 
-    public function testCacheContextIsTypeStableAcrossIntAndStringIdentities(): void
-    {
-        // Regression: MySQL returns identity columns as strings, but hydrated
-        // models hold them as ints. Without normalization, the same record
-        // produces two distinct cache entries and updateCompound() only
-        // invalidates one of them — leaving the other to serve stale reads.
-        $loggerStrategy = $this->createMock(LoggerStrategy::class);
-        $eventStrategy = $this->createMock(EventStrategy::class);
-        $queryStrategy = $this->createMock(QueryStrategy::class);
-        $cacheableService = $this->createMock(CacheableService::class);
-        $table = $this->createMock(Table::class);
-        $table->method('getFieldsForIdentity')->willReturn(['id']);
-        $tableSchemaService = $this->createMock(TableSchemaService::class);
-        $modelAdapter = $this->createMock(ModelAdapter::class);
-
-        $serviceProvider = new DatabaseServiceProvider(
-            $loggerStrategy,
-            $queryStrategy,
-            new NoopQueryBuilder(),
-            new NoopClauseBuilder(),
-            $cacheableService,
-            $eventStrategy,
-            new DatastoreRowCacheFactory($cacheableService, $loggerStrategy)
-        );
-
-        $handler = new DummyDatastoreHandler(
-            $serviceProvider,
-            $table,
-            $tableSchemaService,
-            TestModel::class,
-            $modelAdapter
-        );
-
-        $prober = new ExposedRowCache($cacheableService, $loggerStrategy, $table, TestModel::class, $modelAdapter, false);
-
-        $intContext = $prober->exposeRowContext(['id' => 123]);
-        $stringContext = $prober->exposeRowContext(['id' => '123']);
-
-        $this->assertNotNull($intContext);
-        $this->assertSame($intContext, $stringContext);
-    }
-
     public function testUpdateCompoundInvalidatesCacheRegardlessOfIdentityType(): void
     {
         // Drives the actual stale-read scenario end-to-end: the read path

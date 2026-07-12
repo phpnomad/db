@@ -58,6 +58,12 @@ interface RowCache
      * fallback and caches its result — every row cache read AND the miss-path
      * write happen behind this contract.
      *
+     * Failure semantics: cache-layer failures must never surface — serve the
+     * fallback's value when only the post-load store failed, and load
+     * directly when the probe itself broke. Exceptions thrown BY the
+     * fallback are domain errors (RecordNotFoundException) and must
+     * propagate untouched.
+     *
      * @param array<string, mixed> $identity Canonical identity (from rowIdentity()).
      * @param string|null $generation Pre-query generation snapshot.
      * @param callable $fallback Loads the model on miss; its result is cached.
@@ -75,10 +81,10 @@ interface RowCache
     public function hasRow(array $identityRow, ?string $generation = null): bool;
 
     /**
-     * Read-through for the table's single set-level value (estimatedCount):
-     * serves the cached value or runs the fallback and caches its result.
-     * One undiscriminated slot per table — a second whole-table value would
-     * need a discriminator added to the context.
+     * Read-through for the table's single set-level value: serves the cached
+     * value or runs the fallback and caches its result. One undiscriminated
+     * slot per table — a second whole-table value would need a discriminator
+     * added to the context. Same failure semantics as readRow().
      *
      * @param callable $fallback Computes the value on miss; its result is cached.
      * @return mixed

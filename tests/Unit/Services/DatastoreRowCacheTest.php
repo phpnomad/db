@@ -6,6 +6,7 @@ use PHPNomad\Cache\Services\CacheableService;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Tests\Doubles\ArrayCacheStrategy;
 use PHPNomad\Database\Tests\Doubles\ExposedRowCache;
+use PHPNomad\Database\Tests\Doubles\FlakyCacheStrategy;
 use PHPNomad\Database\Tests\Doubles\NullEventStrategy;
 use PHPNomad\Database\Tests\Doubles\SerializingCachePolicy;
 use PHPNomad\Database\Tests\TestCase;
@@ -53,6 +54,20 @@ class DatastoreRowCacheTest extends TestCase
             $adapter ?? new RowModelAdapter(),
             $useGenerations
         );
+    }
+
+    public function testRowContextIsTypeStableAcrossIntAndStringIdentities(): void
+    {
+        // Regression: MySQL returns identity columns as strings, but hydrated
+        // rows can hold them as ints. Without normalization the same record
+        // produces two distinct cache contexts and invalidation misses one.
+        $rowCache = $this->makeRowCache(['id']);
+
+        $intContext = $rowCache->exposeRowContext(['id' => 123]);
+        $stringContext = $rowCache->exposeRowContext(['id' => '123']);
+
+        $this->assertNotNull($intContext);
+        $this->assertSame($intContext, $stringContext);
     }
 
     public function testRowIdentityReordersToTableOrderAndStringifies(): void
@@ -177,6 +192,44 @@ class DatastoreRowCacheTest extends TestCase
             $rowCache->matchesLookup(new RowModel(['id' => 7, 'keyHash' => 'abc']), ['keyHash' => 'abc'])
         );
     }
+    /**
+     * @return array<string, array{0: bool}>
+     */
+    public function generationModes(): array
+    {
+        return [
+            'generations on' => [true],
+            'generations off' => [false],
+        ];
+    }
+
+    /**
+     * The contract lists invalidateAfterWrite among the swallow-and-log
+     * mutations: consumers call it unguarded after committed writes, so the
+     * default implementation must never let a cache failure escape.
+     *
+     * @dataProvider generationModes
+     */
+    public function testInvalidateAfterWriteSwallowsCacheFailures(bool $useGenerations): void
+    {
+        $flaky = new FlakyCacheStrategy();
+        $this->cacheStrategy = $flaky;
+        $this->cacheableService = new CacheableService(
+            new NullEventStrategy(),
+            $flaky,
+            new SerializingCachePolicy()
+        );
+
+        $logger = $this->createMock(LoggerStrategy::class);
+        $logger->expects($this->atLeastOnce())->method('error');
+
+        $rowCache = $this->makeRowCache(['id'], $useGenerations, $logger);
+
+        $flaky->failWrites = true;
+
+        $this->assertNull($rowCache->invalidateAfterWrite());
+    }
+
 }
 
 class RowModel implements DataModel

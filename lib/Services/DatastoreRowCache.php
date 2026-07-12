@@ -8,6 +8,7 @@ use PHPNomad\Database\Interfaces\RowCache;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Datastore\Interfaces\ModelAdapter;
+use PHPNomad\Cache\Exceptions\CachedItemNotFoundException;
 use PHPNomad\Logger\Interfaces\LoggerStrategy;
 use Throwable;
 
@@ -302,6 +303,11 @@ class DatastoreRowCache implements RowCache
         } catch (Throwable $e) {
             // A probe failure reads as uncached — the caller falls through
             // to the database.
+            $this->logger->warning(
+                'Row cache probe failed — treating the row as uncached.',
+                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+            );
+
             return false;
         }
     }
@@ -347,13 +353,14 @@ class DatastoreRowCache implements RowCache
                 return false;
             }
 
-            $actual = $data[$field];
+            // Normalize both sides through the same rule cache keys use, so
+            // this comparison can never drift from key equality.
+            [$actual, $expected] = array_values($this->stringifyScalars([
+                'actual' => $data[$field],
+                'expected' => $value,
+            ]));
 
-            if (is_scalar($actual) && is_scalar($value)) {
-                if ((string) $actual !== (string) $value) {
-                    return false;
-                }
-            } elseif ($actual !== $value) {
+            if ($actual !== $expected) {
                 return false;
             }
         }
@@ -364,13 +371,22 @@ class DatastoreRowCache implements RowCache
     /** @inheritDoc */
     public function invalidateAfterWrite(): ?string
     {
-        if (!$this->useGenerations) {
-            $this->deleteTableContext();
+        try {
+            if (!$this->useGenerations) {
+                $this->deleteTableContext();
+
+                return null;
+            }
+
+            return $this->bumpGeneration();
+        } catch (Throwable $e) {
+            $this->logger->error(
+                'Post-write cache invalidation failed — cached rows may serve stale data until TTL.',
+                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+            );
 
             return null;
         }
-
-        return $this->bumpGeneration();
     }
 
     /** @inheritDoc */
@@ -378,10 +394,17 @@ class DatastoreRowCache implements RowCache
     {
         try {
             $aliased = $this->cacheableService->get($this->aliasContext($ids, $generation));
+        } catch (CachedItemNotFoundException $e) {
+            return null;
         } catch (Throwable $e) {
-            // Any cache-layer failure reads as a miss: every alias caller
-            // has a database fallback, so a throwing backend degrades to
+            // A cache-layer failure reads as a miss: every alias caller has
+            // a database fallback, so a throwing backend degrades to
             // uncached instead of breaking the lookup.
+            $this->logger->warning(
+                'Alias cache read failed — treating the alias as missing.',
+                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+            );
+
             return null;
         }
 
@@ -421,9 +444,9 @@ class DatastoreRowCache implements RowCache
      * Replaces the table's generation token. Called after every successful
      * write. A no-op when generations are disabled for this table.
      *
-     * @return string|null The freshly minted token, so post-write cache
-     *                     writes (create()'s pre-warm) can key under it; null
-     *                     when generations are disabled.
+     * @return string|null The freshly minted token (currently unconsumed —
+     *                     available to implementations that add post-write
+     *                     cache writes); null when generations are disabled.
      */
     protected function bumpGeneration(): ?string
     {
@@ -458,11 +481,19 @@ class DatastoreRowCache implements RowCache
     {
         try {
             $token = $this->cacheableService->get($this->generationContext());
-        } catch (Throwable $e) {
-            // Read failure is treated exactly like a missing token: mint a
-            // fresh one so the operation proceeds with caching effectively
-            // disabled rather than breaking on a dead cache.
+        } catch (CachedItemNotFoundException $e) {
             $token = null;
+        } catch (Throwable $e) {
+            // A read FAILURE (not a miss) mints an ephemeral token for this
+            // operation only, WITHOUT persisting it: if reads blip while
+            // writes still work, persisting would let every reader clobber
+            // a healthy token and wholesale-invalidate the table cache.
+            $this->logger->warning(
+                'Generation token read failed — using an ephemeral token for this operation.',
+                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+            );
+
+            return $this->mintGeneration();
         }
 
         if (!is_string($token) || $token === '') {

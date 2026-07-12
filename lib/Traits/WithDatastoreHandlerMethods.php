@@ -168,7 +168,7 @@ trait WithDatastoreHandlerMethods
         // can seed the newest generation with a row another writer already
         // overwrote. The first read after create costs one DB round-trip
         // and is always correct.
-        $this->invalidateAfterWriteSafely();
+        $this->rowCache()->invalidateAfterWrite();
 
         $this->serviceProvider->eventStrategy->broadcast(new RecordCreated($result));
 
@@ -246,7 +246,7 @@ trait WithDatastoreHandlerMethods
             }
         } finally {
             if ($deleted) {
-                $this->invalidateAfterWriteSafely();
+                $this->rowCache()->invalidateAfterWrite();
             }
 
             // Broadcasts are buffered and emitted after the SQL work so a
@@ -267,29 +267,6 @@ trait WithDatastoreHandlerMethods
                     );
                 }
             }
-        }
-    }
-
-    /**
-     * Post-write invalidation that never throws: a cache-layer failure after
-     * a committed database write must not turn the write into a
-     * caller-visible error, mask an in-flight exception, or suppress event
-     * broadcasts. Failures are logged and left to TTL recovery.
-     *
-     * @return string|null The fresh generation token, or null when
-     *                     generations are disabled or the cache failed.
-     */
-    protected function invalidateAfterWriteSafely(): ?string
-    {
-        try {
-            return $this->rowCache()->invalidateAfterWrite();
-        } catch (Throwable $e) {
-            $this->serviceProvider->loggerStrategy->error(
-                'Post-write cache invalidation failed — cached rows may serve stale data until TTL.',
-                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
-            );
-
-            return null;
         }
     }
 
@@ -459,6 +436,8 @@ trait WithDatastoreHandlerMethods
             fn (array $identityRow) => !$this->rowCache()->hasRow($identityRow, $generation)
         );
 
+        $hydrated = [];
+
         if (!empty($idsToQuery)) {
             $clauseBuilder = (clone $this->serviceProvider->clauseBuilder)->reset()->useTable($this->table);
             // Get the things that aren't in the cache.
@@ -471,14 +450,35 @@ trait WithDatastoreHandlerMethods
 
             // Cache those items under their canonical row contexts, keyed
             // from the ROW's identity values — never the model's getIdentity(),
-            // which is not necessarily the table's identity.
+            // which is not necessarily the table's identity. The hydrated
+            // models are ALSO held locally: the batch result must not depend
+            // on the cache write landing, or a cache outage silently turns
+            // one list read into 1+N database queries.
             foreach ($data as $row) {
-                $this->rowCache()->storeRow($row, $this->modelAdapter->toModel($row), $generation);
+                $model = $this->modelAdapter->toModel($row);
+                $identity = $this->rowCache()->rowIdentity($row);
+
+                if ($identity !== null) {
+                    $hydrated[serialize($identity)] = $model;
+                }
+
+                $this->rowCache()->storeRow($row, $model, $generation);
             }
         }
 
-        // Now, use the cache to return the rows in the requested order.
-        return Arr::map($ids, fn(array $id) => $this->findFromCompound($id, $generation));
+        // Return the rows in the requested order: just-hydrated models are
+        // served directly; only ids skipped as already-cached consult the
+        // cache (falling through to the database on a miss).
+        return Arr::map($ids, function (array $id) use ($hydrated, $generation) {
+            $identity = $this->rowCache()->rowIdentity($id);
+            $key = $identity === null ? null : serialize($identity);
+
+            if ($key !== null && array_key_exists($key, $hydrated)) {
+                return $hydrated[$key];
+            }
+
+            return $this->findFromCompound($id, $generation);
+        });
     }
 
     /**
@@ -592,8 +592,13 @@ trait WithDatastoreHandlerMethods
         // entry (canonical callers) — which is what makes the canonical
         // identity resolvable below without an extra query. It also throws
         // RecordNotFoundException before any write when the record is gone.
-        $this->findFromCompound($ids, $generation);
-        $this->maybeThrowForDuplicateUniqueFields($attributes, $ids);
+        $record = $this->findFromCompound($ids, $generation);
+
+        // Self-matches are filtered by the pre-read MODEL's identity, not
+        // the caller's key: a business-key caller re-sending the record's
+        // own unique values must not trip a spurious duplicate error just
+        // because their lookup key never equals a model identity.
+        $this->maybeThrowForDuplicateUniqueFields($attributes, $record->getIdentity());
 
         $identity = $this->resolveTableIdentity($ids, $generation);
 
@@ -630,7 +635,7 @@ trait WithDatastoreHandlerMethods
             $this->rowCache()->deleteAlias($ids, $generation);
         }
 
-        $this->invalidateAfterWriteSafely();
+        $this->rowCache()->invalidateAfterWrite();
 
         // The event intentionally carries the caller's key — the lookup
         // contract they wrote against — not the cache-normalized identity

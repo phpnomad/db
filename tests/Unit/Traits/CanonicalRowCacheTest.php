@@ -77,7 +77,8 @@ class CanonicalRowCacheTest extends TestCase
         bool $useGenerations = false,
         ?LoggerStrategy $logger = null,
         ?EventStrategy $events = null,
-        ?ModelAdapter $adapter = null
+        ?ModelAdapter $adapter = null,
+        array $uniqueColumns = []
     ): CanonicalHandler {
         $table = $this->createMock(Table::class);
         $table->method('getName')->willReturn($tableName);
@@ -85,7 +86,7 @@ class CanonicalRowCacheTest extends TestCase
         $table->method('getColumns')->willReturn([]);
 
         $tableSchemaService = $this->createMock(TableSchemaService::class);
-        $tableSchemaService->method('getUniqueColumns')->willReturn([]);
+        $tableSchemaService->method('getUniqueColumns')->willReturn($uniqueColumns);
 
         $logger = $logger ?? $this->createMock(LoggerStrategy::class);
 
@@ -634,6 +635,50 @@ class CanonicalRowCacheTest extends TestCase
         } catch (RecordNotFoundException $e) {
             $this->assertSame([], $this->queryStrategy->updates, 'An unresolvable record was still updated by raw business key.');
         }
+    }
+
+    public function testListReadStaysBatchedWhenCacheWritesFail(): void
+    {
+        // The batch result must not depend on the cache write landing: with
+        // a write-dead cache, one where() is still findIds + one SELECT —
+        // never 1+N per-row re-queries.
+        $flaky = $this->useFlakyCache();
+
+        $handler = $this->makeHandler(['id'], 'test_records', true);
+
+        $flaky->failWrites = true;
+
+        $this->queryStrategy->queueQueryResult([['id' => '1'], ['id' => '2']]);
+        $this->queryStrategy->queueQueryResult([
+            ['id' => '1', 'name' => 'first'],
+            ['id' => '2', 'name' => 'second'],
+        ]);
+
+        $models = $handler->where([['type' => 'AND', 'clauses' => [['column' => 'name', 'operator' => '!=', 'value' => '']]]]);
+
+        $this->assertCount(2, $models);
+        $this->assertSame('first', $models[0]->get('name'));
+        $this->assertSame('second', $models[1]->get('name'));
+        $this->assertSame(2, $this->queryStrategy->queryCount, 'A cache outage degraded a batched list read into per-row queries.');
+    }
+
+    public function testBusinessKeyUpdateResendingOwnUniqueValuesIsNotADuplicate(): void
+    {
+        // Self-matches are filtered by the pre-read model's identity: a
+        // business-key caller re-sending the record's own unique values must
+        // not trip DuplicateEntryException just because their lookup key
+        // never equals a model identity.
+        $handler = $this->makeHandler(['id'], 'test_api_keys', true, null, null, null, [['keyHash']]);
+
+        // Pre-read resolves the record by business key…
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        // …and the duplicate scan finds the same record (identity row, then
+        // its hydration is served from the cache warmed by the pre-read).
+        $this->queryStrategy->queueQueryResult([['id' => '7']]);
+
+        $handler->updateCompound(['keyHash' => 'abc'], ['keyHash' => 'abc', 'status' => 'revoked']);
+
+        $this->assertSame([['id' => '7'], ['keyHash' => 'abc', 'status' => 'revoked']], $this->queryStrategy->updates[0]);
     }
 
 }

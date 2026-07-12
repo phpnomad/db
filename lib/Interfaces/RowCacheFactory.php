@@ -18,9 +18,15 @@ interface RowCacheFactory
      * @param Table $table The table whose contexts the RowCache will build.
      * @param class-string<DataModel> $model The model class cache contexts are typed under.
      * @param ModelAdapter $adapter Used to verify alias-resolved rows against lookup values.
-     * @param bool $useGenerations Whether contexts carry a per-table generation token
-     *                             — see WithDatastoreHandlerMethods::shouldUseTableGenerations()
-     *                             for what opting out costs.
+     * @param bool $useGenerations Whether contexts carry a per-table generation
+     *                             token. On: writes orphan all prior contexts at
+     *                             once, closing the cache-aside write-back race.
+     *                             Off: higher hit rate on write-hot tables, with
+     *                             the race only TTL-bounded and invalidation
+     *                             relying on precise deletes plus read-time
+     *                             lookup verification.
+     *
+     * @see \PHPNomad\Database\Traits\WithDatastoreHandlerMethods::shouldUseTableGenerations() the per-handler override point
      */
     public function make(Table $table, string $model, ModelAdapter $adapter, bool $useGenerations = true): RowCache;
 }
