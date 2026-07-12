@@ -38,3 +38,5 @@ TableSchemaService
 DateModifiedFactory
 IdentifiableDatabaseDatastoreHandler
 PostsTable
+DatabaseServiceProvider
+DateCreatedFactory
