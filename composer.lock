@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bd34040462bfd6ac5f170bd83fa1d6b5",
+    "content-hash": "904e4413baf99cb4cb7a1a355b611cb3",
     "packages": [
         {
             "name": "phpnomad/cache",
@@ -1300,6 +1300,46 @@
                 "source": "https://github.com/phar-io/version/tree/3.2.1"
             },
             "time": "2022-02-21T01:04:05+00:00"
+        },
+        {
+            "name": "phpnomad/event",
+            "version": "1.0.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/phpnomad/event.git",
+                "reference": "b418d8fc90af18b7cb37e118795f9dd92ffeb538"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpnomad/event/zipball/b418d8fc90af18b7cb37e118795f9dd92ffeb538",
+                "reference": "b418d8fc90af18b7cb37e118795f9dd92ffeb538",
+                "shasum": ""
+            },
+            "require-dev": {
+                "phpnomad/tests": "^0.1.0 || ^0.3.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "PHPNomad\\Events\\": "lib/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Alex Standiford",
+                    "email": "alex@standiford.us"
+                }
+            ],
+            "homepage": "https://github.com/phpnomad/core",
+            "support": {
+                "issues": "https://github.com/phpnomad/event/issues",
+                "source": "https://github.com/phpnomad/event/tree/1.0.1"
+            },
+            "time": "2026-06-12T10:56:48+00:00"
         },
         {
             "name": "phpnomad/tests",

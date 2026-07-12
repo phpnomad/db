@@ -1,32 +1,18 @@
 <?php
 
-namespace PHPNomad\Events\Interfaces {
-    if (!interface_exists(Event::class)) {
-        interface Event
-        {
-        }
-    }
-
-    if (!interface_exists(EventStrategy::class)) {
-        interface EventStrategy
-        {
-            public function broadcast(Event $event): void;
-        }
-    }
-}
-
-namespace PHPNomad\Database\Tests\Unit\Traits\Canonical {
+namespace PHPNomad\Database\Tests\Unit\Traits;
 
 use PHPNomad\Cache\Exceptions\CachedItemNotFoundException;
 use PHPNomad\Cache\Interfaces\CachePolicy;
 use PHPNomad\Cache\Interfaces\CacheStrategy;
 use PHPNomad\Cache\Services\CacheableService;
-use PHPNomad\Database\Interfaces\ClauseBuilder;
 use PHPNomad\Database\Interfaces\QueryBuilder;
 use PHPNomad\Database\Interfaces\QueryStrategy;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
+use PHPNomad\Database\Tests\Doubles\NoopClauseBuilder;
+use PHPNomad\Database\Tests\Doubles\NoopQueryBuilder;
 use PHPNomad\Database\Tests\TestCase;
 use PHPNomad\Database\Traits\WithDatastoreHandlerMethods;
 use PHPNomad\Datastore\Interfaces\DataModel;
@@ -71,8 +57,12 @@ class CanonicalRowCacheTest extends TestCase
         $this->queryStrategy = new ScriptedQueryStrategy();
     }
 
-    private function makeHandler(array $identityFields, string $tableName = 'test_records', bool $useGenerations = false): CanonicalHandler
-    {
+    private function makeHandler(
+        array $identityFields,
+        string $tableName = 'test_records',
+        bool $useGenerations = false,
+        ?LoggerStrategy $logger = null
+    ): CanonicalHandler {
         $table = $this->createMock(Table::class);
         $table->method('getName')->willReturn($tableName);
         $table->method('getFieldsForIdentity')->willReturn($identityFields);
@@ -82,10 +72,10 @@ class CanonicalRowCacheTest extends TestCase
         $tableSchemaService->method('getUniqueColumns')->willReturn([]);
 
         $serviceProvider = new DatabaseServiceProvider(
-            $this->createMock(LoggerStrategy::class),
+            $logger ?? $this->createMock(LoggerStrategy::class),
             $this->queryStrategy,
-            new FakeQueryBuilder(),
-            new FakeClauseBuilder(),
+            new NoopQueryBuilder(),
+            new NoopClauseBuilder(),
             $this->cacheableService,
             new NullEventStrategy()
         );
@@ -194,10 +184,24 @@ class CanonicalRowCacheTest extends TestCase
         $model = $handler->findByCompound(['keyHash' => 'abc']);
 
         $this->assertSame('9', $model->get('id'), 'Stale alias did not self-heal.');
+    }
 
-        // And the healed alias serves the next lookup without a query.
+    public function testHealedAliasServesNextLookupWithoutQuery(): void
+    {
+        $handler = $this->makeHandler(['id']);
+
+        // Same healing sequence as testStaleAliasSelfHeals…
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $handler->findByCompound(['keyHash' => 'abc']);
+        $this->cacheableService->delete($handler->exposeRowContext(['id' => '7']));
+        $this->queryStrategy->queueQueryResult([]);
+        $this->queryStrategy->queueQueryResult([['id' => '9', 'keyHash' => 'abc', 'status' => 'active']]);
+        $handler->findByCompound(['keyHash' => 'abc']);
+
+        // …then the healed alias must serve the follow-up lookup query-free.
         $before = $this->queryStrategy->queryCount;
         $handler->findByCompound(['keyHash' => 'abc']);
+
         $this->assertSame($before, $this->queryStrategy->queryCount);
     }
 
@@ -227,25 +231,42 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame('revoked', $fresh->get('status'), 'Late stale write-back was served after the generation bump.');
     }
 
-    public function testDeleteWhereDeletesByTableIdentityAndInvalidates(): void
+    public function testEstimatedCountInvalidatesAfterWrite(): void
     {
-        $handler = $this->makeHandler(['orgId', 'id']);
+        $handler = $this->makeHandler(['id'], 'test_records', true);
 
-        // Prime the cache.
-        $this->queryStrategy->queueQueryResult([['orgId' => '1', 'id' => '42']]);
-        $this->queryStrategy->queueQueryResult([['orgId' => '1', 'id' => '42', 'name' => 'doomed']]);
-        $handler->where([['type' => 'AND', 'clauses' => [['column' => 'name', 'operator' => '=', 'value' => 'doomed']]]]);
+        $this->queryStrategy->estimatedCountValue = 5;
+        $this->assertSame(5, $handler->getEstimatedCount());
 
-        // deleteWhere resolves identity rows and deletes by the FULL table
-        // identity — not the model's subset identity.
-        $this->queryStrategy->queueQueryResult([['orgId' => '1', 'id' => '42']]);
-        $handler->deleteWhere([['column' => 'name', 'operator' => '=', 'value' => 'doomed']]);
+        // Cached: a changed underlying count is not visible yet.
+        $this->queryStrategy->estimatedCountValue = 6;
+        $this->assertSame(5, $handler->getEstimatedCount());
 
-        $this->assertSame([['orgId' => '1', 'id' => '42']], $this->queryStrategy->deletes);
-        $this->assertFalse(
-            $this->cacheableService->exists($handler->exposeRowContext(['orgId' => '1', 'id' => '42'])),
-            'deleteWhere left the canonical row entry behind.'
-        );
+        // Any write bumps the table generation, orphaning the cached count.
+        $handler->create(['name' => 'new row']);
+
+        $this->assertSame(6, $handler->getEstimatedCount(), 'estimatedCount survived a write — generation did not invalidate it.');
+    }
+
+    public function testRowMissingAnIdentityFieldIsNotCachedAndWarns(): void
+    {
+        $logger = $this->createMock(LoggerStrategy::class);
+        $logger->expects($this->atLeastOnce())
+            ->method('warning')
+            ->with($this->stringContains('missing an identity field'), $this->arrayHasKey('missingField'));
+
+        $handler = $this->makeHandler(['orgId', 'id'], 'test_records', false, $logger);
+
+        // The SELECT * row lacks orgId — a partial identity must never
+        // become a cache key.
+        $this->queryStrategy->queueQueryResult([['id' => '42']]);
+        $this->queryStrategy->queueQueryResult([['id' => 42, 'name' => 'incomplete']]);
+        // The read-back cannot be served from cache, so it queries again.
+        $this->queryStrategy->queueQueryResult([['id' => 42, 'name' => 'incomplete']]);
+
+        $handler->where([['type' => 'AND', 'clauses' => [['column' => 'name', 'operator' => '=', 'value' => 'incomplete']]]]);
+
+        $this->assertSame([], $this->cacheStrategy->store, 'A partial-identity row produced a cache entry.');
     }
 }
 
@@ -327,6 +348,7 @@ class ScriptedQueryStrategy implements QueryStrategy
     /** @var array[] */
     private array $queryResults = [];
     public int $queryCount = 0;
+    public int $estimatedCountValue = 0;
     /** @var array[] */
     public array $updates = [];
     /** @var array[] */
@@ -365,7 +387,7 @@ class ScriptedQueryStrategy implements QueryStrategy
 
     public function estimatedCount(Table $table): int
     {
-        return 0;
+        return $this->estimatedCountValue;
     }
 }
 
@@ -436,131 +458,12 @@ class NullEventStrategy implements EventStrategy
     public function broadcast(Event $event): void
     {
     }
-}
 
-class FakeQueryBuilder implements QueryBuilder
-{
-    public function useTable(Table $table)
+    public function attach(string $event, callable $action, ?int $priority = null): void
     {
-        return $this;
     }
 
-    public function select(string $field, string ...$fields)
+    public function detach(string $event, callable $action, ?int $priority = null): void
     {
-        return $this;
     }
-
-    public function from(Table $table)
-    {
-        return $this;
-    }
-
-    public function where(?ClauseBuilder $clauseBuilder)
-    {
-        return $this;
-    }
-
-    public function leftJoin(Table $table, string $column, string $onColumn)
-    {
-        return $this;
-    }
-
-    public function rightJoin(Table $table, string $column, string $onColumn)
-    {
-        return $this;
-    }
-
-    public function groupBy(string $column, string ...$columns)
-    {
-        return $this;
-    }
-
-    public function sum(string $fieldToSum, ?string $alias = null)
-    {
-        return $this;
-    }
-
-    public function count(string $fieldToCount, ?string $alias = null)
-    {
-        return $this;
-    }
-
-    public function limit(int $limit)
-    {
-        return $this;
-    }
-
-    public function offset(int $offset)
-    {
-        return $this;
-    }
-
-    public function orderBy(string $field, string $order)
-    {
-        return $this;
-    }
-
-    public function build(): string
-    {
-        return 'SELECT * FROM test_table';
-    }
-
-    public function reset()
-    {
-        return $this;
-    }
-
-    public function resetClauses(string $clause, string ...$clauses)
-    {
-        return $this;
-    }
-}
-
-class FakeClauseBuilder implements ClauseBuilder
-{
-    public function useTable(Table $table)
-    {
-        return $this;
-    }
-
-    public function where($field, string $operator, ...$values)
-    {
-        return $this;
-    }
-
-    public function andWhere($field, string $operator, ...$values)
-    {
-        return $this;
-    }
-
-    public function orWhere($field, string $operator, ...$values)
-    {
-        return $this;
-    }
-
-    public function group(string $logic, ClauseBuilder ...$clauses)
-    {
-        return $this;
-    }
-
-    public function andGroup(string $logic, ClauseBuilder ...$clauses)
-    {
-        return $this;
-    }
-
-    public function orGroup(string $logic, ClauseBuilder ...$clauses)
-    {
-        return $this;
-    }
-
-    public function build(): string
-    {
-        return 'id = 123';
-    }
-
-    public function reset()
-    {
-        return $this;
-    }
-}
 }
