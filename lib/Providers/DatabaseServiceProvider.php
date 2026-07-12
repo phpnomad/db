@@ -13,6 +13,12 @@ class DatabaseServiceProvider
 {
     public LoggerStrategy $loggerStrategy;
     public QueryStrategy $queryStrategy;
+
+    /**
+     * Row and alias caching in the datastore flows builds every context
+     * through RowCacheContextAdapter — never cache rows or aliases against
+     * this directly with hand-built keys, or invalidation cannot name them.
+     */
     public CacheableService $cacheableService;
 
     public QueryBuilder $queryBuilder;

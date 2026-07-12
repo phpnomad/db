@@ -1,34 +1,19 @@
 <?php
 
-namespace PHPNomad\Events\Interfaces {
-    if (!interface_exists(Event::class)) {
-        interface Event
-        {
-        }
-    }
-
-    if (!interface_exists(EventStrategy::class)) {
-        interface EventStrategy
-        {
-            public function broadcast(Event $event): void;
-        }
-    }
-}
-
-namespace PHPNomad\Database\Tests\Unit\Traits {
+namespace PHPNomad\Database\Tests\Unit\Traits;
 
 use PHPNomad\Cache\Services\CacheableService;
+use PHPNomad\Database\Adapters\RowCacheContextAdapter;
 use PHPNomad\Database\Factories\Column;
-use PHPNomad\Database\Interfaces\ClauseBuilder;
-use PHPNomad\Database\Interfaces\QueryBuilder;
 use PHPNomad\Database\Interfaces\QueryStrategy;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
+use PHPNomad\Database\Tests\Doubles\NoopClauseBuilder;
+use PHPNomad\Database\Tests\Doubles\NoopQueryBuilder;
 use PHPNomad\Database\Tests\TestCase;
 use PHPNomad\Database\Traits\WithDatastoreHandlerMethods;
 use PHPNomad\Datastore\Events\RecordCreated;
-use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
 use PHPNomad\Datastore\Exceptions\RecordNotFoundException;
 use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Datastore\Interfaces\HasSingleIntIdentity;
@@ -60,11 +45,16 @@ class WithDatastoreHandlerMethodsTest extends TestCase
 
         $cacheableService = $this->createMock(CacheableService::class);
         $cacheableService->expects($this->never())->method('exists');
+        // No pre-warm: create() never caches the attribute-hydrated model.
+        // Its only cache write path here (generations disabled) is the
+        // set-level context delete.
+        $cacheableService->expects($this->never())->method('set');
         $cacheableService->expects($this->once())
-            ->method('set')
-            ->with(['identities' => ['id' => '123'], 'type' => TestModel::class], $createdModel);
+            ->method('delete')
+            ->with(['type' => TestModel::class, 'table' => 'test_records']);
 
         $table = $this->createMock(Table::class);
+        $table->method('getName')->willReturn('test_records');
         $table->method('getFieldsForIdentity')->willReturn(['id']);
         $table->method('getColumns')->willReturn([]);
 
@@ -80,8 +70,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $serviceProvider = new DatabaseServiceProvider(
             $loggerStrategy,
             $queryStrategy,
-            new DummyQueryBuilder(),
-            new DummyClauseBuilder(),
+            new NoopQueryBuilder(),
+            new NoopClauseBuilder(),
             $cacheableService,
             $eventStrategy
         );
@@ -117,7 +107,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $createdModel = new TestModel(123);
 
         $cacheableService = $this->createMock(CacheableService::class);
-        $cacheableService->expects($this->once())->method('set');
+        $cacheableService->expects($this->never())->method('set');
 
         $nameColumn = new Column('name', 'VARCHAR', [255]);
         $createdAtColumn = (new Column('createdAt', 'TIMESTAMP'))
@@ -143,8 +133,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $serviceProvider = new DatabaseServiceProvider(
             $loggerStrategy,
             $queryStrategy,
-            new DummyQueryBuilder(),
-            new DummyClauseBuilder(),
+            new NoopQueryBuilder(),
+            new NoopClauseBuilder(),
             $cacheableService,
             $eventStrategy
         );
@@ -157,7 +147,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             $modelAdapter
         );
 
-        $handler->create(['name' => 'Example']);
+        $this->assertSame($createdModel, $handler->create(['name' => 'Example']));
     }
 
     public function testCreateRespectsCallerProvidedValuesOverPhpDefaults(): void
@@ -184,14 +174,15 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $tableSchemaService = $this->createMock(TableSchemaService::class);
         $tableSchemaService->method('getUniqueColumns')->willReturn([]);
 
+        $createdModel = new TestModel(7);
         $modelAdapter = $this->createMock(ModelAdapter::class);
-        $modelAdapter->method('toModel')->willReturn(new TestModel(7));
+        $modelAdapter->method('toModel')->willReturn($createdModel);
 
         $serviceProvider = new DatabaseServiceProvider(
             $loggerStrategy,
             $queryStrategy,
-            new DummyQueryBuilder(),
-            new DummyClauseBuilder(),
+            new NoopQueryBuilder(),
+            new NoopClauseBuilder(),
             $cacheableService,
             $eventStrategy
         );
@@ -204,50 +195,13 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             $modelAdapter
         );
 
-        $handler->create(['createdAt' => 'caller-provided']);
-    }
-
-    public function testCacheContextIsTypeStableAcrossIntAndStringIdentities(): void
-    {
-        // Regression: MySQL returns identity columns as strings, but hydrated
-        // models hold them as ints. Without normalization, the same record
-        // produces two distinct cache entries and updateCompound() only
-        // invalidates one of them — leaving the other to serve stale reads.
-        $loggerStrategy = $this->createMock(LoggerStrategy::class);
-        $eventStrategy = $this->createMock(EventStrategy::class);
-        $queryStrategy = $this->createMock(QueryStrategy::class);
-        $cacheableService = $this->createMock(CacheableService::class);
-        $table = $this->createMock(Table::class);
-        $tableSchemaService = $this->createMock(TableSchemaService::class);
-        $modelAdapter = $this->createMock(ModelAdapter::class);
-
-        $serviceProvider = new DatabaseServiceProvider(
-            $loggerStrategy,
-            $queryStrategy,
-            new DummyQueryBuilder(),
-            new DummyClauseBuilder(),
-            $cacheableService,
-            $eventStrategy
-        );
-
-        $handler = new DummyDatastoreHandler(
-            $serviceProvider,
-            $table,
-            $tableSchemaService,
-            TestModel::class,
-            $modelAdapter
-        );
-
-        $intContext = $handler->exposeCacheContext(['id' => 123]);
-        $stringContext = $handler->exposeCacheContext(['id' => '123']);
-
-        $this->assertSame($intContext, $stringContext);
+        $this->assertSame($createdModel, $handler->create(['createdAt' => 'caller-provided']));
     }
 
     public function testUpdateCompoundInvalidatesCacheRegardlessOfIdentityType(): void
     {
-        // Drives the actual stale-read scenario end-to-end: cacheItems writes
-        // with int identity (from the hydrated model), updateCompound is called
+        // Drives the actual stale-read scenario end-to-end: the read path
+        // caches rows with int identity values, updateCompound is called
         // with the string identity that came back from queryStrategy->query()
         // — both must hit the same cache key for the invalidation to land.
         $loggerStrategy = $this->createMock(LoggerStrategy::class);
@@ -258,7 +212,10 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $cacheableService = $this->createMock(CacheableService::class);
         $cacheableService->method('getWithCache')
             ->willReturnCallback(fn(string $operation, array $context, callable $callback) => $callback());
-        $cacheableService->expects($this->once())
+        // Two deletes: the canonical row entry, then the set-level context
+        // (this handler opts out of generations, so estimatedCount has no
+        // bump to orphan it and is deleted precisely).
+        $cacheableService->expects($this->exactly(2))
             ->method('delete')
             ->willReturnCallback(function (array $context) use (&$deletedKeys) {
                 $deletedKeys[] = $context;
@@ -270,6 +227,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
 
         $table = $this->createMock(Table::class);
         $table->method('getName')->willReturn('test_records');
+        $table->method('getFieldsForIdentity')->willReturn(['id']);
         $tableSchemaService = $this->createMock(TableSchemaService::class);
         $tableSchemaService->method('getUniqueColumns')->willReturn([]);
         $modelAdapter = $this->createMock(ModelAdapter::class);
@@ -278,8 +236,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $serviceProvider = new DatabaseServiceProvider(
             $loggerStrategy,
             $queryStrategy,
-            new DummyQueryBuilder(),
-            new DummyClauseBuilder(),
+            new NoopQueryBuilder(),
+            new NoopClauseBuilder(),
             $cacheableService,
             $eventStrategy
         );
@@ -295,11 +253,13 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         // String identity (the shape MySQL returns).
         $handler->updateCompound(['id' => '42'], ['name' => 'new']);
 
-        // The deleted cache context must match what cacheItems wrote earlier,
-        // which used the int identity from the hydrated model.
-        $expected = $handler->exposeCacheContext(['id' => 42]);
-        $this->assertCount(1, $deletedKeys);
+        // The deleted cache context must match what the read path wrote,
+        // which used the int identity from the hydrated row.
+        $contextAdapter = new RowCacheContextAdapter($table, TestModel::class, $modelAdapter, false);
+        $expected = $contextAdapter->toRowContext(['id' => 42], null);
+        $this->assertCount(2, $deletedKeys);
         $this->assertSame($expected, $deletedKeys[0]);
+        $this->assertSame(['type' => TestModel::class, 'table' => 'test_records'], $deletedKeys[1]);
     }
 
     public function testFindFromCompoundIncludesTableAndIdentityWhenRecordIsMissing(): void
@@ -319,6 +279,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
 
         $table = $this->createMock(Table::class);
         $table->method('getName')->willReturn('test_records');
+        $table->method('getFieldsForIdentity')->willReturn(['id']);
 
         $tableSchemaService = $this->createMock(TableSchemaService::class);
         $modelAdapter = $this->createMock(ModelAdapter::class);
@@ -326,8 +287,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $serviceProvider = new DatabaseServiceProvider(
             $loggerStrategy,
             $queryStrategy,
-            new DummyQueryBuilder(),
-            new DummyClauseBuilder(),
+            new NoopQueryBuilder(),
+            new NoopClauseBuilder(),
             $cacheableService,
             $eventStrategy
         );
@@ -340,11 +301,15 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             $modelAdapter
         );
 
-        $this->expectException(RecordNotFoundException::class);
-        $this->expectExceptionMessage('Record not found in table "test_records"');
-        $this->expectExceptionMessage('"id":123');
-
-        $handler->findByIdentity(['id' => 123]);
+        try {
+            $handler->findByIdentity(['id' => 123]);
+            $this->fail('Expected RecordNotFoundException was not thrown.');
+        } catch (RecordNotFoundException $e) {
+            // expectExceptionMessage() keeps only its LAST invocation, so
+            // both fragments are pinned explicitly.
+            $this->assertStringContainsString('Record not found in table "test_records"', $e->getMessage());
+            $this->assertStringContainsString('"id":123', $e->getMessage());
+        }
     }
 }
 
@@ -371,9 +336,14 @@ class DummyDatastoreHandler
         return $this->findFromCompound($ids);
     }
 
-    public function exposeCacheContext(array $ids): array
+    /**
+     * Legacy tests assert precise per-key cache interactions against a mocked
+     * CacheableService; generations would add token get/set chatter that
+     * belongs to the dedicated generation tests.
+     */
+    protected function shouldUseTableGenerations(): bool
     {
-        return $this->getCacheContextForItem($ids);
+        return false;
     }
 }
 
@@ -392,131 +362,4 @@ class TestModel implements DataModel, HasSingleIntIdentity
     {
         return ['id' => $this->id];
     }
-}
-
-class DummyQueryBuilder implements QueryBuilder
-{
-    public function useTable(Table $table)
-    {
-        return $this;
-    }
-
-    public function select(string $field, string ...$fields)
-    {
-        return $this;
-    }
-
-    public function from(Table $table)
-    {
-        return $this;
-    }
-
-    public function where(?ClauseBuilder $clauseBuilder)
-    {
-        return $this;
-    }
-
-    public function leftJoin(Table $table, string $column, string $onColumn)
-    {
-        return $this;
-    }
-
-    public function rightJoin(Table $table, string $column, string $onColumn)
-    {
-        return $this;
-    }
-
-    public function groupBy(string $column, string ...$columns)
-    {
-        return $this;
-    }
-
-    public function sum(string $fieldToSum, ?string $alias = null)
-    {
-        return $this;
-    }
-
-    public function count(string $fieldToCount, ?string $alias = null)
-    {
-        return $this;
-    }
-
-    public function limit(int $limit)
-    {
-        return $this;
-    }
-
-    public function offset(int $offset)
-    {
-        return $this;
-    }
-
-    public function orderBy(string $field, string $order)
-    {
-        return $this;
-    }
-
-    public function build(): string
-    {
-        return 'SELECT * FROM test_table';
-    }
-
-    public function reset()
-    {
-        return $this;
-    }
-
-    public function resetClauses(string $clause, string ...$clauses)
-    {
-        return $this;
-    }
-}
-
-class DummyClauseBuilder implements ClauseBuilder
-{
-    public function useTable(Table $table)
-    {
-        return $this;
-    }
-
-    public function where($field, string $operator, ...$values)
-    {
-        return $this;
-    }
-
-    public function andWhere($field, string $operator, ...$values)
-    {
-        return $this;
-    }
-
-    public function orWhere($field, string $operator, ...$values)
-    {
-        return $this;
-    }
-
-    public function group(string $logic, ClauseBuilder ...$clauses)
-    {
-        return $this;
-    }
-
-    public function andGroup(string $logic, ClauseBuilder ...$clauses)
-    {
-        return $this;
-    }
-
-    public function orGroup(string $logic, ClauseBuilder ...$clauses)
-    {
-        return $this;
-    }
-
-    public function build(): string
-    {
-        return 'id = 123';
-    }
-
-    public function reset()
-    {
-        return $this;
-    }
-}
 }

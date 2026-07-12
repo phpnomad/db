@@ -15,3 +15,8 @@ jobs:
         uses: php-actions/phpunit@v3
         with:
           configuration: phpunit.xml
+          # Pin to the PHPUnit major the package targets (composer dev deps
+          # resolve 9.6): the action's default phar is PHPUnit 11+, which
+          # ignores @dataProvider annotations and silently skips those tests.
+          version: "9.6"
+          php_version: "8.2"
