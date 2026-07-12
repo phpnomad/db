@@ -218,6 +218,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $queryStrategy = $this->createMock(QueryStrategy::class);
         $cacheableService = $this->createMock(CacheableService::class);
         $table = $this->createMock(Table::class);
+        $table->method('getFieldsForIdentity')->willReturn(['id']);
         $tableSchemaService = $this->createMock(TableSchemaService::class);
         $modelAdapter = $this->createMock(ModelAdapter::class);
 
@@ -238,9 +239,10 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             $modelAdapter
         );
 
-        $intContext = $handler->exposeCacheContext(['id' => 123]);
-        $stringContext = $handler->exposeCacheContext(['id' => '123']);
+        $intContext = $handler->exposeRowContext(['id' => 123]);
+        $stringContext = $handler->exposeRowContext(['id' => '123']);
 
+        $this->assertNotNull($intContext);
         $this->assertSame($intContext, $stringContext);
     }
 
@@ -270,6 +272,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
 
         $table = $this->createMock(Table::class);
         $table->method('getName')->willReturn('test_records');
+        $table->method('getFieldsForIdentity')->willReturn(['id']);
         $tableSchemaService = $this->createMock(TableSchemaService::class);
         $tableSchemaService->method('getUniqueColumns')->willReturn([]);
         $modelAdapter = $this->createMock(ModelAdapter::class);
@@ -295,9 +298,9 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         // String identity (the shape MySQL returns).
         $handler->updateCompound(['id' => '42'], ['name' => 'new']);
 
-        // The deleted cache context must match what cacheItems wrote earlier,
-        // which used the int identity from the hydrated model.
-        $expected = $handler->exposeCacheContext(['id' => 42]);
+        // The deleted cache context must match what the read path wrote,
+        // which used the int identity from the hydrated row.
+        $expected = $handler->exposeRowContext(['id' => 42]);
         $this->assertCount(1, $deletedKeys);
         $this->assertSame($expected, $deletedKeys[0]);
     }
@@ -319,6 +322,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
 
         $table = $this->createMock(Table::class);
         $table->method('getName')->willReturn('test_records');
+        $table->method('getFieldsForIdentity')->willReturn(['id']);
 
         $tableSchemaService = $this->createMock(TableSchemaService::class);
         $modelAdapter = $this->createMock(ModelAdapter::class);
@@ -371,9 +375,19 @@ class DummyDatastoreHandler
         return $this->findFromCompound($ids);
     }
 
-    public function exposeCacheContext(array $ids): array
+    public function exposeRowContext(array $row): ?array
     {
-        return $this->getCacheContextForItem($ids);
+        return $this->getCanonicalRowContext($row);
+    }
+
+    /**
+     * Legacy tests assert precise per-key cache interactions against a mocked
+     * CacheableService; generations would add token get/set chatter that
+     * belongs to the dedicated generation tests.
+     */
+    protected function shouldUseTableGenerations(): bool
+    {
+        return false;
     }
 }
 
