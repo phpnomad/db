@@ -3,13 +3,13 @@
 namespace PHPNomad\Database\Services;
 
 use PHPNomad\Cache\Enums\Operation;
-use PHPNomad\Cache\Exceptions\CachedItemNotFoundException;
 use PHPNomad\Cache\Services\CacheableService;
 use PHPNomad\Database\Interfaces\RowCache;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Datastore\Interfaces\ModelAdapter;
 use PHPNomad\Logger\Interfaces\LoggerStrategy;
+use Throwable;
 
 /**
  * Owns the cache-context vocabulary for one table's datastore: canonical row
@@ -112,7 +112,7 @@ class DatastoreRowCache implements RowCache
      * @param string|null $generation Generation snapshot to key under; taken fresh when omitted.
      * @return array|null Null when the row cannot produce a full identity.
      */
-    public function rowContext(array $row, ?string $generation = null): ?array
+    protected function rowContext(array $row, ?string $generation = null): ?array
     {
         $identity = $this->rowIdentity($row);
 
@@ -151,7 +151,7 @@ class DatastoreRowCache implements RowCache
     }
 
     /**
-     * The set-level context for whole-table values.
+     * The set-level context — one undiscriminated slot per table.
      *
      * @param string|null $generation Generation snapshot; taken fresh when omitted.
      */
@@ -225,10 +225,26 @@ class DatastoreRowCache implements RowCache
     {
         $context = $this->rowContext($identityRow, $generation);
 
-        return $context !== null && $this->cacheableService->exists($context);
+        if ($context === null) {
+            return false;
+        }
+
+        try {
+            return $this->cacheableService->exists($context);
+        } catch (Throwable $e) {
+            // A probe failure reads as uncached — the caller falls through
+            // to the database.
+            return false;
+        }
     }
 
-    /** @inheritDoc */
+    /**
+     * @inheritDoc
+     *
+     * The table context is a single undiscriminated slot: it holds exactly
+     * one set-level value per table (estimatedCount today). A second value
+     * would need a discriminator added to the context.
+     */
     public function readTableValue(callable $fallback)
     {
         return $this->cacheableService->getWithCache(Operation::Read, $this->tableContext(), $fallback);
@@ -294,7 +310,10 @@ class DatastoreRowCache implements RowCache
     {
         try {
             $aliased = $this->cacheableService->get($this->aliasContext($ids, $generation));
-        } catch (CachedItemNotFoundException $e) {
+        } catch (Throwable $e) {
+            // Any cache-layer failure reads as a miss: every alias caller
+            // has a database fallback, so a throwing backend degrades to
+            // uncached instead of breaking the lookup.
             return null;
         }
 
@@ -351,12 +370,6 @@ class DatastoreRowCache implements RowCache
         return $token;
     }
 
-    /** @inheritDoc */
-    public function usesGenerations(): bool
-    {
-        return $this->useGenerations;
-    }
-
     /**
      * Reads the current generation token for this table, minting one when
      * absent (first read, or after eviction — both simply start a new
@@ -377,7 +390,10 @@ class DatastoreRowCache implements RowCache
     {
         try {
             $token = $this->cacheableService->get($this->generationContext());
-        } catch (CachedItemNotFoundException $e) {
+        } catch (Throwable $e) {
+            // Read failure is treated exactly like a missing token: mint a
+            // fresh one so the operation proceeds with caching effectively
+            // disabled rather than breaking on a dead cache.
             $token = null;
         }
 
@@ -386,7 +402,7 @@ class DatastoreRowCache implements RowCache
 
             try {
                 $this->cacheableService->set($this->generationContext(), $token);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 // Cache down: every operation mints its own token, so keys
                 // never match and reads fall through to the database —
                 // caching degrades to disabled instead of breaking reads.

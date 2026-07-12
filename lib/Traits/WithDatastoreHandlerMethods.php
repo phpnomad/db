@@ -211,7 +211,9 @@ trait WithDatastoreHandlerMethods
     }
 
     /**
-     * Delete all items that fit the specified condition.
+     * Deletes every row matching the conditions, by full table identity.
+     * Each deleted row broadcasts a RecordDeleted carrying its raw identity
+     * row; no matching rows is a silent no-op.
      *
      * @param array $conditions
      * @return void
@@ -227,6 +229,7 @@ trait WithDatastoreHandlerMethods
 
         $generation = $this->rowCache()->snapshotGeneration();
         $deleted = false;
+        $broadcastQueue = [];
 
         // Alias entries pointing at deleted rows are left to self-heal: the
         // row read they resolve to misses and falls through to the database.
@@ -256,17 +259,31 @@ trait WithDatastoreHandlerMethods
                     );
                 }
 
-                // The broadcast carries the raw identity row (DB-typed values):
-                // the deletion HAPPENED, so listeners must hear about it even
-                // when a canonical cache identity could not be derived, and cache
-                // key normalization must not leak into the event contract.
-                $this->serviceProvider->eventStrategy->broadcast(new RecordDeleted($this->model, $identityRow));
-
+                $broadcastQueue[] = $identityRow;
                 $deleted = true;
             }
         } finally {
             if ($deleted) {
                 $this->invalidateAfterWriteSafely();
+            }
+
+            // Broadcasts are buffered and emitted after the SQL work so a
+            // throwing listener cannot abort a bulk delete mid-set, and
+            // emitted per-row inside the finally so rows deleted before a
+            // mid-loop SQL failure still announce themselves. Each carries
+            // the raw identity row (DB-typed values): the deletion HAPPENED,
+            // listeners must hear about it even when no cache identity could
+            // be derived, and cache-key normalization must not leak into the
+            // event contract.
+            foreach ($broadcastQueue as $deletedIdentityRow) {
+                try {
+                    $this->serviceProvider->eventStrategy->broadcast(new RecordDeleted($this->model, $deletedIdentityRow));
+                } catch (Throwable $e) {
+                    $this->serviceProvider->loggerStrategy->error(
+                        'A RecordDeleted listener failed; remaining deletion events still fire.',
+                        ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+                    );
+                }
             }
         }
     }
@@ -423,6 +440,7 @@ trait WithDatastoreHandlerMethods
     public function findIds(array $conditions, ?int $limit = null, ?int $offset = null): array
     {
         $this->serviceProvider->queryBuilder
+            ->reset()
             ->from($this->table)
             ->select(...$this->table->getFieldsForIdentity());
 
@@ -631,6 +649,9 @@ trait WithDatastoreHandlerMethods
             $this->invalidateAfterWriteSafely();
         }
 
+        // The event intentionally carries the caller's key — the lookup
+        // contract they wrote against — not the cache-normalized identity
+        // the SQL targeted.
         $this->serviceProvider->eventStrategy->broadcast(new RecordUpdated($this->model, $ids, $attributes));
     }
 
@@ -639,10 +660,9 @@ trait WithDatastoreHandlerMethods
      * identity: directly when the key IS the table identity, via the alias
      * entry (warmed by the pre-read) otherwise.
      *
-     * For generation-disabled tables the alias is the ONLY invalidation
-     * route — there is no bump to fall back on — so an alias miss (evicted
-     * between the pre-read and here) resolves from the database instead of
-     * silently skipping precise invalidation.
+     * An alias miss (evicted between the pre-read and here, or a cache
+     * outage) resolves from the database: the caller targets its SQL write
+     * at this identity, so resolution must not silently degrade.
      *
      * @param array<string, mixed> $ids
      * @param string|null $generation Generation snapshot for the alias lookup.
@@ -660,10 +680,11 @@ trait WithDatastoreHandlerMethods
             return $aliased;
         }
 
-        if ($this->rowCache()->usesGenerations()) {
-            return null;
-        }
-
+        // The alias should have been warmed by the pre-read; reaching here
+        // means it was evicted or the cache is down. Resolve from the
+        // database regardless of generation mode — the SQL update targets
+        // this identity, so skipping resolution would reopen the
+        // multi-row fan-out for non-unique business keys.
         try {
             [$row] = $this->queryRowAndModel($ids);
 

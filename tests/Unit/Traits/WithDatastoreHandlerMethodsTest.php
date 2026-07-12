@@ -7,6 +7,7 @@ use PHPNomad\Database\Factories\Column;
 use PHPNomad\Database\Interfaces\QueryStrategy;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Factories\DatastoreRowCacheFactory;
+use PHPNomad\Database\Tests\Doubles\ExposedRowCache;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\Doubles\NoopClauseBuilder;
@@ -229,8 +230,10 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             $modelAdapter
         );
 
-        $intContext = $handler->exposeRowContext(['id' => 123]);
-        $stringContext = $handler->exposeRowContext(['id' => '123']);
+        $prober = new ExposedRowCache($cacheableService, $loggerStrategy, $table, TestModel::class, $modelAdapter, false);
+
+        $intContext = $prober->exposeRowContext(['id' => 123]);
+        $stringContext = $prober->exposeRowContext(['id' => '123']);
 
         $this->assertNotNull($intContext);
         $this->assertSame($intContext, $stringContext);
@@ -294,7 +297,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
 
         // The deleted cache context must match what the read path wrote,
         // which used the int identity from the hydrated row.
-        $expected = $handler->exposeRowContext(['id' => 42]);
+        $prober = new ExposedRowCache($cacheableService, $loggerStrategy, $table, TestModel::class, $modelAdapter, false);
+        $expected = $prober->exposeRowContext(['id' => 42]);
         $this->assertCount(2, $deletedKeys);
         $this->assertSame($expected, $deletedKeys[0]);
         $this->assertSame(['type' => TestModel::class], $deletedKeys[1]);
@@ -369,11 +373,6 @@ class DummyDatastoreHandler
     public function findByIdentity(array $ids)
     {
         return $this->findFromCompound($ids);
-    }
-
-    public function exposeRowContext(array $row): ?array
-    {
-        return $this->rowCache()->rowContext($row);
     }
 
     /**

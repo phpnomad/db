@@ -4,8 +4,8 @@ namespace PHPNomad\Database\Tests\Unit\Services;
 
 use PHPNomad\Cache\Services\CacheableService;
 use PHPNomad\Database\Interfaces\Table;
-use PHPNomad\Database\Services\DatastoreRowCache;
 use PHPNomad\Database\Tests\Doubles\ArrayCacheStrategy;
+use PHPNomad\Database\Tests\Doubles\ExposedRowCache;
 use PHPNomad\Database\Tests\Doubles\NullEventStrategy;
 use PHPNomad\Database\Tests\Doubles\SerializingCachePolicy;
 use PHPNomad\Database\Tests\TestCase;
@@ -130,14 +130,28 @@ class DatastoreRowCacheTest extends TestCase
         $this->assertSame(['id' => '7'], $rowCache->resolveAliasedIdentity(['keyHash' => 'abc']));
     }
 
-    public function testMatchesLookupComparesTypeInsensitively(): void
+    /**
+     * @return array<string, array{0: array, 1: array, 2: bool}>
+     */
+    public function lookupComparisons(): array
+    {
+        return [
+            'same-type match' => [['id' => 7, 'keyHash' => 'abc'], ['keyHash' => 'abc'], true],
+            'same-type mismatch' => [['id' => 7, 'keyHash' => 'abc'], ['keyHash' => 'xyz'], false],
+            'int model vs string lookup' => [['id' => 7, 'keyHash' => 'abc'], ['id' => '7'], true],
+            'string model vs int lookup' => [['id' => '7', 'keyHash' => 'abc'], ['id' => 7], true],
+            'cross-type mismatch' => [['id' => 7, 'keyHash' => 'abc'], ['id' => '8'], false],
+        ];
+    }
+
+    /**
+     * @dataProvider lookupComparisons
+     */
+    public function testMatchesLookupComparesScalarsTypeInsensitively(array $modelRow, array $lookup, bool $expected): void
     {
         $rowCache = $this->makeRowCache(['id']);
 
-        $model = new RowModel(['id' => 7, 'keyHash' => 'abc']);
-
-        $this->assertTrue($rowCache->matchesLookup($model, ['keyHash' => 'abc']));
-        $this->assertFalse($rowCache->matchesLookup($model, ['keyHash' => 'xyz']));
+        $this->assertSame($expected, $rowCache->matchesLookup(new RowModel($modelRow), $lookup));
     }
 
     public function testMatchesLookupTreatsUnverifiableFieldAsStaleWithoutGenerations(): void
@@ -162,18 +176,6 @@ class DatastoreRowCacheTest extends TestCase
         $this->assertTrue(
             $rowCache->matchesLookup(new RowModel(['id' => 7, 'keyHash' => 'abc']), ['keyHash' => 'abc'])
         );
-    }
-}
-
-/**
- * Exposes the protected alias context builder so tests can poison the exact
- * cache slot an alias would occupy.
- */
-class ExposedRowCache extends DatastoreRowCache
-{
-    public function exposeAliasContext(array $ids): array
-    {
-        return $this->aliasContext($ids);
     }
 }
 

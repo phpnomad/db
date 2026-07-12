@@ -9,7 +9,10 @@ use PHPNomad\Datastore\Interfaces\DataModel;
  * identities, alias entries, set-level contexts, and per-table generation
  * tokens. Every cache read and every mutation the datastore performs
  * happens behind this contract — the consuming trait holds no cache access
- * of its own — so writers can always name the keys readers used.
+ * of its own — so writers can always name the keys readers used. The
+ * WHEN of alias healing (verify on hit, drop on mismatch or dead target)
+ * is datastore orchestration and lives with the consuming trait; this
+ * contract supplies the operations it composes.
  *
  * @see \PHPNomad\Database\Services\DatastoreRowCache the default implementation
  */
@@ -24,8 +27,9 @@ interface RowCache
     public function isTableIdentity(array $ids): bool;
 
     /**
-     * Extracts the canonical identity from row data, or null (logged) when
-     * the row is missing an identity field.
+     * Extracts the canonical identity from row data. Null (logged) when the
+     * row is missing an identity field, or (not logged) when the table
+     * declares no identity fields at all.
      *
      * @param array<string, mixed> $row
      * @return array<string, mixed>|null Scalars stringified, table order.
@@ -33,19 +37,11 @@ interface RowCache
     public function rowIdentity(array $row): ?array;
 
     /**
-     * Builds the ONE cache context a row is stored under.
-     *
-     * @param array<string, mixed> $row
-     * @param string|null $generation Generation snapshot; taken fresh when omitted.
-     */
-    public function rowContext(array $row, ?string $generation = null): ?array;
-
-    /**
      * Reads the identity an alias entry points at, validated against the
      * table's identity shape. Null on miss or malformed value.
      *
      * @param array<string, mixed> $ids
-     * @param string|null $generation
+     * @param string|null $generation Pre-query generation snapshot.
      * @return array<string, mixed>|null
      */
     public function resolveAliasedIdentity(array $ids, ?string $generation = null): ?array;
@@ -126,7 +122,7 @@ interface RowCache
      *
      * @param array<string, mixed> $ids
      * @param array<string, mixed> $identity
-     * @param string|null $generation
+     * @param string|null $generation Pre-query generation snapshot.
      */
     public function storeAlias(array $ids, array $identity, ?string $generation = null): void;
 
@@ -142,7 +138,7 @@ interface RowCache
      * Deletes an alias entry.
      *
      * @param array<string, mixed> $ids
-     * @param string|null $generation
+     * @param string|null $generation Pre-query generation snapshot.
      */
     public function deleteAlias(array $ids, ?string $generation = null): void;
 
@@ -153,8 +149,4 @@ interface RowCache
      */
     public function snapshotGeneration(): ?string;
 
-    /**
-     * Whether contexts built by this service carry a generation token.
-     */
-    public function usesGenerations(): bool;
-}
+    }

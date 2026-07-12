@@ -8,6 +8,7 @@ use PHPNomad\Database\Factories\DatastoreRowCacheFactory;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\Doubles\ArrayCacheStrategy;
+use PHPNomad\Database\Tests\Doubles\ExposedRowCache;
 use PHPNomad\Database\Tests\Doubles\FlakyCacheStrategy;
 use PHPNomad\Database\Tests\Doubles\NoopClauseBuilder;
 use PHPNomad\Database\Tests\Doubles\NoopQueryBuilder;
@@ -50,6 +51,13 @@ class CanonicalRowCacheTest extends TestCase
     private CacheableService $cacheableService;
     private ScriptedQueryStrategy $queryStrategy;
 
+    /**
+     * Context prober mirroring the last-built handler's row-cache config;
+     * computes the same cache slots (shared cache = shared generation token)
+     * without widening the production RowCache contract.
+     */
+    private ExposedRowCache $prober;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -91,12 +99,23 @@ class CanonicalRowCacheTest extends TestCase
             new DatastoreRowCacheFactory($this->cacheableService, $logger)
         );
 
+        $adapter = $adapter ?? new ArrayModelAdapter();
+
+        $this->prober = new ExposedRowCache(
+            $this->cacheableService,
+            $logger,
+            $table,
+            AttrModel::class,
+            $adapter,
+            $useGenerations
+        );
+
         return new CanonicalHandler(
             $serviceProvider,
             $table,
             $tableSchemaService,
             AttrModel::class,
-            $adapter ?? new ArrayModelAdapter(),
+            $adapter,
             $useGenerations
         );
     }
@@ -133,7 +152,7 @@ class CanonicalRowCacheTest extends TestCase
 
         // Cached under the TABLE identity (orgId + id, stringified, table order)…
         $this->assertTrue(
-            $this->cacheableService->exists($handler->exposeRowContext(['orgId' => 1, 'id' => 42])),
+            $this->cacheableService->exists($this->prober->exposeRowContext(['orgId' => 1, 'id' => 42])),
             'Row is not cached under its canonical table-identity context.'
         );
         // …and NOT under the model's own (subset) identity.
@@ -174,7 +193,7 @@ class CanonicalRowCacheTest extends TestCase
         // invalidation saw.
         $this->assertSame([['id' => '7'], ['status' => 'revoked']], $this->queryStrategy->updates[0]);
         $this->assertFalse(
-            $this->cacheableService->exists($handler->exposeRowContext(['id' => '7'])),
+            $this->cacheableService->exists($this->prober->exposeRowContext(['id' => '7'])),
             'Business-key update left the canonical row entry to serve stale reads.'
         );
 
@@ -215,7 +234,7 @@ class CanonicalRowCacheTest extends TestCase
 
         // The row dies out from under the alias (deleted / re-keyed outside
         // this process). Drop the row entry to simulate; the alias remains.
-        $this->cacheableService->delete($handler->exposeRowContext(['id' => '7']));
+        $this->cacheableService->delete($this->prober->exposeRowContext(['id' => '7']));
 
         // Alias → id 7 → miss → DB says id 7 is gone…
         $this->queryStrategy->queueQueryResult([]);
@@ -288,7 +307,7 @@ class CanonicalRowCacheTest extends TestCase
         $stale = $handler->findByCompound(['id' => '7']);
 
         // A slow reader computed its context BEFORE the write…
-        $staleContext = $handler->exposeRowContext(['id' => '7']);
+        $staleContext = $this->prober->exposeRowContext(['id' => '7']);
 
         // …the writer updates and bumps the generation (its pre-read is
         // served from the cache — no query)…
@@ -404,7 +423,7 @@ class CanonicalRowCacheTest extends TestCase
 
         $this->assertSame([['orgId' => '1', 'id' => '42']], $this->queryStrategy->deletes);
         $this->assertFalse(
-            $this->cacheableService->exists($handler->exposeRowContext(['orgId' => '1', 'id' => '42'])),
+            $this->cacheableService->exists($this->prober->exposeRowContext(['orgId' => '1', 'id' => '42'])),
             'deleteWhere left the canonical row entry behind.'
         );
 
@@ -579,11 +598,6 @@ class CanonicalHandler
     public function findByCompound(array $ids)
     {
         return $this->findFromCompound($ids);
-    }
-
-    public function exposeRowContext(array $row): ?array
-    {
-        return $this->rowCache()->rowContext($row);
     }
 }
 
