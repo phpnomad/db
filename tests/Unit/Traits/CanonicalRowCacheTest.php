@@ -223,7 +223,7 @@ class CanonicalRowCacheTest extends TestCase
         // exact entry count below is the general guard — one row entry plus
         // the generation token when generations are on.
         $this->assertFalse(
-            $this->cacheableService->exists(['type' => IdentityRowModel::class, 'identities' => ['id' => '42']]),
+            $this->cacheableService->exists(['type' => IdentityRowModel::class, 'table' => 'test_records', 'identities' => ['id' => '42']]),
             'Row leaked a cache entry keyed by the MODEL identity.'
         );
         $this->assertCount($expectedEntries, $this->cacheStrategy->store, 'Unexpected cache entries beyond the row (and generation token).');

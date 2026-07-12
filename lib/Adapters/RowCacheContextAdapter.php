@@ -155,7 +155,7 @@ class RowCacheContextAdapter
      */
     public function toIdentityContext(array $identity, ?string $generation = null): array
     {
-        return $this->toGenerationKeyedContext(['type' => $this->model, 'identities' => $this->stringifyScalars($identity)], $generation);
+        return $this->toGenerationKeyedContext($this->baseContext() + ['identities' => $this->stringifyScalars($identity)], $generation);
     }
 
     /**
@@ -174,7 +174,7 @@ class RowCacheContextAdapter
 
         ksort($normalized);
 
-        return $this->toGenerationKeyedContext(['type' => $this->model, 'alias' => $normalized], $generation);
+        return $this->toGenerationKeyedContext($this->baseContext() + ['alias' => $normalized], $generation);
     }
 
     /**
@@ -187,7 +187,7 @@ class RowCacheContextAdapter
      */
     public function toTableContext(?string $generation = null): array
     {
-        return $this->toGenerationKeyedContext(['type' => $this->model], $generation);
+        return $this->toGenerationKeyedContext($this->baseContext(), $generation);
     }
 
     /**
@@ -198,7 +198,19 @@ class RowCacheContextAdapter
      */
     public function toGenerationContext(): array
     {
-        return ['type' => $this->model, 'generation' => true];
+        return $this->baseContext() + ['generation' => true];
+    }
+
+    /**
+     * The discriminators every context carries. Model class AND table name:
+     * nothing enforces a 1:1 model-to-table mapping, and two tables sharing
+     * a model class must never cross-serve rows with coinciding identities.
+     *
+     * @return array<string, mixed>
+     */
+    protected function baseContext(): array
+    {
+        return ['type' => $this->model, 'table' => $this->table->getName()];
     }
 
     /**

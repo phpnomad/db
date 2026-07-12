@@ -162,8 +162,25 @@ class RowCacheContextAdapterTest extends TestCase
     public function testGenerationKeyedContextsCarryTheSnapshot(): void
     {
         $this->assertSame(
-            ['type' => IdentityRowModel::class, 'gen' => 'token-1'],
+            ['type' => IdentityRowModel::class, 'table' => 'test_records', 'gen' => 'token-1'],
             $this->makeAdapter(['id'], true)->toTableContext('token-1')
+        );
+    }
+
+    public function testContextsNeverCollideAcrossTablesSharingAModel(): void
+    {
+        // Nothing enforces a 1:1 model-to-table mapping: two tables reusing
+        // one model class must never cross-serve rows whose identities
+        // coincide, so every context carries the table name too.
+        $other = $this->createMock(Table::class);
+        $other->method('getName')->willReturn('other_records');
+        $other->method('getFieldsForIdentity')->willReturn(['id']);
+
+        $otherAdapter = new RowCacheContextAdapter($other, IdentityRowModel::class, new IdentityRowModelAdapter(), true);
+
+        $this->assertNotSame(
+            $this->makeAdapter(['id'], true)->toRowContext(['id' => '7'], 'token-1'),
+            $otherAdapter->toRowContext(['id' => '7'], 'token-1')
         );
     }
 
@@ -178,7 +195,7 @@ class RowCacheContextAdapterTest extends TestCase
     public function testGenerationDisabledTablesNeverCarryTokens(): void
     {
         $this->assertSame(
-            ['type' => IdentityRowModel::class],
+            ['type' => IdentityRowModel::class, 'table' => 'test_records'],
             $this->makeAdapter(['id'], false)->toTableContext('token-1')
         );
     }

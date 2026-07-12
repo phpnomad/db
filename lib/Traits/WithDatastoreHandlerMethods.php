@@ -44,9 +44,18 @@ trait WithDatastoreHandlerMethods
      */
     public function getEstimatedCount(): int
     {
-        return (int) $this->readTableValueThrough(function () {
+        $count = $this->readTableValueThrough(function () {
             return $this->serviceProvider->queryStrategy->estimatedCount($this->table);
         });
+
+        if (is_numeric($count)) {
+            return (int) $count;
+        }
+
+        // Poisoned set-level slot (row and alias slots evict-and-repair;
+        // this one is bypassed until the next invalidation) — serve the
+        // database's answer rather than a garbage cast.
+        return $this->serviceProvider->queryStrategy->estimatedCount($this->table);
     }
 
     /**
@@ -251,13 +260,13 @@ trait WithDatastoreHandlerMethods
      */
     public function deleteWhere(array $conditions): void
     {
+        $generation = $this->snapshotGeneration();
+
         try {
             $identityRows = $this->findIds([['type' => 'AND', 'clauses' => $conditions]]);
         } catch (RecordNotFoundException $e) {
             return;
         }
-
-        $generation = $this->snapshotGeneration();
         $deleted = false;
         $broadcastQueue = [];
 
@@ -634,6 +643,12 @@ trait WithDatastoreHandlerMethods
 
             if ($started) {
                 throw $e;
+            }
+
+            // An entry evicted between the service's exists() and get() is a
+            // normal miss under LRU pressure, not a failing backend — no log.
+            if ($e instanceof CachedItemNotFoundException) {
+                return $fallback();
             }
 
             $this->serviceProvider->loggerStrategy->warning(

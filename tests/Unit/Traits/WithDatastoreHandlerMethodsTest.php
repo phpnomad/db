@@ -51,9 +51,10 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $cacheableService->expects($this->never())->method('set');
         $cacheableService->expects($this->once())
             ->method('delete')
-            ->with(['type' => TestModel::class]);
+            ->with(['type' => TestModel::class, 'table' => 'test_records']);
 
         $table = $this->createMock(Table::class);
+        $table->method('getName')->willReturn('test_records');
         $table->method('getFieldsForIdentity')->willReturn(['id']);
         $table->method('getColumns')->willReturn([]);
 
@@ -258,7 +259,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $expected = $contextAdapter->toRowContext(['id' => 42], null);
         $this->assertCount(2, $deletedKeys);
         $this->assertSame($expected, $deletedKeys[0]);
-        $this->assertSame(['type' => TestModel::class], $deletedKeys[1]);
+        $this->assertSame(['type' => TestModel::class, 'table' => 'test_records'], $deletedKeys[1]);
     }
 
     public function testFindFromCompoundIncludesTableAndIdentityWhenRecordIsMissing(): void
