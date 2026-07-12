@@ -35,3 +35,6 @@ datastore
 PHPNomad
 PostDatabaseDatastoreHandler
 TableSchemaService
+DateModifiedFactory
+IdentifiableDatabaseDatastoreHandler
+PostsTable

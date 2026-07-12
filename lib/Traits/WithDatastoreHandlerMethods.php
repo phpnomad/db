@@ -43,7 +43,12 @@ trait WithDatastoreHandlerMethods
         });
     }
 
-    /** @inheritDoc */
+    /**
+     * @inheritDoc
+     *
+     * @param array<int, array<string, mixed>> $conditions
+     * @return DataModel[]
+     */
     public function where(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): array
     {
         try {
@@ -56,7 +61,12 @@ trait WithDatastoreHandlerMethods
         }
     }
 
-    /** @inheritDoc */
+    /**
+     * @inheritDoc
+     *
+     * @param array<int, array<string, mixed>> $conditions
+     * @return DataModel[]
+     */
     public function andWhere(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): array
     {
         return $this->where([
@@ -67,7 +77,12 @@ trait WithDatastoreHandlerMethods
         ], $limit, $offset, $orderBy, $order);
     }
 
-    /** @inheritDoc */
+    /**
+     * @inheritDoc
+     *
+     * @param array<int, array<string, mixed>> $conditions
+     * @return DataModel[]
+     */
     public function orWhere(array $conditions, ?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC'): array
     {
         return $this->where([
@@ -78,7 +93,11 @@ trait WithDatastoreHandlerMethods
         ], $limit, $offset, $orderBy, $order);
     }
 
-    /** @inheritDoc */
+    /**
+     * @inheritDoc
+     *
+     * @param array<int, array<string, mixed>> $conditions
+     */
     public function countWhere(array $conditions): int
     {
         $this->initiateQuery(
@@ -102,7 +121,11 @@ trait WithDatastoreHandlerMethods
         return Arr::get($result, 'count', 0);
     }
 
-    /** @inheritDoc */
+    /**
+     * @inheritDoc
+     *
+     * @param array<int, array<string, mixed>> $conditions
+     */
     public function countAndWhere(array $conditions): int
     {
         return $this->countWhere([
@@ -113,7 +136,11 @@ trait WithDatastoreHandlerMethods
         ]);
     }
 
-    /** @inheritDoc */
+    /**
+     * @inheritDoc
+     *
+     * @param array<int, array<string, mixed>> $conditions
+     */
     public function countOrWhere(array $conditions): int
     {
         return $this->countWhere([
@@ -124,7 +151,11 @@ trait WithDatastoreHandlerMethods
         ]);
     }
 
-    /** @inheritDoc */
+    /**
+     * @inheritDoc
+     *
+     * @param mixed $value
+     */
     public function findBy(string $field, $value): DataModel
     {
         $result = $this->andWhere([['column' => $field, 'operator' => '=', 'value' => $value]], 1);
@@ -136,7 +167,11 @@ trait WithDatastoreHandlerMethods
         return Arr::get($result, 0);
     }
 
-    /** @inheritDoc */
+    /**
+     * @inheritDoc
+     *
+     * @param array<string, mixed> $attributes
+     */
     public function create(array $attributes): DataModel
     {
         $fields = $this->table->getFieldsForIdentity();
@@ -208,7 +243,7 @@ trait WithDatastoreHandlerMethods
      * Each deleted row broadcasts a RecordDeleted carrying its raw identity
      * row; no matching rows is a silent no-op.
      *
-     * @param array $conditions
+     * @param array<int, array<string, mixed>> $conditions
      * @return void
      * @throws DatastoreErrorException
      */
@@ -398,10 +433,10 @@ trait WithDatastoreHandlerMethods
 
 
     /**
-     * @param array $conditions
+     * @param array<int, array<string, mixed>> $conditions
      * @param int|null $limit
      * @param int|null $offset
-     * @return array
+     * @return array<int, array<string, mixed>>
      * @throws DatastoreErrorException
      */
     public function findIds(array $conditions, ?int $limit = null, ?int $offset = null): array
@@ -416,7 +451,7 @@ trait WithDatastoreHandlerMethods
     /**
      * Gets the models for the given identity rows, read-through cached.
      *
-     * @param array<string, int|string>[] $ids Identity rows from findIds() (values arrive DB-typed).
+     * @param array<int, array<string, mixed>> $ids Identity rows from findIds() (values arrive DB-typed).
      * @return DataModel[]
      */
     protected function getModels(array $ids): array
@@ -593,7 +628,12 @@ trait WithDatastoreHandlerMethods
         return [$item, $this->modelAdapter->toModel($item)];
     }
 
-    /** @inheritDoc */
+    /**
+     * @inheritDoc
+     *
+     * @param array<string, mixed> $ids
+     * @param array<string, mixed> $attributes
+     */
     public function updateCompound($ids, array $attributes): void
     {
         $generation = $this->rowCache()->snapshotGeneration();
@@ -714,8 +754,8 @@ trait WithDatastoreHandlerMethods
     }
 
     /**
-     * @param array $attributes
-     * @param array $fields
+     * @param array<string, mixed> $attributes
+     * @param array<int, string> $fields
      * @return void
      * @throws DatastoreErrorException
      * @throws DuplicateEntryException
@@ -748,9 +788,9 @@ trait WithDatastoreHandlerMethods
     }
 
     /**
-     * @param array $attributes
-     * @param array $fields
-     * @return array
+     * @param array<string, mixed> $attributes
+     * @param array<int, string> $fields
+     * @return array<string, mixed>
      */
     protected function removeIdentifiableFields(array $attributes, array $fields): array
     {
@@ -760,7 +800,7 @@ trait WithDatastoreHandlerMethods
     /**
      * Looks up records to check if a record with the specified unique columns already exists.
      *
-     * @param array $data
+     * @param array<string, mixed> $data
      * @return DataModel[] List of existing items that match the unique constraints.
      * @throws DatastoreErrorException
      * @throws RecordNotFoundException
@@ -817,9 +857,9 @@ trait WithDatastoreHandlerMethods
      * shadow a duplicate sharing the model identity; such adapters trade
      * that for not tripping spurious self-duplicates).
      *
-     * @param array $data
-     * @param array|null $updateTableIdentity Canonical identity of the record being updated.
-     * @param array|null $updateModelIdentity Model identity of the record being updated.
+     * @param array<string, mixed> $data
+     * @param array<string, mixed>|null $updateTableIdentity Canonical identity of the record being updated.
+     * @param array<string, mixed>|null $updateModelIdentity Model identity of the record being updated.
      * @return void
      * @throws DuplicateEntryException
      * @throws DatastoreErrorException
