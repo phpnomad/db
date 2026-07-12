@@ -11,21 +11,33 @@ use PHPNomad\Cache\Interfaces\CachePolicy;
  */
 class SerializingCachePolicy implements CachePolicy
 {
+    /**
+     * @param array<string, mixed> $context
+     */
     public function shouldCache(string $operation, array $context = []): bool
     {
         return true;
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     public function getCacheKey(array $context): string
     {
         return md5(serialize($context));
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     public function getTtl(array $context = []): ?int
     {
         return 60;
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     public function shouldInvalidate(string $operation, array $context = []): bool
     {
         return true;

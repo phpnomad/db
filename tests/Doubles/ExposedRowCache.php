@@ -18,11 +18,25 @@ use PHPNomad\Database\Services\DatastoreRowCache;
  */
 class ExposedRowCache extends DatastoreRowCache
 {
-    public function exposeRowContext(array $row): ?array
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    public function exposeRowContext(array $row): array
     {
-        return $this->rowContext($row);
+        $context = $this->rowContext($row);
+
+        if ($context === null) {
+            throw new \RuntimeException('Test row cannot produce a full identity: ' . json_encode($row));
+        }
+
+        return $context;
     }
 
+    /**
+     * @param array<string, mixed> $ids
+     * @return array<string, mixed>
+     */
     public function exposeAliasContext(array $ids): array
     {
         return $this->aliasContext($ids);

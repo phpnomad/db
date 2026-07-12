@@ -14,20 +14,26 @@ use PHPNomad\Database\Interfaces\Table;
  */
 class ScriptedQueryStrategy implements QueryStrategy
 {
-    /** @var array[] */
+    /** @var array<int, array<int, array<string, mixed>>> */
     private array $queryResults = [];
     public int $queryCount = 0;
     public int $estimatedCountValue = 0;
-    /** @var array[] */
+    /** @var array<int, array<int, array<string, mixed>>> */
     public array $updates = [];
-    /** @var array[] */
+    /** @var array<int, array<string, mixed>> */
     public array $deletes = [];
 
+    /**
+     * @param array<int, array<string, mixed>> $result
+     */
     public function queueQueryResult(array $result): void
     {
         $this->queryResults[] = $result;
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     public function query(QueryBuilder $builder): array
     {
         $this->queryCount++;
@@ -39,6 +45,10 @@ class ScriptedQueryStrategy implements QueryStrategy
         return array_shift($this->queryResults);
     }
 
+    /**
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
     public function insert(Table $table, array $data): array
     {
         return ['id' => 1];
@@ -48,6 +58,9 @@ class ScriptedQueryStrategy implements QueryStrategy
     public ?int $throwOnDeleteCall = null;
     private int $deleteCalls = 0;
 
+    /**
+     * @param array<string, mixed> $ids
+     */
     public function delete(Table $table, array $ids): void
     {
         $this->deleteCalls++;
@@ -59,6 +72,10 @@ class ScriptedQueryStrategy implements QueryStrategy
         $this->deletes[] = $ids;
     }
 
+    /**
+     * @param array<string, mixed> $ids
+     * @param array<string, mixed> $data
+     */
     public function update(Table $table, array $ids, array $data): void
     {
         $this->updates[] = [$ids, $data];

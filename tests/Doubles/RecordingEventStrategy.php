@@ -22,8 +22,9 @@ class RecordingEventStrategy implements EventStrategy
     /**
      * All recorded broadcasts of one event class, in broadcast order.
      *
-     * @param class-string $eventClass
-     * @return Event[]
+     * @template T of Event
+     * @param class-string<T> $eventClass
+     * @return array<int, T>
      */
     public function ofType(string $eventClass): array
     {

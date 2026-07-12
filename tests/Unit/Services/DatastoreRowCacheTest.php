@@ -39,6 +39,10 @@ class DatastoreRowCacheTest extends TestCase
         );
     }
 
+    /**
+     * @param array<int, string> $identityFields
+     * @param ModelAdapter<DataModel>|null $adapter
+     */
     private function makeRowCache(
         array $identityFields,
         bool $useGenerations = false,
@@ -95,7 +99,7 @@ class DatastoreRowCacheTest extends TestCase
         $this->assertNull($rowCache->rowIdentity(['id' => 42]));
     }
     /**
-     * @return array<string, array{0: array, 1: bool}>
+     * @return array<string, array{0: array<string, mixed>, 1: bool}>
      */
     public static function identityShapes(): array
     {
@@ -111,6 +115,8 @@ class DatastoreRowCacheTest extends TestCase
 
     /**
      * @dataProvider identityShapes
+     *
+     * @param array<string, mixed> $ids
      */
     public function testIsTableIdentityMatchesFieldSetsNotOrder(array $ids, bool $expected): void
     {
@@ -141,7 +147,7 @@ class DatastoreRowCacheTest extends TestCase
     }
 
     /**
-     * @return array<string, array{0: array, 1: array, 2: bool}>
+     * @return array<string, array{0: array<string, mixed>, 1: array<string, mixed>, 2: bool}>
      */
     public static function lookupComparisons(): array
     {
@@ -156,6 +162,9 @@ class DatastoreRowCacheTest extends TestCase
 
     /**
      * @dataProvider lookupComparisons
+     *
+     * @param array<string, mixed> $modelRow
+     * @param array<string, mixed> $lookup
      */
     public function testMatchesLookupComparesScalarsTypeInsensitively(array $modelRow, array $lookup, bool $expected): void
     {

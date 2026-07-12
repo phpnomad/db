@@ -76,6 +76,11 @@ class CanonicalRowCacheTest extends TestCase
         $this->queryStrategy = new ScriptedQueryStrategy();
     }
 
+    /**
+     * @param array<int, string> $identityFields
+     * @param ModelAdapter<DataModel>|null $adapter
+     * @param array<int, array<int, string>> $uniqueColumns
+     */
     private function makeHandler(
         array $identityFields,
         string $tableName = 'test_records',
@@ -213,7 +218,9 @@ class CanonicalRowCacheTest extends TestCase
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'revoked']]);
         $models = $handler->where([['type' => 'AND', 'clauses' => [['column' => 'keyHash', 'operator' => '=', 'value' => 'abc']]]]);
 
-        $this->assertSame('revoked', $models[0]->get('status'));
+        $revoked = $models[0];
+        \assert($revoked instanceof IdentityRowModel);
+        $this->assertSame('revoked', $revoked->get('status'));
     }
 
     /**
@@ -237,7 +244,7 @@ class CanonicalRowCacheTest extends TestCase
      * Seeds keyHash abc → id 7, kills row 7 out from under the alias, and
      * scripts the re-resolution to id 9 — the shared healing sequence.
      */
-    private function healRotatedAlias(CanonicalHandler $handler): DataModel
+    private function healRotatedAlias(CanonicalHandler $handler): IdentityRowModel
     {
         // Seed: keyHash abc → id 7.
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
@@ -523,6 +530,7 @@ class CanonicalRowCacheTest extends TestCase
         $flaky->failWrites = true;
 
         $created = $handler->create(['name' => 'survivor']);
+        \assert($created instanceof IdentityRowModel);
 
         $this->assertSame('survivor', $created->get('name'));
         $this->assertCount(1, $events->ofType(RecordCreated::class), 'A cache outage suppressed RecordCreated for a committed insert.');
@@ -684,8 +692,10 @@ class CanonicalRowCacheTest extends TestCase
         $models = $handler->where([['type' => 'AND', 'clauses' => [['column' => 'name', 'operator' => '!=', 'value' => '']]]]);
 
         $this->assertCount(2, $models);
-        $this->assertSame('first', $models[0]->get('name'));
-        $this->assertSame('second', $models[1]->get('name'));
+        [$first, $second] = $models;
+        \assert($first instanceof IdentityRowModel && $second instanceof IdentityRowModel);
+        $this->assertSame('first', $first->get('name'));
+        $this->assertSame('second', $second->get('name'));
         $this->assertSame(2, $this->queryStrategy->queryCount, 'A cache outage degraded a batched list read into per-row queries.');
     }
 
@@ -709,7 +719,7 @@ class CanonicalRowCacheTest extends TestCase
     }
 
     /**
-     * @return array<string, array{0: array, 1: string, 2: string}>
+     * @return array<string, array{0: array<string, mixed>, 1: string, 2: string}>
      */
     public static function readOutageLookups(): array
     {
@@ -724,6 +734,8 @@ class CanonicalRowCacheTest extends TestCase
      * lookup, whatever its shape.
      *
      * @dataProvider readOutageLookups
+     *
+     * @param array<string, mixed> $lookup
      */
     public function testReadsSurviveACacheThatFailsOnReads(array $lookup, string $field, string $expected): void
     {
@@ -825,7 +837,9 @@ class CanonicalRowCacheTest extends TestCase
         $models = $handler->where([['type' => 'AND', 'clauses' => [['column' => 'name', 'operator' => '!=', 'value' => '']]]]);
 
         $this->assertCount(1, $models, 'A concurrently deleted row collapsed the whole result.');
-        $this->assertSame('survivor', $models[0]->get('name'));
+        $survivor = $models[0];
+        \assert($survivor instanceof IdentityRowModel);
+        $this->assertSame('survivor', $survivor->get('name'));
     }
 
     public function testMidLoopSqlFailureStillInvalidatesAndAnnouncesCompletedDeletes(): void
@@ -845,7 +859,8 @@ class CanonicalRowCacheTest extends TestCase
         try {
             $handler->deleteWhere([['column' => 'status', 'operator' => '=', 'value' => 'doomed']]);
             $this->fail('Expected the mid-loop SQL failure to propagate.');
-        } catch (\LogicException $e) {
+        } catch (\Throwable $e) {
+            $this->assertInstanceOf(\LogicException::class, $e);
             $this->assertSame([['id' => '1']], $this->queryStrategy->deletes, 'Row 1 was not deleted before the failure.');
             $this->assertCount(1, $events->ofType(RecordDeleted::class), 'A completed delete was not announced after a mid-loop failure.');
             $this->assertFalse(
@@ -884,6 +899,10 @@ class CanonicalHandler
 
     private bool $useGenerations;
 
+    /**
+     * @param class-string<\PHPNomad\Datastore\Interfaces\DataModel> $model
+     * @param ModelAdapter<\PHPNomad\Datastore\Interfaces\DataModel> $modelAdapter
+     */
     public function __construct(
         DatabaseServiceProvider $serviceProvider,
         Table $table,
@@ -905,8 +924,15 @@ class CanonicalHandler
         return $this->useGenerations;
     }
 
+    /**
+     * @param array<string, mixed> $ids
+     * @return IdentityRowModel
+     */
     public function findByCompound(array $ids)
     {
-        return $this->findFromCompound($ids);
+        $model = $this->findFromCompound($ids);
+        \assert($model instanceof IdentityRowModel);
+
+        return $model;
     }
 }

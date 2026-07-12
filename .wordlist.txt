@@ -23,10 +23,15 @@ Traceback
 nodejs
 npm
 fediverse
-readmegetUnprefixedName
+readme
+getUnprefixedName
 lookups
 phpnomad
 PrimaryKeyFactory
 schemas
 txt
 WithDatastoreHandlerMethods
+datastore
+PHPNomad
+PostDatabaseDatastoreHandler
+TableSchemaService
