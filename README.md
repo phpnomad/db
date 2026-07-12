@@ -125,7 +125,8 @@ The `QueryBuilder` turns that array into parameterized SQL and runs it through w
 - Extend `IdentifiableDatabaseDatastoreHandler` as the base for any handler keyed by a single `id` column
 - Use the `WithDatastoreHandlerMethods` trait for CRUD, cache reads, cache invalidation, and event dispatch
 - Build reads and writes through `QueryBuilder` and `ClauseBuilder` with condition arrays instead of raw SQL
-- Inject `DatabaseServiceProvider` into every handler to access `QueryBuilder`, `QueryStrategy`, `ClauseBuilder`, `CacheableService`, `EventStrategy`, and `LoggerStrategy`
+- Inject `DatabaseServiceProvider` into every handler to access `QueryBuilder`, `QueryStrategy`, `ClauseBuilder`, `CacheableService`, `EventStrategy`, `LoggerStrategy`, and the `RowCacheFactory` that builds each table's row cache
+- Rows are cached under canonical table-identity keys with per-table generation tokens; override `shouldUseTableGenerations()` on a handler to trade the generation token's race protection for a higher hit rate on write-hot tables
 - Use column factories like `PrimaryKeyFactory`, `DateCreatedFactory`, `DateModifiedFactory`, and `ForeignKeyFactory` for common column patterns
 - Model many-to-many relationships with `JunctionTable`, which handles compound primary keys and foreign key constraints
 

@@ -4,6 +4,7 @@ namespace PHPNomad\Database\Tests\Unit\Traits;
 
 use PHPNomad\Cache\Services\CacheableService;
 use PHPNomad\Database\Interfaces\Table;
+use PHPNomad\Database\Factories\DatastoreRowCacheFactory;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\Doubles\ArrayCacheStrategy;
@@ -74,13 +75,16 @@ class CanonicalRowCacheTest extends TestCase
         $tableSchemaService = $this->createMock(TableSchemaService::class);
         $tableSchemaService->method('getUniqueColumns')->willReturn([]);
 
+        $logger = $logger ?? $this->createMock(LoggerStrategy::class);
+
         $serviceProvider = new DatabaseServiceProvider(
-            $logger ?? $this->createMock(LoggerStrategy::class),
+            $logger,
             $this->queryStrategy,
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $this->cacheableService,
-            $events ?? new NullEventStrategy()
+            $events ?? new NullEventStrategy(),
+            new DatastoreRowCacheFactory($this->cacheableService, $logger)
         );
 
         return new CanonicalHandler(
@@ -290,9 +294,15 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame('revoked', $fresh->get('status'), 'Late stale write-back was served after the generation bump.');
     }
 
-    public function testEstimatedCountInvalidatesAfterWrite(): void
+    /**
+     * Generations orphan the cached count via the bump; opt-out tables
+     * delete the set-level context precisely. Same observable behavior.
+     *
+     * @dataProvider generationModes
+     */
+    public function testEstimatedCountInvalidatesAfterWrite(bool $useGenerations): void
     {
-        $handler = $this->makeHandler(['id'], 'test_records', true);
+        $handler = $this->makeHandler(['id'], 'test_records', $useGenerations);
 
         $this->queryStrategy->estimatedCountValue = 5;
         $this->assertSame(5, $handler->getEstimatedCount());
@@ -301,27 +311,10 @@ class CanonicalRowCacheTest extends TestCase
         $this->queryStrategy->estimatedCountValue = 6;
         $this->assertSame(5, $handler->getEstimatedCount());
 
-        // Any write bumps the table generation, orphaning the cached count.
+        // Any write invalidates the cached count.
         $handler->create(['name' => 'new row']);
 
-        $this->assertSame(6, $handler->getEstimatedCount(), 'estimatedCount survived a write — generation did not invalidate it.');
-    }
-
-    public function testEstimatedCountInvalidatesAfterWriteWithoutGenerations(): void
-    {
-        // Opt-out tables have no generation bump; writes must delete the
-        // set-level context precisely instead.
-        $handler = $this->makeHandler(['id'], 'test_records', false);
-
-        $this->queryStrategy->estimatedCountValue = 5;
-        $this->assertSame(5, $handler->getEstimatedCount());
-
-        $this->queryStrategy->estimatedCountValue = 6;
-        $this->assertSame(5, $handler->getEstimatedCount());
-
-        $handler->create(['name' => 'new row']);
-
-        $this->assertSame(6, $handler->getEstimatedCount(), 'estimatedCount survived a write on a generation-disabled table.');
+        $this->assertSame(6, $handler->getEstimatedCount(), 'estimatedCount survived a write.');
     }
 
     public function testCreatePreWarmsRowReadableWithoutQuery(): void
@@ -406,11 +399,10 @@ class CanonicalRowCacheTest extends TestCase
 
         // The deletion is broadcast with the raw identity row — DB-typed
         // values, no cache normalization in the event contract.
-        $deletions = array_filter($events->broadcasts, fn($event) => $event instanceof RecordDeleted);
+        $deletions = $events->ofType(RecordDeleted::class);
         $this->assertCount(1, $deletions);
-        $deletion = array_values($deletions)[0];
-        $this->assertSame(AttrModel::class, $deletion->getType());
-        $this->assertSame(['orgId' => '1', 'id' => '42'], $deletion->getIdentity());
+        $this->assertSame(AttrModel::class, $deletions[0]->getType());
+        $this->assertSame(['orgId' => '1', 'id' => '42'], $deletions[0]->getIdentity());
     }
 
     public function testDeleteWhereBroadcastsWhenIdentityCannotBeDerived(): void
@@ -428,9 +420,9 @@ class CanonicalRowCacheTest extends TestCase
 
         $this->assertSame([['id' => '42']], $this->queryStrategy->deletes);
 
-        $deletions = array_filter($events->broadcasts, fn($event) => $event instanceof RecordDeleted);
+        $deletions = $events->ofType(RecordDeleted::class);
         $this->assertCount(1, $deletions);
-        $this->assertSame(['id' => '42'], array_values($deletions)[0]->getIdentity());
+        $this->assertSame(['id' => '42'], $deletions[0]->getIdentity());
     }
 
     public function testDeleteWhereWithNoMatchesLeavesCacheUntouched(): void

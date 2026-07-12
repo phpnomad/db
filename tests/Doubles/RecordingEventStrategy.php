@@ -19,6 +19,17 @@ class RecordingEventStrategy implements EventStrategy
         $this->broadcasts[] = $event;
     }
 
+    /**
+     * All recorded broadcasts of one event class, in broadcast order.
+     *
+     * @param class-string $eventClass
+     * @return Event[]
+     */
+    public function ofType(string $eventClass): array
+    {
+        return array_values(array_filter($this->broadcasts, fn (Event $event) => $event instanceof $eventClass));
+    }
+
     public function attach(string $event, callable $action, ?int $priority = null): void
     {
     }

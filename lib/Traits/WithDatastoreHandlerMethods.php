@@ -19,6 +19,7 @@ use PHPNomad\Datastore\Interfaces\HasSingleIntIdentity;
 use PHPNomad\Datastore\Interfaces\ModelAdapter;
 use PHPNomad\Utils\Helpers\Arr;
 use PHPNomad\Utils\Helpers\Obj;
+use Throwable;
 
 trait WithDatastoreHandlerMethods
 {
@@ -161,16 +162,24 @@ trait WithDatastoreHandlerMethods
         $row = Arr::merge($attributes, $ids);
         $result = $this->modelAdapter->toModel($row);
 
-        // Bump BEFORE pre-warming so the row entry lands under the new
-        // generation and stays readable; set-level caches (estimatedCount)
-        // keyed under the old generation become unreachable.
-        $generation = $this->rowCache()->bumpGeneration();
-        $this->invalidateSetCachesWithoutGenerations();
+        // The insert is committed: cache maintenance below is best-effort
+        // and must not fail the create or suppress RecordCreated. Bump
+        // BEFORE pre-warming so the row entry lands under the new
+        // generation and stays readable; set-level caches keyed under the
+        // old generation become unreachable.
+        try {
+            $generation = $this->rowCache()->invalidateAfterWrite();
 
-        // Pre-warm the cache so subsequent reads of this record don't have to
-        // round-trip the DB at all. Same canonical key every read path uses,
-        // so existing read paths transparently pick it up.
-        $this->rowCache()->storeRow($row, $result, $generation);
+            // Pre-warm the cache so subsequent reads of this record don't
+            // have to round-trip the DB at all. Same canonical key every
+            // read path uses, so existing read paths transparently pick it up.
+            $this->rowCache()->storeRow($row, $result, $generation);
+        } catch (Throwable $e) {
+            $this->serviceProvider->loggerStrategy->error(
+                'Post-create cache maintenance failed — the row was created but not pre-warmed.',
+                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+            );
+        }
 
         $this->serviceProvider->eventStrategy->broadcast(new RecordCreated($result));
 
@@ -232,10 +241,19 @@ trait WithDatastoreHandlerMethods
                 // outside the matched set.
                 $this->serviceProvider->queryStrategy->delete($this->table, $identityRow);
 
-                $identity = $this->rowCache()->rowIdentity($identityRow);
+                try {
+                    $identity = $this->rowCache()->rowIdentity($identityRow);
 
-                if ($identity !== null) {
-                    $this->rowCache()->deleteRow($identity, $generation);
+                    if ($identity !== null) {
+                        $this->rowCache()->deleteRow($identity, $generation);
+                    }
+                } catch (Throwable $e) {
+                    // Cache trouble must not abort the remaining SQL deletes;
+                    // the finally-block invalidation is the safety net.
+                    $this->serviceProvider->loggerStrategy->warning(
+                        'Cache invalidation failed for a deleted row.',
+                        ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+                    );
                 }
 
                 // The broadcast carries the raw identity row (DB-typed values):
@@ -248,21 +266,31 @@ trait WithDatastoreHandlerMethods
             }
         } finally {
             if ($deleted) {
-                $this->rowCache()->bumpGeneration();
-                $this->invalidateSetCachesWithoutGenerations();
+                $this->invalidateAfterWriteSafely();
             }
         }
     }
 
     /**
-     * Set-level caches (estimatedCount) are normally orphaned by the
-     * generation bump. Tables opted out of generations have no bump, so
-     * writes delete the set-level context precisely instead.
+     * Post-write invalidation that never throws: a cache-layer failure after
+     * a committed database write must not turn the write into a
+     * caller-visible error, mask an in-flight exception, or suppress event
+     * broadcasts. Failures are logged and left to TTL recovery.
+     *
+     * @return string|null The fresh generation token, or null when
+     *                     generations are disabled or the cache failed.
      */
-    protected function invalidateSetCachesWithoutGenerations(): void
+    protected function invalidateAfterWriteSafely(): ?string
     {
-        if (!$this->rowCache()->usesGenerations()) {
-            $this->rowCache()->deleteTableContext();
+        try {
+            return $this->rowCache()->invalidateAfterWrite();
+        } catch (Throwable $e) {
+            $this->serviceProvider->loggerStrategy->error(
+                'Post-write cache invalidation failed — cached rows may serve stale data until TTL.',
+                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+            );
+
+            return null;
         }
     }
 
@@ -362,6 +390,7 @@ trait WithDatastoreHandlerMethods
         return $this->rowCacheService ??= $this->serviceProvider->rowCacheFactory->make(
             $this->table,
             $this->model,
+            $this->modelAdapter,
             $this->shouldUseTableGenerations()
         );
     }
@@ -480,11 +509,7 @@ trait WithDatastoreHandlerMethods
         if ($this->rowCache()->isTableIdentity($ids)) {
             $identity = $this->rowCache()->rowIdentity($ids);
 
-            return $this->serviceProvider->cacheableService->getWithCache(
-                Operation::Read,
-                $this->rowCache()->identityContext($identity, $generation),
-                fn () => $this->queryRowAndModel($ids)[1]
-            );
+            return $this->rowCache()->readRow($identity, $generation, fn () => $this->queryRowAndModel($ids)[1]);
         }
 
         // Business-key lookup: resolve through an alias entry so the row is
@@ -501,7 +526,7 @@ trait WithDatastoreHandlerMethods
                 // tables nothing else would ever notice — the alias would
                 // keep serving fresh-looking rows for a key they no longer
                 // carry.
-                if ($this->modelMatchesLookup($model, $ids)) {
+                if ($this->rowCache()->matchesLookup($model, $ids)) {
                     return $model;
                 }
 
@@ -523,38 +548,6 @@ trait WithDatastoreHandlerMethods
         }
 
         return $model;
-    }
-
-    /**
-     * True when the model's serialized data still carries the caller's
-     * lookup values. Fields the adapter does not expose are skipped — they
-     * cannot be verified, and models with narrower serialization should not
-     * lose alias caching over it.
-     *
-     * @param DataModel $model
-     * @param array<string, mixed> $ids The caller's lookup key.
-     */
-    protected function modelMatchesLookup(DataModel $model, array $ids): bool
-    {
-        $data = $this->modelAdapter->toArray($model);
-
-        foreach ($ids as $field => $value) {
-            if (!array_key_exists($field, $data)) {
-                continue;
-            }
-
-            $actual = $data[$field];
-
-            if (is_scalar($actual) && is_scalar($value)) {
-                if ((string) $actual !== (string) $value) {
-                    return false;
-                }
-            } elseif ($actual !== $value) {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     /**
@@ -585,7 +578,7 @@ trait WithDatastoreHandlerMethods
 
         if (!$item) {
             throw new RecordNotFoundException(sprintf(
-                'Record not found in table "%s" using identity %s.',
+                'Record not found in table "%s" using lookup key %s.',
                 $this->table->getName(),
                 $this->encodeExceptionContext($ids)
             ));
@@ -601,32 +594,42 @@ trait WithDatastoreHandlerMethods
 
         // The pre-read warms the alias (business-key callers) or the row
         // entry (canonical callers) — which is what makes the canonical
-        // identity resolvable below without an extra query.
-        $record = $this->findFromCompound($ids, $generation);
+        // identity resolvable below without an extra query. It also throws
+        // RecordNotFoundException before any write when the record is gone.
+        $this->findFromCompound($ids, $generation);
         $this->maybeThrowForDuplicateUniqueFields($attributes, $ids);
 
         $identity = $this->resolveTableIdentity($ids, $generation);
 
         $this->serviceProvider->queryStrategy->update($this->table, $ids, $attributes);
 
-        // Precise invalidation first, under the pre-write generation (the
-        // one readers wrote their entries with), then bump. The precise
-        // deletes carry tables that opt out of generations; the bump closes
-        // the cache-aside race for everyone else.
-        if ($identity !== null) {
-            $this->rowCache()->deleteRow($identity, $generation);
+        // The DB write is committed: everything below is best-effort cache
+        // maintenance, and a cache-layer failure must not turn the
+        // successful update into a caller-visible error or suppress the
+        // RecordUpdated broadcast. Precise deletes run under the pre-write
+        // generation (the one readers wrote their entries with), then the
+        // finally-block bump closes the cache-aside race — precise deletes
+        // carry tables that opt out of generations.
+        try {
+            if ($identity !== null) {
+                $this->rowCache()->deleteRow($identity, $generation);
+            }
+
+            if (!$this->rowCache()->isTableIdentity($ids)) {
+                // Drop the alias too: the update may have moved the row's
+                // business key or identity out from under it.
+                $this->rowCache()->deleteAlias($ids, $generation);
+            }
+        } catch (Throwable $e) {
+            $this->serviceProvider->loggerStrategy->error(
+                'Post-update cache invalidation failed — the generation bump is the remaining safety net.',
+                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+            );
+        } finally {
+            $this->invalidateAfterWriteSafely();
         }
 
-        if (!$this->rowCache()->isTableIdentity($ids)) {
-            // Drop the alias too: the update may have moved the row's
-            // business key or identity out from under it.
-            $this->rowCache()->deleteAlias($ids, $generation);
-        }
-
-        $this->rowCache()->bumpGeneration();
-        $this->invalidateSetCachesWithoutGenerations();
-
-        $this->serviceProvider->eventStrategy->broadcast(new RecordUpdated($record::class, $ids, $attributes));
+        $this->serviceProvider->eventStrategy->broadcast(new RecordUpdated($this->model, $ids, $attributes));
     }
 
     /**

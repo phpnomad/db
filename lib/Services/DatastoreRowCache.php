@@ -2,10 +2,13 @@
 
 namespace PHPNomad\Database\Services;
 
+use PHPNomad\Cache\Enums\Operation;
 use PHPNomad\Cache\Exceptions\CachedItemNotFoundException;
 use PHPNomad\Cache\Services\CacheableService;
 use PHPNomad\Database\Interfaces\RowCache;
 use PHPNomad\Database\Interfaces\Table;
+use PHPNomad\Datastore\Interfaces\DataModel;
+use PHPNomad\Datastore\Interfaces\ModelAdapter;
 use PHPNomad\Logger\Interfaces\LoggerStrategy;
 
 /**
@@ -28,34 +31,32 @@ class DatastoreRowCache implements RowCache
     protected Table $table;
 
     /**
-     * @var class-string
+     * @var class-string<DataModel>
      */
     protected string $model;
+    protected ModelAdapter $modelAdapter;
     protected bool $useGenerations;
 
     /**
-     * @param class-string $model
+     * @param class-string<DataModel> $model
      */
     public function __construct(
         CacheableService $cacheableService,
         LoggerStrategy $logger,
         Table $table,
         string $model,
+        ModelAdapter $modelAdapter,
         bool $useGenerations = true
     ) {
         $this->cacheableService = $cacheableService;
         $this->logger = $logger;
         $this->table = $table;
         $this->model = $model;
+        $this->modelAdapter = $modelAdapter;
         $this->useGenerations = $useGenerations;
     }
 
-    /**
-     * True when the given compound key is exactly the table's identity field
-     * set (order-insensitive).
-     *
-     * @param array<string, mixed> $ids
-     */
+    /** @inheritDoc */
     public function isTableIdentity(array $ids): bool
     {
         $identityFields = $this->table->getFieldsForIdentity();
@@ -149,12 +150,7 @@ class DatastoreRowCache implements RowCache
         return $this->withGeneration(['type' => $this->model, 'alias' => $normalized], $generation);
     }
 
-    /**
-     * The set-level context for whole-table values (estimatedCount and any
-     * future query caches).
-     *
-     * @param string|null $generation Generation snapshot to key under; taken fresh when omitted.
-     */
+    /** @inheritDoc */
     public function tableContext(?string $generation = null): array
     {
         return $this->withGeneration(['type' => $this->model], $generation);
@@ -183,48 +179,94 @@ class DatastoreRowCache implements RowCache
         }
     }
 
-    /**
-     * Stores an alias entry pointing a business key at a canonical identity.
-     *
-     * @param array<string, mixed> $ids
-     * @param array<string, mixed> $identity
-     * @param string|null $generation
-     */
+    /** @inheritDoc */
     public function storeAlias(array $ids, array $identity, ?string $generation = null): void
     {
         $this->cacheableService->set($this->aliasContext($ids, $generation), $identity);
     }
 
-    /**
-     * Deletes the row entry for a canonical identity.
-     *
-     * @param array<string, mixed> $identity
-     * @param string|null $generation The generation readers wrote under.
-     */
+    /** @inheritDoc */
     public function deleteRow(array $identity, ?string $generation = null): void
     {
         $this->cacheableService->delete($this->identityContext($identity, $generation));
     }
 
-    /**
-     * Deletes an alias entry.
-     *
-     * @param array<string, mixed> $ids
-     * @param string|null $generation
-     */
+    /** @inheritDoc */
     public function deleteAlias(array $ids, ?string $generation = null): void
     {
         $this->cacheableService->delete($this->aliasContext($ids, $generation));
     }
 
-    /**
-     * Deletes the set-level context. Writes on generation-disabled tables
-     * call this because they have no bump to orphan it; generation-enabled
-     * tables never need it.
-     */
+    /** @inheritDoc */
     public function deleteTableContext(): void
     {
         $this->cacheableService->delete($this->tableContext());
+    }
+
+    /** @inheritDoc */
+    public function readRow(array $identity, ?string $generation, callable $fallback)
+    {
+        return $this->cacheableService->getWithCache(
+            Operation::Read,
+            $this->identityContext($identity, $generation),
+            $fallback
+        );
+    }
+
+    /**
+     * @inheritDoc
+     *
+     * Fields the adapter does not expose are skipped — they cannot be
+     * verified, and models with narrower serialization should not lose
+     * alias caching over it. But when generations are disabled and NO field
+     * was verifiable, the alias is treated as stale (with a warning):
+     * read-time verification is the only rotation defense those tables have,
+     * and a vacuous pass would silently remove it.
+     */
+    public function matchesLookup(DataModel $model, array $ids): bool
+    {
+        $data = $this->modelAdapter->toArray($model);
+        $verified = 0;
+
+        foreach ($ids as $field => $value) {
+            if (!array_key_exists($field, $data)) {
+                continue;
+            }
+
+            $verified++;
+            $actual = $data[$field];
+
+            if (is_scalar($actual) && is_scalar($value)) {
+                if ((string) $actual !== (string) $value) {
+                    return false;
+                }
+            } elseif ($actual !== $value) {
+                return false;
+            }
+        }
+
+        if ($verified === 0 && !$this->useGenerations) {
+            $this->logger->warning(
+                'Alias lookup could not be verified — the model adapter exposes none of the lookup fields; treating the alias as stale.',
+                ['table' => $this->table->getName(), 'lookupFields' => array_keys($ids)]
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /** @inheritDoc */
+    public function invalidateAfterWrite(): ?string
+    {
+        if (!$this->useGenerations) {
+            $this->deleteTableContext();
+
+            return null;
+        }
+
+        return $this->bumpGeneration();
     }
 
     /**
@@ -269,16 +311,7 @@ class DatastoreRowCache implements RowCache
         return $context;
     }
 
-    /**
-     * Takes the generation snapshot a read or invalidation operation should
-     * key its contexts under — ONCE, at the start of the operation, before
-     * any database query. Null when generations are disabled for this table.
-     *
-     * One snapshot per operation is both the race fence (a stale write-back
-     * keyed with a pre-write snapshot can never collide with post-bump
-     * reader keys) and the round-trip bound (one token fetch per operation
-     * instead of one per row).
-     */
+    /** @inheritDoc */
     public function snapshotGeneration(): ?string
     {
         return $this->useGenerations ? $this->currentGeneration() : null;
@@ -305,9 +338,7 @@ class DatastoreRowCache implements RowCache
         return $token;
     }
 
-    /**
-     * Whether contexts built by this service carry a generation token.
-     */
+    /** @inheritDoc */
     public function usesGenerations(): bool
     {
         return $this->useGenerations;
@@ -322,6 +353,12 @@ class DatastoreRowCache implements RowCache
      * this context would re-mint a token on every read, silently defeating
      * generation stability, and each re-mint would broadcast CacheMissed
      * noise. The token must live outside policy discretion.
+     *
+     * The get-then-set is last-write-wins rather than add-if-absent, and
+     * that is safe: every minter SETs its token before performing its DB
+     * read, and tokens are random — concurrent re-mints can only orphan
+     * each other's fresh entries (a cold-start hit-rate cost), never revive
+     * a stale one.
      */
     protected function currentGeneration(): string
     {

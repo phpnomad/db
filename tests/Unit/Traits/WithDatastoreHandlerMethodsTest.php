@@ -6,6 +6,7 @@ use PHPNomad\Cache\Services\CacheableService;
 use PHPNomad\Database\Factories\Column;
 use PHPNomad\Database\Interfaces\QueryStrategy;
 use PHPNomad\Database\Interfaces\Table;
+use PHPNomad\Database\Factories\DatastoreRowCacheFactory;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\Doubles\NoopClauseBuilder;
@@ -67,7 +68,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $cacheableService,
-            $eventStrategy
+            $eventStrategy,
+            new DatastoreRowCacheFactory($cacheableService, $loggerStrategy)
         );
 
         $handler = new DummyDatastoreHandler(
@@ -130,7 +132,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $cacheableService,
-            $eventStrategy
+            $eventStrategy,
+            new DatastoreRowCacheFactory($cacheableService, $loggerStrategy)
         );
 
         $handler = new DummyDatastoreHandler(
@@ -141,7 +144,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             $modelAdapter
         );
 
-        $handler->create(['name' => 'Example']);
+        $this->assertSame($createdModel, $handler->create(['name' => 'Example']));
     }
 
     public function testCreateRespectsCallerProvidedValuesOverPhpDefaults(): void
@@ -168,8 +171,9 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $tableSchemaService = $this->createMock(TableSchemaService::class);
         $tableSchemaService->method('getUniqueColumns')->willReturn([]);
 
+        $createdModel = new TestModel(7);
         $modelAdapter = $this->createMock(ModelAdapter::class);
-        $modelAdapter->method('toModel')->willReturn(new TestModel(7));
+        $modelAdapter->method('toModel')->willReturn($createdModel);
 
         $serviceProvider = new DatabaseServiceProvider(
             $loggerStrategy,
@@ -177,7 +181,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $cacheableService,
-            $eventStrategy
+            $eventStrategy,
+            new DatastoreRowCacheFactory($cacheableService, $loggerStrategy)
         );
 
         $handler = new DummyDatastoreHandler(
@@ -188,7 +193,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             $modelAdapter
         );
 
-        $handler->create(['createdAt' => 'caller-provided']);
+        $this->assertSame($createdModel, $handler->create(['createdAt' => 'caller-provided']));
     }
 
     public function testCacheContextIsTypeStableAcrossIntAndStringIdentities(): void
@@ -212,7 +217,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $cacheableService,
-            $eventStrategy
+            $eventStrategy,
+            new DatastoreRowCacheFactory($cacheableService, $loggerStrategy)
         );
 
         $handler = new DummyDatastoreHandler(
@@ -271,7 +277,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $cacheableService,
-            $eventStrategy
+            $eventStrategy,
+            new DatastoreRowCacheFactory($cacheableService, $loggerStrategy)
         );
 
         $handler = new DummyDatastoreHandler(
@@ -321,7 +328,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $cacheableService,
-            $eventStrategy
+            $eventStrategy,
+            new DatastoreRowCacheFactory($cacheableService, $loggerStrategy)
         );
 
         $handler = new DummyDatastoreHandler(

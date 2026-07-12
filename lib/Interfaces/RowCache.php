@@ -2,6 +2,8 @@
 
 namespace PHPNomad\Database\Interfaces;
 
+use PHPNomad\Datastore\Interfaces\DataModel;
+
 /**
  * The cache-context contract for one table's datastore: canonical row
  * identities, alias entries, set-level contexts, and per-table generation
@@ -65,7 +67,7 @@ interface RowCache
 
     /**
      * Reads the identity an alias entry points at, validated against the
-     * table's identity shape. Null on miss, cache failure, or malformed value.
+     * table's identity shape. Null on miss or malformed value.
      *
      * @param array<string, mixed> $ids
      * @param string|null $generation
@@ -74,14 +76,52 @@ interface RowCache
     public function resolveAliasedIdentity(array $ids, ?string $generation = null): ?array;
 
     /**
+     * Read-through for a canonical row: serves the cached model or runs the
+     * fallback and caches its result — every row cache read AND the miss-path
+     * write happen behind this contract.
+     *
+     * @param array<string, mixed> $identity Canonical identity (from rowIdentity()).
+     * @param string|null $generation Pre-query generation snapshot.
+     * @param callable $fallback Loads the model on miss; its result is cached.
+     * @return mixed The cached or freshly loaded model.
+     */
+    public function readRow(array $identity, ?string $generation, callable $fallback);
+
+    /**
+     * True when the model still carries the caller's lookup values —
+     * the guard against an alias whose business key was rotated out from
+     * under it by an identity-keyed update. For generation-disabled tables
+     * an unverifiable lookup (no field exposed by the adapter) is treated
+     * as stale, because this check is their ONLY rotation defense.
+     *
+     * @param DataModel $model
+     * @param array<string, mixed> $ids The caller's lookup key.
+     */
+    public function matchesLookup(DataModel $model, array $ids): bool;
+
+    /**
+     * The one post-write invalidation call: bumps the generation when
+     * generations are on, precisely deletes the set-level context when they
+     * are off. Every successful write must end with this.
+     *
+     * @return string|null The fresh generation token (for post-write cache
+     *                     writes), or null when generations are disabled.
+     */
+    public function invalidateAfterWrite(): ?string;
+
+    /**
      * Stores a row's model under its canonical row context. Skips (logged)
      * when the row cannot produce a full identity.
      *
+     * Contract-level invariant for ANY generation-aware implementation: read
+     * paths MUST pass the generation snapshot they took before querying the
+     * database. A token fetched at store time can postdate a concurrent
+     * write's bump, landing a stale row under the new generation — the exact
+     * race generations exist to close.
+     *
      * @param array<string, mixed> $row
      * @param mixed $model
-     * @param string|null $generation Pre-query generation snapshot — see the
-     *                                implementation for why read paths must
-     *                                pass the snapshot they queried under.
+     * @param string|null $generation Pre-query generation snapshot.
      */
     public function storeRow(array $row, $model, ?string $generation = null): void;
 
@@ -117,7 +157,13 @@ interface RowCache
     public function deleteTableContext(): void;
 
     /**
-     * Folds the current table generation into a cache context.
+     * Folds the current table generation into a cache context. The token is
+     * replaced on every write, which orphans all previously written contexts
+     * for the table at once — the transaction-free invalidation primitive
+     * the whole design leans on.
+     *
+     * @param array $context The context to fold the token into.
+     * @param string|null $generation Snapshot to fold in; fetched fresh when omitted.
      */
     public function withGeneration(array $context, ?string $generation = null): array;
 
