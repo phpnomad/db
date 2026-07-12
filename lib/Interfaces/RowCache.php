@@ -55,7 +55,8 @@ interface RowCache
 
     /**
      * Reads the identity an alias entry points at, validated against the
-     * table's identity shape. Null on miss or malformed value.
+     * table's identity shape. Null on miss, malformed value, or a
+     * cache-layer read failure (logged).
      *
      * @param array<string, mixed> $ids
      * @param string|null $generation Pre-query generation snapshot.

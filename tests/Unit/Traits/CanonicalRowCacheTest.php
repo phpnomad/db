@@ -19,6 +19,7 @@ use PHPNomad\Database\Tests\Doubles\NullEventStrategy;
 use PHPNomad\Database\Tests\Doubles\RecordingEventStrategy;
 use PHPNomad\Database\Tests\Doubles\ScriptedQueryStrategy;
 use PHPNomad\Database\Tests\Doubles\SerializingCachePolicy;
+use PHPNomad\Database\Tests\Doubles\ThrowingOnceEventStrategy;
 use PHPNomad\Database\Tests\TestCase;
 use PHPNomad\Database\Traits\WithDatastoreHandlerMethods;
 use PHPNomad\Datastore\Events\RecordCreated;
@@ -705,34 +706,25 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame([['keyHash' => 'abc', 'id' => '7'], ['keyHash' => 'abc', 'status' => 'revoked']], $this->queryStrategy->updates[0]);
     }
 
-    public function testBusinessKeyReadSurvivesACacheThatFailsOnReads(): void
+    /**
+     * @return array<string, array{0: array, 1: string, 2: string}>
+     */
+    public function readOutageLookups(): array
     {
-        // Alias-read and token-read failures must degrade to database
-        // loads — never break the lookup.
-        $flaky = $this->useFlakyCache();
-        $logger = $this->createMock(LoggerStrategy::class);
-        $logger->expects($this->atLeastOnce())
-            ->method('warning')
-            ->with($this->logicalOr(
-                $this->stringContains('read failed'),
-                $this->stringContains('store failed'),
-                $this->stringContains('Could not cache'),
-                $this->stringContains('Could not persist')
-            ));
-
-        $handler = $this->makeHandler(['id'], 'test_records', true, $logger);
-
-        $flaky->failReads = true;
-
-        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
-        $byKey = $handler->findByCompound(['keyHash' => 'abc']);
-
-        $this->assertSame('7', $byKey->get('id'));
+        return [
+            'business-key lookup (alias + token reads)' => [['keyHash' => 'abc'], 'id', '7'],
+            'canonical lookup (read-through probe)' => [['id' => '7'], 'status', 'active'],
+        ];
     }
 
-    public function testCanonicalReadSurvivesACacheThatFailsOnReads(): void
+    /**
+     * Probe/read failures must degrade to database loads — never break the
+     * lookup, whatever its shape.
+     *
+     * @dataProvider readOutageLookups
+     */
+    public function testReadsSurviveACacheThatFailsOnReads(array $lookup, string $field, string $expected): void
     {
-        // A broken read-through probe must load directly from the database.
         $flaky = $this->useFlakyCache();
         $logger = $this->createMock(LoggerStrategy::class);
         $logger->expects($this->atLeastOnce())
@@ -749,9 +741,9 @@ class CanonicalRowCacheTest extends TestCase
         $flaky->failReads = true;
 
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
-        $byId = $handler->findByCompound(['id' => '7']);
+        $model = $handler->findByCompound($lookup);
 
-        $this->assertSame('active', $byId->get('status'));
+        $this->assertSame($expected, $model->get($field));
     }
 
     public function testEstimatedCountSurvivesACacheThatFailsOnReads(): void
@@ -833,6 +825,52 @@ class CanonicalRowCacheTest extends TestCase
 
         $this->assertCount(1, $models, 'A concurrently deleted row collapsed the whole result.');
         $this->assertSame('survivor', $models[0]->get('name'));
+    }
+
+    public function testMidLoopSqlFailureStillInvalidatesAndAnnouncesCompletedDeletes(): void
+    {
+        // Row 1 deletes and must still bump the generation and broadcast,
+        // even though row 2's SQL delete throws.
+        $events = new RecordingEventStrategy();
+        $handler = $this->makeHandler(['id'], 'test_records', true, null, $events);
+
+        // Prime a token + a cached row so invalidation is observable.
+        $this->queryStrategy->queueQueryResult([['id' => '1', 'status' => 'doomed']]);
+        $handler->findByCompound(['id' => '1']);
+
+        $this->queryStrategy->queueQueryResult([['id' => '1'], ['id' => '2']]);
+        $this->queryStrategy->throwOnDeleteCall = 2;
+
+        try {
+            $handler->deleteWhere([['column' => 'status', 'operator' => '=', 'value' => 'doomed']]);
+            $this->fail('Expected the mid-loop SQL failure to propagate.');
+        } catch (\LogicException $e) {
+            $this->assertSame([['id' => '1']], $this->queryStrategy->deletes, 'Row 1 was not deleted before the failure.');
+            $this->assertCount(1, $events->ofType(RecordDeleted::class), 'A completed delete was not announced after a mid-loop failure.');
+            $this->assertFalse(
+                $this->cacheableService->exists($this->prober->exposeRowContext(['id' => '1'])),
+                'The completed delete\'s row entry survived the failure.'
+            );
+        }
+    }
+
+    public function testThrowingListenerDoesNotSuppressRemainingDeleteBroadcasts(): void
+    {
+        // The FIRST RecordDeleted listener throws; the second row's event
+        // must still fire (and the failure is logged, not propagated).
+        $events = new ThrowingOnceEventStrategy();
+        $logger = $this->createMock(LoggerStrategy::class);
+        $logger->expects($this->atLeastOnce())
+            ->method('error')
+            ->with($this->stringContains('listener failed'));
+
+        $handler = $this->makeHandler(['id'], 'test_records', true, $logger, $events);
+
+        $this->queryStrategy->queueQueryResult([['id' => '1'], ['id' => '2']]);
+
+        $handler->deleteWhere([['column' => 'status', 'operator' => '=', 'value' => 'doomed']]);
+
+        $this->assertCount(2, $events->ofType(RecordDeleted::class), 'A throwing listener suppressed a sibling RecordDeleted.');
     }
 
 }

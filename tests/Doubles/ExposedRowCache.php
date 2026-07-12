@@ -10,11 +10,11 @@ use PHPNomad\Database\Services\DatastoreRowCache;
  * poisoning, and manual invalidation) without widening the production
  * contract.
  *
- * Tests normally avoid extending lib/ concretes (the ANTI-PATTERNS KB entry
- * flags inheritance from package classes); this subclass is the deliberate
- * exception, because the alternative is putting key plumbing back on the
- * RowCache interface, which the production contract intentionally narrowed
- * away.
+ * Tests normally avoid extending lib/ concretes — inheriting from package
+ * classes couples tests to internals and is the shape the coding standards
+ * steer away from. This subclass is the deliberate exception, because the
+ * alternative is putting key plumbing back on the RowCache interface, which
+ * the production contract intentionally narrowed away.
  */
 class ExposedRowCache extends DatastoreRowCache
 {

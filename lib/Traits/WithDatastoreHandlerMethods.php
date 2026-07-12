@@ -171,6 +171,9 @@ trait WithDatastoreHandlerMethods
         // and is always correct.
         $this->rowCache()->invalidateAfterWrite();
 
+        // Single-record broadcasts intentionally PROPAGATE listener
+        // exceptions (the pre-PR contract): there are no sibling events to
+        // protect, unlike deleteWhere's buffered bulk emission.
         $this->serviceProvider->eventStrategy->broadcast(new RecordCreated($result));
 
         return $result;
@@ -277,7 +280,7 @@ trait WithDatastoreHandlerMethods
      */
     protected function initiateQuery(?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC', array $select = null)
     {
-        $this->serviceProvider->clauseBuilder->useTable($this->table);
+        $this->serviceProvider->clauseBuilder->reset()->useTable($this->table);
         $select = $select === null ? $this->table->getFieldsForIdentity() : $select;
 
 
@@ -403,23 +406,9 @@ trait WithDatastoreHandlerMethods
      */
     public function findIds(array $conditions, ?int $limit = null, ?int $offset = null): array
     {
-        $this->serviceProvider->clauseBuilder->reset()->useTable($this->table);
-
-        $this->serviceProvider->queryBuilder
-            ->reset()
-            ->from($this->table)
-            ->select(...$this->table->getFieldsForIdentity());
-
-
-        if ($limit) {
-            $this->serviceProvider->queryBuilder->limit($limit);
-        }
-
-        if ($offset) {
-            $this->serviceProvider->queryBuilder->offset($offset);
-        }
-
-        $this->buildConditions($conditions);
+        // Same bootstrap as where(): initiateQuery()'s select defaults to
+        // the identity fields, which is exactly this method's projection.
+        $this->initiateQuery($limit, $offset)->buildConditions($conditions);
 
         return $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
     }
@@ -668,7 +657,8 @@ trait WithDatastoreHandlerMethods
 
         // The event intentionally carries the caller's key — the lookup
         // contract they wrote against — not the cache-normalized identity
-        // the SQL targeted.
+        // the SQL targeted. Like create(), a single-record broadcast
+        // propagates listener exceptions; only bulk emission isolates them.
         $this->serviceProvider->eventStrategy->broadcast(new RecordUpdated($this->model, $ids, $attributes));
     }
 

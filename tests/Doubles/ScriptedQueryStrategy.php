@@ -44,8 +44,18 @@ class ScriptedQueryStrategy implements QueryStrategy
         return ['id' => 1];
     }
 
+    /** @var int|null 1-indexed delete call that should throw. */
+    public ?int $throwOnDeleteCall = null;
+    private int $deleteCalls = 0;
+
     public function delete(Table $table, array $ids): void
     {
+        $this->deleteCalls++;
+
+        if ($this->throwOnDeleteCall !== null && $this->deleteCalls === $this->throwOnDeleteCall) {
+            throw new LogicException('Simulated SQL delete failure on call ' . $this->deleteCalls . '.');
+        }
+
         $this->deletes[] = $ids;
     }
 

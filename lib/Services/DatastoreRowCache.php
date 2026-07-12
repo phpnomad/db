@@ -172,6 +172,10 @@ class DatastoreRowCache implements RowCache
     /** @inheritDoc */
     public function storeRow(array $row, $model, ?string $generation = null): void
     {
+        if ($this->isEphemeralGeneration($generation)) {
+            return;
+        }
+
         $context = $this->rowContext($row, $generation);
 
         if ($context === null) {
@@ -191,6 +195,10 @@ class DatastoreRowCache implements RowCache
     /** @inheritDoc */
     public function storeAlias(array $ids, array $identity, ?string $generation = null): void
     {
+        if ($this->isEphemeralGeneration($generation)) {
+            return;
+        }
+
         try {
             $this->cacheableService->set($this->aliasContext($ids, $generation), $identity);
         } catch (Throwable $e) {
@@ -449,8 +457,9 @@ class DatastoreRowCache implements RowCache
     }
 
     /**
-     * Replaces the table's generation token. Called after every successful
-     * write. A no-op when generations are disabled for this table.
+     * Replaces the table's generation token. Called after every write that
+     * committed at least one row. A no-op when generations are disabled for
+     * this table.
      *
      * @return string|null The freshly minted token — propagated through
      *                     invalidateAfterWrite() for implementations that add
@@ -502,7 +511,7 @@ class DatastoreRowCache implements RowCache
                 ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
             );
 
-            return $this->mintGeneration();
+            return $this->mintEphemeralGeneration();
         }
 
         if (!is_string($token) || $token === '') {
@@ -539,6 +548,26 @@ class DatastoreRowCache implements RowCache
     protected function mintGeneration(): string
     {
         return bin2hex(random_bytes(8));
+    }
+
+    /**
+     * Mints a token for a single operation during a token-read outage. The
+     * prefix marks it so write-backs can skip: entries keyed under a token
+     * nobody else can ever read are pure garbage written at read-traffic
+     * rate.
+     */
+    protected function mintEphemeralGeneration(): string
+    {
+        return 'ephemeral-' . bin2hex(random_bytes(8));
+    }
+
+    /**
+     * True when the snapshot was minted during a token-read outage and no
+     * cache entry keyed under it can ever be served.
+     */
+    protected function isEphemeralGeneration(?string $generation): bool
+    {
+        return $generation !== null && strpos($generation, 'ephemeral-') === 0;
     }
 
     /**
