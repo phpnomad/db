@@ -163,7 +163,7 @@ class RowCacheContextAdapter
      */
     public function toIdentityContext(array $identity, ?string $generation = null): array
     {
-        return $this->withGeneration(['type' => $this->model, 'identities' => $this->stringifyScalars($identity)], $generation);
+        return $this->toGenerationKeyedContext(['type' => $this->model, 'identities' => $this->stringifyScalars($identity)], $generation);
     }
 
     /**
@@ -182,7 +182,7 @@ class RowCacheContextAdapter
 
         ksort($normalized);
 
-        return $this->withGeneration(['type' => $this->model, 'alias' => $normalized], $generation);
+        return $this->toGenerationKeyedContext(['type' => $this->model, 'alias' => $normalized], $generation);
     }
 
     /**
@@ -195,7 +195,7 @@ class RowCacheContextAdapter
      */
     public function toTableContext(?string $generation = null): array
     {
-        return $this->withGeneration(['type' => $this->model], $generation);
+        return $this->toGenerationKeyedContext(['type' => $this->model], $generation);
     }
 
     /**
@@ -223,7 +223,7 @@ class RowCacheContextAdapter
      *
      * @see https://developer.wordpress.org/reference/functions/wp_cache_set_last_changed/ the pattern's origin
      */
-    public function withGeneration(array $context, ?string $generation): array
+    protected function toGenerationKeyedContext(array $context, ?string $generation): array
     {
         if (!$this->useGenerations) {
             return $context;
@@ -241,6 +241,16 @@ class RowCacheContextAdapter
         $context['gen'] = $generation;
 
         return $context;
+    }
+
+    /**
+     * Marks a freshly minted token as ephemeral — the shape
+     * isEphemeralGeneration() recognizes. The adapter owns the format; the
+     * handler owns the minting.
+     */
+    public function toEphemeralGeneration(string $token): string
+    {
+        return self::EPHEMERAL_GENERATION_PREFIX . $token;
     }
 
     /**

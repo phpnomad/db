@@ -500,7 +500,7 @@ trait WithDatastoreHandlerMethods
                 ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exceptionMessage' => $e->getMessage()]
             );
 
-            return RowCacheContextAdapter::EPHEMERAL_GENERATION_PREFIX . $this->mintGenerationToken();
+            return $this->getCacheContextAdapter()->toEphemeralGeneration($this->mintGenerationToken());
         }
 
         if (is_string($token) && $this->getCacheContextAdapter()->isValidGeneration($token)) {

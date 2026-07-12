@@ -205,6 +205,13 @@ class RowCacheContextAdapterTest extends TestCase
         $this->assertSame($expected, $this->makeAdapter(['id'], true)->isEphemeralGeneration($token));
     }
 
+    public function testEphemeralMarkingRoundTrips(): void
+    {
+        $adapter = $this->makeAdapter(['id'], true);
+
+        $this->assertTrue($adapter->isEphemeralGeneration($adapter->toEphemeralGeneration('abc123')));
+    }
+
     /**
      * @return array<string, array{0: mixed, 1: bool}>
      */
