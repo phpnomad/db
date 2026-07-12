@@ -22,6 +22,9 @@ class ScriptedQueryStrategy implements QueryStrategy
     public array $updates = [];
     /** @var array<int, array<string, mixed>> */
     public array $deletes = [];
+    /** @var int|null 1-indexed delete call that should throw. */
+    public ?int $throwOnDeleteCall = null;
+    private int $deleteCalls = 0;
 
     /**
      * @param array<int, array<string, mixed>> $result
@@ -53,10 +56,6 @@ class ScriptedQueryStrategy implements QueryStrategy
     {
         return ['id' => 1];
     }
-
-    /** @var int|null 1-indexed delete call that should throw. */
-    public ?int $throwOnDeleteCall = null;
-    private int $deleteCalls = 0;
 
     /**
      * @param array<string, mixed> $ids

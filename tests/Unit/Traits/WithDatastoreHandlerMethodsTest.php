@@ -3,10 +3,10 @@
 namespace PHPNomad\Database\Tests\Unit\Traits;
 
 use PHPNomad\Cache\Services\CacheableService;
+use PHPNomad\Database\Adapters\RowCacheContextAdapter;
 use PHPNomad\Database\Factories\Column;
 use PHPNomad\Database\Interfaces\QueryStrategy;
 use PHPNomad\Database\Interfaces\Table;
-use PHPNomad\Database\Adapters\RowCacheContextAdapter;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\Doubles\NoopClauseBuilder;
@@ -255,7 +255,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         // The deleted cache context must match what the read path wrote,
         // which used the int identity from the hydrated row.
         $contextAdapter = new RowCacheContextAdapter($table, TestModel::class, $modelAdapter, false);
-        $expected = $contextAdapter->rowContext(['id' => 42], null);
+        $expected = $contextAdapter->toRowContext(['id' => 42], null);
         $this->assertCount(2, $deletedKeys);
         $this->assertSame($expected, $deletedKeys[0]);
         $this->assertSame(['type' => TestModel::class], $deletedKeys[1]);

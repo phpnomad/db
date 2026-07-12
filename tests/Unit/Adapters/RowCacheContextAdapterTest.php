@@ -5,7 +5,7 @@ namespace PHPNomad\Database\Tests\Unit\Adapters;
 use PHPNomad\Database\Adapters\RowCacheContextAdapter;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Tests\Doubles\FieldHidingModelAdapter;
-use PHPNomad\Database\Tests\Doubles\HidingModelAdapter;
+use PHPNomad\Database\Tests\Doubles\OpaqueModelAdapter;
 use PHPNomad\Database\Tests\Doubles\IdentityRowModel;
 use PHPNomad\Database\Tests\Doubles\IdentityRowModelAdapter;
 use PHPNomad\Database\Tests\TestCase;
@@ -44,10 +44,10 @@ class RowCacheContextAdapterTest extends TestCase
         // produces two distinct cache contexts and invalidation misses one.
         $adapter = $this->makeAdapter(['id']);
 
-        $this->assertNotNull($adapter->rowContext(['id' => 123], null));
+        $this->assertNotNull($adapter->toRowContext(['id' => 123], null));
         $this->assertSame(
-            $adapter->rowContext(['id' => 123], null),
-            $adapter->rowContext(['id' => '123'], null)
+            $adapter->toRowContext(['id' => 123], null),
+            $adapter->toRowContext(['id' => '123'], null)
         );
     }
 
@@ -57,7 +57,7 @@ class RowCacheContextAdapterTest extends TestCase
 
         $this->assertSame(
             ['orgId' => '1', 'id' => '42'],
-            $adapter->rowIdentity(['id' => 42, 'name' => 'extra', 'orgId' => 1])
+            $adapter->toRowIdentity(['id' => 42, 'name' => 'extra', 'orgId' => 1])
         );
     }
 
@@ -67,7 +67,7 @@ class RowCacheContextAdapterTest extends TestCase
         // owns the logging.
         $adapter = $this->makeAdapter(['orgId', 'id']);
 
-        $this->assertNull($adapter->rowIdentity(['id' => 42]));
+        $this->assertNull($adapter->toRowIdentity(['id' => 42]));
     }
 
     public function testRawIdentityKeepsOriginalValueTypes(): void
@@ -78,7 +78,7 @@ class RowCacheContextAdapterTest extends TestCase
 
         $this->assertSame(
             ['orgId' => 1, 'id' => 42],
-            $adapter->rawIdentity(['id' => 42, 'orgId' => 1, 'name' => 'extra'])
+            $adapter->toRawIdentity(['id' => 42, 'orgId' => 1, 'name' => 'extra'])
         );
     }
 
@@ -154,7 +154,7 @@ class RowCacheContextAdapterTest extends TestCase
     {
         // Tri-state: the adapter reports "unverifiable"; the datastore
         // handler owns the policy for what that means per generation mode.
-        $adapter = $this->makeAdapter(['id'], false, new HidingModelAdapter());
+        $adapter = $this->makeAdapter(['id'], false, new OpaqueModelAdapter());
 
         $this->assertNull($adapter->matchesLookup(new IdentityRowModel(['id' => 7, 'keyHash' => 'abc']), ['keyHash' => 'abc']));
     }
@@ -163,7 +163,7 @@ class RowCacheContextAdapterTest extends TestCase
     {
         $this->assertSame(
             ['type' => IdentityRowModel::class, 'gen' => 'token-1'],
-            $this->makeAdapter(['id'], true)->tableContext('token-1')
+            $this->makeAdapter(['id'], true)->toTableContext('token-1')
         );
     }
 
@@ -172,14 +172,14 @@ class RowCacheContextAdapterTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('generation snapshot is required');
 
-        $this->makeAdapter(['id'], true)->tableContext(null);
+        $this->makeAdapter(['id'], true)->toTableContext(null);
     }
 
     public function testGenerationDisabledTablesNeverCarryTokens(): void
     {
         $this->assertSame(
             ['type' => IdentityRowModel::class],
-            $this->makeAdapter(['id'], false)->tableContext('token-1')
+            $this->makeAdapter(['id'], false)->toTableContext('token-1')
         );
     }
 

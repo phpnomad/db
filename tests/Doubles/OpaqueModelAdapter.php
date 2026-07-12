@@ -11,7 +11,7 @@ use PHPNomad\Datastore\Interfaces\ModelAdapter;
  *
  * @implements ModelAdapter<DataModel>
  */
-class HidingModelAdapter implements ModelAdapter
+class OpaqueModelAdapter implements ModelAdapter
 {
     /**
      * @param array<string, mixed> $array

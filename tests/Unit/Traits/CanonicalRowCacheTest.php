@@ -3,19 +3,19 @@
 namespace PHPNomad\Database\Tests\Unit\Traits;
 
 use PHPNomad\Cache\Services\CacheableService;
+use PHPNomad\Database\Adapters\RowCacheContextAdapter;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\Doubles\ArrayCacheStrategy;
-use PHPNomad\Database\Adapters\RowCacheContextAdapter;
 use PHPNomad\Database\Tests\Doubles\FieldHidingModelAdapter;
 use PHPNomad\Database\Tests\Doubles\FlakyCacheStrategy;
-use PHPNomad\Database\Tests\Doubles\HidingModelAdapter;
 use PHPNomad\Database\Tests\Doubles\IdentityRowModel;
 use PHPNomad\Database\Tests\Doubles\IdentityRowModelAdapter;
 use PHPNomad\Database\Tests\Doubles\NoopClauseBuilder;
 use PHPNomad\Database\Tests\Doubles\NoopQueryBuilder;
 use PHPNomad\Database\Tests\Doubles\NullEventStrategy;
+use PHPNomad\Database\Tests\Doubles\OpaqueModelAdapter;
 use PHPNomad\Database\Tests\Doubles\RecordingEventStrategy;
 use PHPNomad\Database\Tests\Doubles\ScriptedQueryStrategy;
 use PHPNomad\Database\Tests\Doubles\SerializingCachePolicy;
@@ -135,7 +135,7 @@ class CanonicalRowCacheTest extends TestCase
     private function currentToken(): ?string
     {
         try {
-            $token = $this->cacheableService->get($this->contextAdapter->generationContext());
+            $token = $this->cacheableService->get($this->contextAdapter->toGenerationContext());
         } catch (\Throwable $e) {
             return null;
         }
@@ -151,7 +151,7 @@ class CanonicalRowCacheTest extends TestCase
      */
     private function probeRowContext(array $row): array
     {
-        $context = $this->contextAdapter->rowContext($row, $this->currentToken());
+        $context = $this->contextAdapter->toRowContext($row, $this->currentToken());
         \assert($context !== null);
 
         return $context;
@@ -165,7 +165,7 @@ class CanonicalRowCacheTest extends TestCase
      */
     private function probeAliasContext(array $ids): array
     {
-        return $this->contextAdapter->aliasContext($ids, $this->currentToken());
+        return $this->contextAdapter->toAliasContext($ids, $this->currentToken());
     }
 
     /**
@@ -635,7 +635,7 @@ class CanonicalRowCacheTest extends TestCase
             ->method('warning')
             ->with($this->stringContains('could not be verified'));
 
-        $handler = $this->makeHandler(['id'], 'test_records', false, $logger, null, new HidingModelAdapter());
+        $handler = $this->makeHandler(['id'], 'test_records', false, $logger, null, new OpaqueModelAdapter());
 
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
         $handler->findByCompound(['keyHash' => 'abc']);
@@ -968,7 +968,7 @@ class CanonicalRowCacheTest extends TestCase
     {
         // With generations on, the bump covers rotation — an unverifiable
         // alias (adapter exposes nothing) is trusted and served query-free.
-        $handler = $this->makeHandler(['id'], 'test_records', true, null, null, new HidingModelAdapter());
+        $handler = $this->makeHandler(['id'], 'test_records', true, null, null, new OpaqueModelAdapter());
 
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
         $handler->findByCompound(['keyHash' => 'abc']);
@@ -998,9 +998,34 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame('7', $model->get('id'));
     }
 
+    /**
+     * @dataProvider generationModes
+     */
+    public function testPoisonedCanonicalEntryIsEvictedAndRepaired(bool $useGenerations): void
+    {
+        // A canonical slot holding something that is not a model must never
+        // be served — and it must not stay poisoned: the read repairs the
+        // slot so subsequent reads are cache hits again.
+        $handler = $this->makeHandler(['id'], 'test_records', $useGenerations);
+
+        $this->queryStrategy->queueQueryResult([['id' => '1', 'status' => 'seed']]);
+        $handler->findByCompound(['id' => '1']);
+
+        $this->cacheableService->set($this->probeRowContext(['id' => '1']), 'not-a-model');
+
+        $this->queryStrategy->queueQueryResult([['id' => '1', 'status' => 'active']]);
+        $model = $handler->findByCompound(['id' => '1']);
+
+        $this->assertSame('active', $model->get('status'));
+
+        // No queued result remains, so a second read can only succeed if the
+        // slot was re-warmed — a query here throws by construction.
+        $repaired = $handler->findByCompound(['id' => '1']);
+
+        $this->assertSame('active', $repaired->get('status'));
+    }
+
 }
-
-
 
 class CanonicalHandler
 {
@@ -1009,8 +1034,8 @@ class CanonicalHandler
     private bool $useGenerations;
 
     /**
-     * @param class-string<\PHPNomad\Datastore\Interfaces\DataModel> $model
-     * @param ModelAdapter<\PHPNomad\Datastore\Interfaces\DataModel> $modelAdapter
+     * @param class-string<DataModel> $model
+     * @param ModelAdapter<DataModel> $modelAdapter
      */
     public function __construct(
         DatabaseServiceProvider $serviceProvider,

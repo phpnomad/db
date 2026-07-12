@@ -164,7 +164,7 @@ trait WithDatastoreHandlerMethods
         $model = $result[0] ?? null;
 
         if (!$model instanceof DataModel) {
-            throw new RecordNotFoundException(sprintf('Could not find a record where %s equals %s.', $field, $this->encodeExceptionContext(['value' => $value])));
+            throw new RecordNotFoundException(sprintf('Could not find a record in table "%s" using lookup key %s.', $this->table->getName(), $this->encodeExceptionContext([$field => $value])));
         }
 
         return $model;
@@ -305,7 +305,7 @@ trait WithDatastoreHandlerMethods
                 } catch (Throwable $e) {
                     $this->serviceProvider->loggerStrategy->error(
                         'A RecordDeleted listener failed; remaining deletion events still fire.',
-                        ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
+                        ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exceptionMessage' => $e->getMessage()]
                     );
                 }
             }
@@ -403,7 +403,7 @@ trait WithDatastoreHandlerMethods
      * entirely from $table/$model/$modelAdapter, which consumers set after
      * construction.
      */
-    protected function cacheContext(): RowCacheContextAdapter
+    protected function getCacheContextAdapter(): RowCacheContextAdapter
     {
         return $this->rowCacheContextAdapter ??= new RowCacheContextAdapter(
             $this->table,
@@ -439,7 +439,7 @@ trait WithDatastoreHandlerMethods
      */
     protected function deriveRowIdentity(array $row): ?array
     {
-        $identity = $this->cacheContext()->rowIdentity($row);
+        $identity = $this->getCacheContextAdapter()->toRowIdentity($row);
 
         if ($identity === null) {
             $this->serviceProvider->loggerStrategy->warning(
@@ -469,7 +469,7 @@ trait WithDatastoreHandlerMethods
      */
     protected function snapshotGeneration(): ?string
     {
-        return $this->cacheContext()->usesGenerations() ? $this->currentGeneration() : null;
+        return $this->getCacheContextAdapter()->usesGenerations() ? $this->currentGeneration() : null;
     }
 
     /**
@@ -484,7 +484,7 @@ trait WithDatastoreHandlerMethods
      */
     protected function currentGeneration(): string
     {
-        $context = $this->cacheContext()->generationContext();
+        $context = $this->getCacheContextAdapter()->toGenerationContext();
 
         try {
             $token = $this->serviceProvider->cacheableService->get($context);
@@ -497,13 +497,13 @@ trait WithDatastoreHandlerMethods
             // healthy token and wholesale-invalidate the table cache.
             $this->serviceProvider->loggerStrategy->warning(
                 'Generation token read failed — using an ephemeral token for this operation.',
-                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
+                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exceptionMessage' => $e->getMessage()]
             );
 
             return RowCacheContextAdapter::EPHEMERAL_GENERATION_PREFIX . $this->mintGenerationToken();
         }
 
-        if (is_string($token) && $this->cacheContext()->isValidGeneration($token)) {
+        if (is_string($token) && $this->getCacheContextAdapter()->isValidGeneration($token)) {
             return $token;
         }
 
@@ -517,7 +517,7 @@ trait WithDatastoreHandlerMethods
             // caching degrades to disabled instead of breaking reads.
             $this->serviceProvider->loggerStrategy->warning(
                 'Could not persist a table generation token — caching is effectively disabled until the cache recovers.',
-                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
+                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exceptionMessage' => $e->getMessage()]
             );
         }
 
@@ -538,20 +538,20 @@ trait WithDatastoreHandlerMethods
     protected function invalidateAfterWrite(): ?string
     {
         try {
-            if (!$this->cacheContext()->usesGenerations()) {
-                $this->serviceProvider->cacheableService->delete($this->cacheContext()->tableContext(null));
+            if (!$this->getCacheContextAdapter()->usesGenerations()) {
+                $this->serviceProvider->cacheableService->delete($this->getCacheContextAdapter()->toTableContext(null));
 
                 return null;
             }
 
             $token = $this->mintGenerationToken();
-            $this->serviceProvider->cacheableService->set($this->cacheContext()->generationContext(), $token);
+            $this->serviceProvider->cacheableService->set($this->getCacheContextAdapter()->toGenerationContext(), $token);
 
             return $token;
         } catch (Throwable $e) {
             $this->serviceProvider->loggerStrategy->error(
                 'Post-write cache invalidation failed — cached rows may serve stale data until TTL.',
-                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
+                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exceptionMessage' => $e->getMessage()]
             );
 
             return null;
@@ -570,11 +570,11 @@ trait WithDatastoreHandlerMethods
      */
     protected function readRowThrough(array $identity, ?string $generation, callable $fallback)
     {
-        if ($this->cacheContext()->isEphemeralGeneration($generation)) {
+        if ($this->getCacheContextAdapter()->isEphemeralGeneration($generation)) {
             return $fallback();
         }
 
-        return $this->guardedReadThrough($this->cacheContext()->identityContext($identity, $generation), $fallback);
+        return $this->guardedReadThrough($this->getCacheContextAdapter()->toIdentityContext($identity, $generation), $fallback);
     }
 
     /**
@@ -587,11 +587,11 @@ trait WithDatastoreHandlerMethods
     {
         $generation = $this->snapshotGeneration();
 
-        if ($this->cacheContext()->isEphemeralGeneration($generation)) {
+        if ($this->getCacheContextAdapter()->isEphemeralGeneration($generation)) {
             return $fallback();
         }
 
-        return $this->guardedReadThrough($this->cacheContext()->tableContext($generation), $fallback);
+        return $this->guardedReadThrough($this->getCacheContextAdapter()->toTableContext($generation), $fallback);
     }
 
     /**
@@ -626,7 +626,7 @@ trait WithDatastoreHandlerMethods
             if ($resolved) {
                 $this->serviceProvider->loggerStrategy->warning(
                     'Cache store failed after a successful load — serving the loaded value uncached.',
-                    ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
+                    ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exceptionMessage' => $e->getMessage()]
                 );
 
                 return $value;
@@ -638,7 +638,7 @@ trait WithDatastoreHandlerMethods
 
             $this->serviceProvider->loggerStrategy->warning(
                 'Cache read failed — loading directly from the fallback.',
-                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
+                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exceptionMessage' => $e->getMessage()]
             );
 
             return $fallback();
@@ -654,7 +654,7 @@ trait WithDatastoreHandlerMethods
      */
     protected function hasRowEntry(array $identityRow, ?string $generation): bool
     {
-        $context = $this->cacheContext()->rowContext($identityRow, $generation);
+        $context = $this->getCacheContextAdapter()->toRowContext($identityRow, $generation);
 
         if ($context === null) {
             return false;
@@ -665,7 +665,7 @@ trait WithDatastoreHandlerMethods
         } catch (Throwable $e) {
             $this->serviceProvider->loggerStrategy->warning(
                 'Row cache probe failed — treating the row as uncached.',
-                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
+                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exceptionMessage' => $e->getMessage()]
             );
 
             return false;
@@ -684,7 +684,7 @@ trait WithDatastoreHandlerMethods
      */
     protected function storeRowEntry(array $row, DataModel $model, ?string $generation): void
     {
-        if ($this->cacheContext()->isEphemeralGeneration($generation)) {
+        if ($this->getCacheContextAdapter()->isEphemeralGeneration($generation)) {
             return;
         }
 
@@ -695,11 +695,11 @@ trait WithDatastoreHandlerMethods
         }
 
         try {
-            $this->serviceProvider->cacheableService->set($this->cacheContext()->identityContext($identity, $generation), $model);
+            $this->serviceProvider->cacheableService->set($this->getCacheContextAdapter()->toIdentityContext($identity, $generation), $model);
         } catch (Throwable $e) {
             $this->serviceProvider->loggerStrategy->warning(
                 'Could not cache a row — the next read will hit the database.',
-                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
+                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exceptionMessage' => $e->getMessage()]
             );
         }
     }
@@ -714,16 +714,16 @@ trait WithDatastoreHandlerMethods
      */
     protected function storeAliasEntry(array $ids, array $identity, ?string $generation): void
     {
-        if ($this->cacheContext()->isEphemeralGeneration($generation)) {
+        if ($this->getCacheContextAdapter()->isEphemeralGeneration($generation)) {
             return;
         }
 
         try {
-            $this->serviceProvider->cacheableService->set($this->cacheContext()->aliasContext($ids, $generation), $identity);
+            $this->serviceProvider->cacheableService->set($this->getCacheContextAdapter()->toAliasContext($ids, $generation), $identity);
         } catch (Throwable $e) {
             $this->serviceProvider->loggerStrategy->warning(
                 'Could not cache an alias — the next lookup will re-resolve from the database.',
-                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
+                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exceptionMessage' => $e->getMessage()]
             );
         }
     }
@@ -737,11 +737,11 @@ trait WithDatastoreHandlerMethods
     protected function deleteRowEntry(array $identity, ?string $generation): void
     {
         try {
-            $this->serviceProvider->cacheableService->delete($this->cacheContext()->identityContext($identity, $generation));
+            $this->serviceProvider->cacheableService->delete($this->getCacheContextAdapter()->toIdentityContext($identity, $generation));
         } catch (Throwable $e) {
             $this->serviceProvider->loggerStrategy->error(
                 'Could not delete a cached row — it may serve stale data until the generation bump or TTL.',
-                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
+                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exceptionMessage' => $e->getMessage()]
             );
         }
     }
@@ -755,11 +755,11 @@ trait WithDatastoreHandlerMethods
     protected function deleteAliasEntry(array $ids, ?string $generation): void
     {
         try {
-            $this->serviceProvider->cacheableService->delete($this->cacheContext()->aliasContext($ids, $generation));
+            $this->serviceProvider->cacheableService->delete($this->getCacheContextAdapter()->toAliasContext($ids, $generation));
         } catch (Throwable $e) {
             $this->serviceProvider->loggerStrategy->error(
                 'Could not delete a cached alias — it may serve a stale identity until the generation bump or TTL.',
-                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
+                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exceptionMessage' => $e->getMessage()]
             );
         }
     }
@@ -776,19 +776,19 @@ trait WithDatastoreHandlerMethods
     protected function resolveAliasedIdentity(array $ids, ?string $generation): ?array
     {
         try {
-            $aliased = $this->serviceProvider->cacheableService->get($this->cacheContext()->aliasContext($ids, $generation));
+            $aliased = $this->serviceProvider->cacheableService->get($this->getCacheContextAdapter()->toAliasContext($ids, $generation));
         } catch (CachedItemNotFoundException $e) {
             return null;
         } catch (Throwable $e) {
             $this->serviceProvider->loggerStrategy->warning(
                 'Alias cache read failed — treating the alias as missing.',
-                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
+                ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exceptionMessage' => $e->getMessage()]
             );
 
             return null;
         }
 
-        return (is_array($aliased) && $this->cacheContext()->isTableIdentity($aliased)) ? $aliased : null;
+        return (is_array($aliased) && $this->getCacheContextAdapter()->isTableIdentity($aliased)) ? $aliased : null;
     }
 
 
@@ -848,7 +848,7 @@ trait WithDatastoreHandlerMethods
             // one list read into 1+N database queries.
             foreach ($data as $row) {
                 $model = $this->modelAdapter->toModel($row);
-                $key = $this->cacheContext()->identityKey($row);
+                $key = $this->getCacheContextAdapter()->toIdentityKey($row);
 
                 if ($key !== null) {
                     $hydrated[$key] = $model;
@@ -863,7 +863,7 @@ trait WithDatastoreHandlerMethods
         $models = [];
 
         foreach ($ids as $id) {
-            $key = $this->cacheContext()->identityKey($id);
+            $key = $this->getCacheContextAdapter()->toIdentityKey($id);
 
             if ($key !== null && array_key_exists($key, $hydrated)) {
                 $models[] = $hydrated[$key];
@@ -906,18 +906,26 @@ trait WithDatastoreHandlerMethods
 
         // Canonical lookup: the caller's key IS the table identity, so the
         // row entry can be addressed directly (after normalizing order/types).
-        if ($this->cacheContext()->isTableIdentity($ids)) {
+        if ($this->getCacheContextAdapter()->isTableIdentity($ids)) {
             $identity = $this->deriveRowIdentity($ids);
 
             if ($identity !== null) {
                 $model = $this->readRowThrough($identity, $generation, fn () => $this->queryRowAndModel($ids)[1]);
 
                 // A cached value that is not a model (a poisoned or
-                // old-format entry) must never be served — fall through to
-                // the database.
+                // old-format entry) must never be served — evict it and
+                // repair the slot from the database, mirroring how the
+                // alias path handles malformed entries.
                 if ($model instanceof DataModel) {
                     return $model;
                 }
+
+                $this->deleteRowEntry($identity, $generation);
+
+                [$freshRow, $freshModel] = $this->queryRowAndModel($ids);
+                $this->storeRowEntry($freshRow, $freshModel, $generation);
+
+                return $freshModel;
             }
 
             [, $freshModel] = $this->queryRowAndModel($ids);
@@ -939,14 +947,14 @@ trait WithDatastoreHandlerMethods
                 // tables nothing else would ever notice — the alias would
                 // keep serving fresh-looking rows for a key they no longer
                 // carry.
-                $matches = $this->cacheContext()->matchesLookup($model, $ids);
+                $matches = $this->getCacheContextAdapter()->matchesLookup($model, $ids);
 
                 if ($matches === null) {
                     // Unverifiable: the adapter exposes none of the lookup
                     // fields. With generations on, the bump covers rotation
                     // and the alias can be trusted; without them this check
                     // is the ONLY rotation defense, so the alias is stale.
-                    if ($this->cacheContext()->usesGenerations()) {
+                    if ($this->getCacheContextAdapter()->usesGenerations()) {
                         return $model;
                     }
 
@@ -1061,7 +1069,7 @@ trait WithDatastoreHandlerMethods
         // no-op instead of updating a row that no longer carries the key.
         // (QueryStrategy::update() returns void, so a no-op write still
         // broadcasts; documented as a known limitation.)
-        $conditions = $this->cacheContext()->isTableIdentity($ids) ? $identity : Arr::merge($ids, $identity);
+        $conditions = $this->getCacheContextAdapter()->isTableIdentity($ids) ? $identity : Arr::merge($ids, $identity);
         $this->serviceProvider->queryStrategy->update($this->table, $conditions, $attributes);
 
         // The DB write is committed: the invalidation below is best-effort
@@ -1075,7 +1083,7 @@ trait WithDatastoreHandlerMethods
             $this->deleteRowEntry($canonicalIdentity, $generation);
         }
 
-        if (!$this->cacheContext()->isTableIdentity($ids)) {
+        if (!$this->getCacheContextAdapter()->isTableIdentity($ids)) {
             // Drop the alias too: the update may have moved the row's
             // business key or identity out from under it.
             $this->deleteAliasEntry($ids, $generation);
@@ -1109,8 +1117,8 @@ trait WithDatastoreHandlerMethods
         // WHERE, and cache-key stringification is cache vocabulary that
         // should not leak into driver-typed comparisons. (The cache delete
         // canonicalizes separately.)
-        if ($this->cacheContext()->isTableIdentity($ids)) {
-            return $this->cacheContext()->rawIdentity($ids);
+        if ($this->getCacheContextAdapter()->isTableIdentity($ids)) {
+            return $this->getCacheContextAdapter()->toRawIdentity($ids);
         }
 
         $aliased = $this->resolveAliasedIdentity($ids, $generation);
@@ -1131,7 +1139,7 @@ trait WithDatastoreHandlerMethods
         try {
             [$row] = $this->queryRowAndModel($ids);
 
-            return $this->cacheContext()->rawIdentity($row);
+            return $this->getCacheContextAdapter()->toRawIdentity($row);
         } catch (RecordNotFoundException $e) {
             return null;
         }

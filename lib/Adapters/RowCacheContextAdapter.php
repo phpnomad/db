@@ -2,6 +2,7 @@
 
 namespace PHPNomad\Database\Adapters;
 
+use InvalidArgumentException;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Datastore\Interfaces\ModelAdapter;
@@ -19,6 +20,13 @@ use PHPNomad\Datastore\Interfaces\ModelAdapter;
  */
 class RowCacheContextAdapter
 {
+    /**
+     * Prefix marking a token minted during a token-read outage. Entries
+     * keyed under such a token can never be read back, so every caching
+     * path skips them.
+     */
+    public const EPHEMERAL_GENERATION_PREFIX = 'ephemeral-';
+
     protected Table $table;
 
     /**
@@ -78,7 +86,7 @@ class RowCacheContextAdapter
      *                                   partial context must never become a cache key. (Pure:
      *                                   the caller logs.)
      */
-    public function rowIdentity(array $row): ?array
+    public function toRowIdentity(array $row): ?array
     {
         $identity = [];
 
@@ -95,14 +103,14 @@ class RowCacheContextAdapter
 
     /**
      * Converts row data to its raw table-identity projection — same fields
-     * as rowIdentity(), original value types. This feeds SQL conditions,
+     * as toRowIdentity(), original value types. This feeds SQL conditions,
      * where cache-key stringification must not leak into driver-typed
      * comparisons.
      *
      * @param array<string, mixed> $row
      * @return array<string, mixed>|null
      */
-    public function rawIdentity(array $row): ?array
+    public function toRawIdentity(array $row): ?array
     {
         $identity = [];
 
@@ -124,9 +132,9 @@ class RowCacheContextAdapter
      * @param array<string, mixed> $row
      * @return string|null Null when the row cannot produce a full identity.
      */
-    public function identityKey(array $row): ?string
+    public function toIdentityKey(array $row): ?string
     {
-        $identity = $this->rowIdentity($row);
+        $identity = $this->toRowIdentity($row);
 
         return $identity === null ? null : serialize($identity);
     }
@@ -138,22 +146,22 @@ class RowCacheContextAdapter
      * @param string|null $generation Pre-query generation snapshot.
      * @return array<string, mixed>|null Null when the row cannot produce a full identity.
      */
-    public function rowContext(array $row, ?string $generation = null): ?array
+    public function toRowContext(array $row, ?string $generation = null): ?array
     {
-        $identity = $this->rowIdentity($row);
+        $identity = $this->toRowIdentity($row);
 
-        return $identity === null ? null : $this->identityContext($identity, $generation);
+        return $identity === null ? null : $this->toIdentityContext($identity, $generation);
     }
 
     /**
-     * Wraps an already-canonical identity (from rowIdentity()) in the row
+     * Wraps an already-canonical identity (from toRowIdentity()) in the row
      * cache context.
      *
      * @param array<string, mixed> $identity
      * @param string|null $generation Pre-query generation snapshot.
      * @return array<string, mixed>
      */
-    public function identityContext(array $identity, ?string $generation = null): array
+    public function toIdentityContext(array $identity, ?string $generation = null): array
     {
         return $this->withGeneration(['type' => $this->model, 'identities' => $this->stringifyScalars($identity)], $generation);
     }
@@ -168,7 +176,7 @@ class RowCacheContextAdapter
      * @param string|null $generation Pre-query generation snapshot.
      * @return array<string, mixed>
      */
-    public function aliasContext(array $ids, ?string $generation = null): array
+    public function toAliasContext(array $ids, ?string $generation = null): array
     {
         $normalized = $this->stringifyScalars($ids);
 
@@ -185,7 +193,7 @@ class RowCacheContextAdapter
      * @param string|null $generation Pre-query generation snapshot.
      * @return array<string, mixed>
      */
-    public function tableContext(?string $generation = null): array
+    public function toTableContext(?string $generation = null): array
     {
         return $this->withGeneration(['type' => $this->model], $generation);
     }
@@ -196,7 +204,7 @@ class RowCacheContextAdapter
      *
      * @return array<string, mixed>
      */
-    public function generationContext(): array
+    public function toGenerationContext(): array
     {
         return ['type' => $this->model, 'generation' => true];
     }
@@ -225,7 +233,7 @@ class RowCacheContextAdapter
             // A generation-keyed table must never build an unkeyed context:
             // no bump could ever orphan it, and it would collide with the
             // generation-disabled shape. Failing loudly beats fail-open.
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 'A generation snapshot is required to build cache contexts for a generation-keyed table.'
             );
         }
@@ -234,13 +242,6 @@ class RowCacheContextAdapter
 
         return $context;
     }
-
-    /**
-     * Prefix marking a token minted during a token-read outage. Entries
-     * keyed under such a token can never be read back, so every caching
-     * path skips them.
-     */
-    public const EPHEMERAL_GENERATION_PREFIX = 'ephemeral-';
 
     /**
      * True when the snapshot was minted during a token-read outage and no
