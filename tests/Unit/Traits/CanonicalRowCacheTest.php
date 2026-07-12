@@ -4,11 +4,10 @@ namespace PHPNomad\Database\Tests\Unit\Traits;
 
 use PHPNomad\Cache\Services\CacheableService;
 use PHPNomad\Database\Interfaces\Table;
-use PHPNomad\Database\Factories\DatastoreRowCacheFactory;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\Doubles\ArrayCacheStrategy;
-use PHPNomad\Database\Tests\Doubles\ExposedRowCache;
+use PHPNomad\Database\Adapters\RowCacheContextAdapter;
 use PHPNomad\Database\Tests\Doubles\FlakyCacheStrategy;
 use PHPNomad\Database\Tests\Doubles\HidingModelAdapter;
 use PHPNomad\Database\Tests\Doubles\IdentityRowModel;
@@ -57,11 +56,11 @@ class CanonicalRowCacheTest extends TestCase
     private ScriptedQueryStrategy $queryStrategy;
 
     /**
-     * Context prober mirroring the last-built handler's row-cache config;
-     * computes the same cache slots (shared cache = shared generation token)
-     * without widening the production RowCache contract.
+     * Context adapter mirroring the last-built handler's configuration;
+     * computes the same cache slots (shared cache = shared generation token,
+     * read by the probe helpers below).
      */
-    private ExposedRowCache $prober;
+    private RowCacheContextAdapter $contextAdapter;
 
     protected function setUp(): void
     {
@@ -106,15 +105,12 @@ class CanonicalRowCacheTest extends TestCase
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $this->cacheableService,
-            $events ?? new NullEventStrategy(),
-            new DatastoreRowCacheFactory($this->cacheableService, $logger)
+            $events ?? new NullEventStrategy()
         );
 
         $adapter = $adapter ?? new IdentityRowModelAdapter();
 
-        $this->prober = new ExposedRowCache(
-            $this->cacheableService,
-            $logger,
+        $this->contextAdapter = new RowCacheContextAdapter(
             $table,
             IdentityRowModel::class,
             $adapter,
@@ -129,6 +125,46 @@ class CanonicalRowCacheTest extends TestCase
             $adapter,
             $useGenerations
         );
+    }
+
+    /**
+     * Reads the live generation token straight from the cache, the way the
+     * datastore handler would snapshot it.
+     */
+    private function currentToken(): ?string
+    {
+        try {
+            $token = $this->cacheableService->get($this->contextAdapter->generationContext());
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        return is_string($token) ? $token : null;
+    }
+
+    /**
+     * The cache slot a row currently lives under (live token included).
+     *
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function probeRowContext(array $row): array
+    {
+        $context = $this->contextAdapter->rowContext($row, $this->currentToken());
+        \assert($context !== null);
+
+        return $context;
+    }
+
+    /**
+     * The cache slot an alias currently lives under (live token included).
+     *
+     * @param array<string, mixed> $ids
+     * @return array<string, mixed>
+     */
+    private function probeAliasContext(array $ids): array
+    {
+        return $this->contextAdapter->aliasContext($ids, $this->currentToken());
     }
 
     /**
@@ -163,7 +199,7 @@ class CanonicalRowCacheTest extends TestCase
 
         // Cached under the TABLE identity (orgId + id, stringified, table order)…
         $this->assertTrue(
-            $this->cacheableService->exists($this->prober->exposeRowContext(['orgId' => 1, 'id' => 42])),
+            $this->cacheableService->exists($this->probeRowContext(['orgId' => 1, 'id' => 42])),
             'Row is not cached under its canonical table-identity context.'
         );
         // …and NOT under the model's own (subset) identity. The probed shape
@@ -209,7 +245,7 @@ class CanonicalRowCacheTest extends TestCase
         // carries the key.
         $this->assertSame([['keyHash' => 'abc', 'id' => '7'], ['status' => 'revoked']], $this->queryStrategy->updates[0]);
         $this->assertFalse(
-            $this->cacheableService->exists($this->prober->exposeRowContext(['id' => '7'])),
+            $this->cacheableService->exists($this->probeRowContext(['id' => '7'])),
             'Business-key update left the canonical row entry to serve stale reads.'
         );
 
@@ -252,7 +288,7 @@ class CanonicalRowCacheTest extends TestCase
 
         // The row dies out from under the alias (deleted / re-keyed outside
         // this process). Drop the row entry to simulate; the alias remains.
-        $this->cacheableService->delete($this->prober->exposeRowContext(['id' => '7']));
+        $this->cacheableService->delete($this->probeRowContext(['id' => '7']));
 
         // Alias → id 7 → miss → DB says id 7 is gone…
         $this->queryStrategy->queueQueryResult([]);
@@ -325,7 +361,7 @@ class CanonicalRowCacheTest extends TestCase
         $stale = $handler->findByCompound(['id' => '7']);
 
         // A slow reader computed its context BEFORE the write…
-        $staleContext = $this->prober->exposeRowContext(['id' => '7']);
+        $staleContext = $this->probeRowContext(['id' => '7']);
 
         // …the writer updates and bumps the generation (its pre-read is
         // served from the cache — no query)…
@@ -417,7 +453,7 @@ class CanonicalRowCacheTest extends TestCase
         $logger = $this->createMock(LoggerStrategy::class);
         $logger->expects($this->atLeastOnce())
             ->method('warning')
-            ->with($this->stringContains('missing an identity field'), $this->arrayHasKey('missingField'));
+            ->with($this->stringContains('missing an identity field'), $this->arrayHasKey('rowFields'));
 
         $handler = $this->makeHandler(['orgId', 'id'], 'test_records', $useGenerations, $logger);
 
@@ -455,7 +491,7 @@ class CanonicalRowCacheTest extends TestCase
 
         $this->assertSame([['orgId' => '1', 'id' => '42']], $this->queryStrategy->deletes);
         $this->assertFalse(
-            $this->cacheableService->exists($this->prober->exposeRowContext(['orgId' => '1', 'id' => '42'])),
+            $this->cacheableService->exists($this->probeRowContext(['orgId' => '1', 'id' => '42'])),
             'deleteWhere left the canonical row entry behind.'
         );
 
@@ -633,7 +669,7 @@ class CanonicalRowCacheTest extends TestCase
         // entry so the next lookup takes the re-read path.
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
         $handler->findByCompound(['keyHash' => 'abc']);
-        $this->cacheableService->delete($this->prober->exposeRowContext(['id' => '7']));
+        $this->cacheableService->delete($this->probeRowContext(['id' => '7']));
 
         $flaky->failWrites = true;
 
@@ -864,7 +900,7 @@ class CanonicalRowCacheTest extends TestCase
             $this->assertSame([['id' => '1']], $this->queryStrategy->deletes, 'Row 1 was not deleted before the failure.');
             $this->assertCount(1, $events->ofType(RecordDeleted::class), 'A completed delete was not announced after a mid-loop failure.');
             $this->assertFalse(
-                $this->cacheableService->exists($this->prober->exposeRowContext(['id' => '1'])),
+                $this->cacheableService->exists($this->probeRowContext(['id' => '1'])),
                 'The completed delete\'s row entry survived the failure.'
             );
         }

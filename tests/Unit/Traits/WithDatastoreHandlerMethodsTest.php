@@ -6,8 +6,7 @@ use PHPNomad\Cache\Services\CacheableService;
 use PHPNomad\Database\Factories\Column;
 use PHPNomad\Database\Interfaces\QueryStrategy;
 use PHPNomad\Database\Interfaces\Table;
-use PHPNomad\Database\Factories\DatastoreRowCacheFactory;
-use PHPNomad\Database\Tests\Doubles\ExposedRowCache;
+use PHPNomad\Database\Adapters\RowCacheContextAdapter;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\Doubles\NoopClauseBuilder;
@@ -73,8 +72,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $cacheableService,
-            $eventStrategy,
-            new DatastoreRowCacheFactory($cacheableService, $loggerStrategy)
+            $eventStrategy
         );
 
         $handler = new DummyDatastoreHandler(
@@ -137,8 +135,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $cacheableService,
-            $eventStrategy,
-            new DatastoreRowCacheFactory($cacheableService, $loggerStrategy)
+            $eventStrategy
         );
 
         $handler = new DummyDatastoreHandler(
@@ -186,8 +183,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $cacheableService,
-            $eventStrategy,
-            new DatastoreRowCacheFactory($cacheableService, $loggerStrategy)
+            $eventStrategy
         );
 
         $handler = new DummyDatastoreHandler(
@@ -242,8 +238,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $cacheableService,
-            $eventStrategy,
-            new DatastoreRowCacheFactory($cacheableService, $loggerStrategy)
+            $eventStrategy
         );
 
         $handler = new DummyDatastoreHandler(
@@ -259,8 +254,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
 
         // The deleted cache context must match what the read path wrote,
         // which used the int identity from the hydrated row.
-        $prober = new ExposedRowCache($cacheableService, $loggerStrategy, $table, TestModel::class, $modelAdapter, false);
-        $expected = $prober->exposeRowContext(['id' => 42]);
+        $contextAdapter = new RowCacheContextAdapter($table, TestModel::class, $modelAdapter, false);
+        $expected = $contextAdapter->rowContext(['id' => 42], null);
         $this->assertCount(2, $deletedKeys);
         $this->assertSame($expected, $deletedKeys[0]);
         $this->assertSame(['type' => TestModel::class], $deletedKeys[1]);
@@ -294,8 +289,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $cacheableService,
-            $eventStrategy,
-            new DatastoreRowCacheFactory($cacheableService, $loggerStrategy)
+            $eventStrategy
         );
 
         $handler = new DummyDatastoreHandler(

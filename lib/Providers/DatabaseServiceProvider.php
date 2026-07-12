@@ -6,7 +6,6 @@ use PHPNomad\Cache\Services\CacheableService;
 use PHPNomad\Database\Interfaces\ClauseBuilder;
 use PHPNomad\Database\Interfaces\QueryBuilder;
 use PHPNomad\Database\Interfaces\QueryStrategy;
-use PHPNomad\Database\Interfaces\RowCacheFactory;
 use PHPNomad\Events\Interfaces\EventStrategy;
 use PHPNomad\Logger\Interfaces\LoggerStrategy;
 
@@ -16,20 +15,15 @@ class DatabaseServiceProvider
     public QueryStrategy $queryStrategy;
 
     /**
-     * Kept on the bundle as an extension surface for downstream handlers
-     * with caching needs beyond row caching. All row and alias caching in
-     * the package's datastore flows routes through the RowCache built by
-     * $rowCacheFactory (schema lookups cache separately via
-     * TableSchemaService) — never cache rows or aliases against this
-     * directly; build or extend a RowCache instead, or invalidation cannot
-     * name your keys.
+     * Row and alias caching in the datastore flows builds every context
+     * through RowCacheContextAdapter — never cache rows or aliases against
+     * this directly with hand-built keys, or invalidation cannot name them.
      */
     public CacheableService $cacheableService;
 
     public QueryBuilder $queryBuilder;
     public ClauseBuilder $clauseBuilder;
     public EventStrategy $eventStrategy;
-    public RowCacheFactory $rowCacheFactory;
 
     public function __construct(
         LoggerStrategy   $loggerStrategy,
@@ -37,8 +31,7 @@ class DatabaseServiceProvider
         QueryBuilder     $queryBuilder,
         ClauseBuilder    $clauseBuilder,
         CacheableService $cacheableService,
-        EventStrategy    $eventStrategy,
-        RowCacheFactory  $rowCacheFactory
+        EventStrategy    $eventStrategy
     )
     {
         $this->clauseBuilder = $clauseBuilder;
@@ -47,6 +40,5 @@ class DatabaseServiceProvider
         $this->queryBuilder = $queryBuilder;
         $this->cacheableService = $cacheableService;
         $this->eventStrategy = $eventStrategy;
-        $this->rowCacheFactory = $rowCacheFactory;
     }
 }
