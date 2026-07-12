@@ -197,6 +197,8 @@ class CanonicalRowCacheTest extends TestCase
         $models = $handler->where([['type' => 'AND', 'clauses' => [['column' => 'name', 'operator' => '=', 'value' => 'first']]]]);
 
         $this->assertCount(1, $models);
+        $this->assertInstanceOf(IdentityRowModel::class, $models[0]);
+        $this->assertSame('first', $models[0]->get('name'));
 
         // Cached under the TABLE identity (orgId + id, stringified, table order)…
         $this->assertTrue(
@@ -840,16 +842,44 @@ class CanonicalRowCacheTest extends TestCase
         // …and after recovery the original entries are untouched and served.
         $flaky->failReads = false;
 
-        foreach ($storeBefore as $key => $value) {
-            $this->assertArrayHasKey($key, $this->cacheStrategy->store, 'A read blip clobbered a healthy cache entry.');
-        }
-
-        // And nothing NEW was written: stores no-op under ephemeral tokens,
-        // so a blip cannot fill the cache with unreachable entries.
-        $this->assertCount(count($storeBefore), $this->cacheStrategy->store, 'An ephemeral-token read wrote unreachable cache entries.');
+        // Byte-for-byte: nothing clobbered, nothing NEW written — stores
+        // no-op under ephemeral tokens, so a blip can neither corrupt healthy
+        // entries nor fill the cache with unreachable ones.
+        $this->assertSame($storeBefore, $this->cacheStrategy->store, 'A read blip changed the cache.');
 
         $served = $handler->findByCompound(['id' => '7']);
         $this->assertSame('active', $served->get('status'));
+    }
+
+    public function testAReadOutageNeverFillsTheCacheThroughDirectStorePaths(): void
+    {
+        // Ephemeral tokens must gate the DIRECT store paths (alias writes and
+        // the list-read batch write-back), not just read-throughs: during a
+        // read outage WRITES still work, so without the guard every lookup
+        // would land entries under a token that is never persisted —
+        // unbounded, unreachable cache garbage.
+        $flaky = $this->useFlakyCache();
+
+        $handler = $this->makeHandler(['id'], 'test_records', true);
+
+        // Healthy read establishes a token and a canonical row entry.
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $handler->findByCompound(['id' => '7']);
+        $storeBefore = $this->cacheStrategy->store;
+
+        $flaky->failReads = true;
+
+        // Business-key lookup — would store an alias and a row directly.
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $this->assertSame('active', $handler->findByCompound(['keyHash' => 'abc'])->get('status'));
+
+        // List read — getModels() would batch-write rows back.
+        $this->queryStrategy->queueQueryResult([['id' => '7']]);
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $models = $handler->where([['type' => 'AND', 'clauses' => [['column' => 'status', 'operator' => '=', 'value' => 'active']]]]);
+
+        $this->assertCount(1, $models);
+        $this->assertSame($storeBefore, $this->cacheStrategy->store, 'A read outage wrote cache entries under an ephemeral token.');
     }
 
     public function testDuplicateOnADifferentRowSharingTheModelIdentityIsStillCaught(): void
@@ -980,22 +1010,49 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame($before, $this->queryStrategy->queryCount, 'An unverifiable alias was re-resolved despite generation coverage.');
     }
 
-    public function testMalformedAliasValueIsNeverDereferencedAsAnIdentity(): void
+    /**
+     * An alias slot can hold garbage from a corrupted write or an older key
+     * vocabulary: string garbage, arrays with the wrong fields, or identity
+     * SUBSETS (old formats). None may ever be dereferenced as an identity.
+     *
+     * @return array<string, array{0: array<int, string>, 1: mixed, 2: array<string, mixed>, 3: array<string, mixed>}>
+     */
+    public static function malformedAliasPoisons(): array
     {
-        // Old-format or corrupted alias entries (anything that is not a
-        // valid table identity) must fall through to the database.
-        $handler = $this->makeHandler(['id'], 'test_records', true);
+        return [
+            'string garbage' => [['id'], 'not-an-identity', ['id' => '1', 'status' => 'seed'], ['id' => '7', 'keyHash' => 'abc', 'status' => 'active']],
+            'wrong-field array' => [['id'], ['status' => 'active'], ['id' => '1', 'status' => 'seed'], ['id' => '7', 'keyHash' => 'abc', 'status' => 'active']],
+            'identity subset (old format)' => [['id', 'tenantId'], ['id' => '7'], ['id' => '1', 'tenantId' => '1', 'status' => 'seed'], ['id' => '7', 'tenantId' => '2', 'keyHash' => 'abc', 'status' => 'active']],
+        ];
+    }
+
+    /**
+     * @dataProvider malformedAliasPoisons
+     * @param array<int, string> $identityFields
+     * @param mixed $poison
+     * @param array<string, mixed> $seedRow
+     * @param array<string, mixed> $freshRow
+     */
+    public function testMalformedAliasValueIsNeverDereferencedAsAnIdentity(array $identityFields, $poison, array $seedRow, array $freshRow): void
+    {
+        $handler = $this->makeHandler($identityFields, 'test_records', true);
 
         // Establish a token so the poisoned slot matches what reads probe.
-        $this->queryStrategy->queueQueryResult([['id' => '1', 'status' => 'seed']]);
-        $handler->findByCompound(['id' => '1']);
+        $this->queryStrategy->queueQueryResult([$seedRow]);
+        $handler->findByCompound(array_intersect_key($seedRow, array_flip($identityFields)));
 
-        $this->cacheableService->set($this->probeAliasContext(['keyHash' => 'abc']), 'not-an-identity');
+        $this->cacheableService->set($this->probeAliasContext(['keyHash' => 'abc']), $poison);
 
-        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $this->queryStrategy->queueQueryResult([$freshRow]);
         $model = $handler->findByCompound(['keyHash' => 'abc']);
 
         $this->assertSame('7', $model->get('id'));
+
+        // And the slot is REPAIRED, not just bypassed: with nothing queued,
+        // a second lookup can only be served by the healed alias + row.
+        $repaired = $handler->findByCompound(['keyHash' => 'abc']);
+
+        $this->assertSame('7', $repaired->get('id'));
     }
 
     /**

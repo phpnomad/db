@@ -300,11 +300,15 @@ class WithDatastoreHandlerMethodsTest extends TestCase
             $modelAdapter
         );
 
-        $this->expectException(RecordNotFoundException::class);
-        $this->expectExceptionMessage('Record not found in table "test_records"');
-        $this->expectExceptionMessage('"id":123');
-
-        $handler->findByIdentity(['id' => 123]);
+        try {
+            $handler->findByIdentity(['id' => 123]);
+            $this->fail('Expected RecordNotFoundException was not thrown.');
+        } catch (RecordNotFoundException $e) {
+            // expectExceptionMessage() keeps only its LAST invocation, so
+            // both fragments are pinned explicitly.
+            $this->assertStringContainsString('Record not found in table "test_records"', $e->getMessage());
+            $this->assertStringContainsString('"id":123', $e->getMessage());
+        }
     }
 }
 
