@@ -265,7 +265,7 @@ trait WithDatastoreHandlerMethods
                 } catch (Throwable $e) {
                     $this->serviceProvider->loggerStrategy->error(
                         'A RecordDeleted listener failed; remaining deletion events still fire.',
-                        ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+                        ['table' => $this->table->getName(), 'exceptionClass' => get_class($e), 'exception' => $e->getMessage()]
                     );
                 }
             }
@@ -403,6 +403,8 @@ trait WithDatastoreHandlerMethods
      */
     public function findIds(array $conditions, ?int $limit = null, ?int $offset = null): array
     {
+        $this->serviceProvider->clauseBuilder->reset()->useTable($this->table);
+
         $this->serviceProvider->queryBuilder
             ->reset()
             ->from($this->table)
@@ -448,6 +450,7 @@ trait WithDatastoreHandlerMethods
             // Get the things that aren't in the cache.
             $data = $this->serviceProvider->queryStrategy->query(
                 $this->serviceProvider->queryBuilder
+                    ->reset()
                     ->from($this->table)
                     ->select('*')
                     ->where($clauseBuilder->andWhere($this->table->getFieldsForIdentity(), 'IN', ...$idsToQuery))
@@ -473,15 +476,29 @@ trait WithDatastoreHandlerMethods
         // Return the rows in the requested order: just-hydrated models are
         // served directly; only ids skipped as already-cached consult the
         // cache (falling through to the database on a miss).
-        return Arr::map($ids, function (array $id) use ($hydrated, $generation) {
+        $models = [];
+
+        foreach ($ids as $id) {
             $key = $this->rowCache()->identityKey($id);
 
             if ($key !== null && array_key_exists($key, $hydrated)) {
-                return $hydrated[$key];
+                $models[] = $hydrated[$key];
+
+                continue;
             }
 
-            return $this->findFromCompound($id, $generation);
-        });
+            try {
+                $models[] = $this->findFromCompound($id, $generation);
+            } catch (RecordNotFoundException $e) {
+                // The row vanished between the id query and hydration (a
+                // concurrent delete). Skip it — letting this escape would
+                // collapse the WHOLE result to [] in where()'s catch,
+                // discarding rows that still exist.
+                continue;
+            }
+        }
+
+        return $models;
     }
 
     /**
@@ -567,6 +584,7 @@ trait WithDatastoreHandlerMethods
 
         $items = $this->serviceProvider->queryStrategy->query(
             $this->serviceProvider->queryBuilder
+                ->reset()
                 ->select('*')
                 ->from($this->table)
                 ->where($clauseBuilder)
@@ -616,7 +634,7 @@ trait WithDatastoreHandlerMethods
         // (falling back to model identity only when an adapter cannot expose
         // one): model identities can be shared by distinct rows, and a true
         // duplicate must not hide behind one.
-        $this->maybeThrowForDuplicateUniqueFields($attributes, $identity, $record->getIdentity());
+        $this->maybeThrowForDuplicateUniqueFields($attributes, $this->rowCache()->rowIdentity($identity), $record->getIdentity());
 
         // The SQL update targets the RESOLVED table identity AND the
         // caller's own lookup fields: the identity pins exactly one row (no
@@ -634,7 +652,11 @@ trait WithDatastoreHandlerMethods
         // the pre-write generation — the one readers wrote their entries
         // with. The bump closes the cache-aside race; precise deletes carry
         // tables that opt out of generations.
-        $this->rowCache()->deleteRow($identity, $generation);
+        $canonicalIdentity = $this->rowCache()->rowIdentity($identity);
+
+        if ($canonicalIdentity !== null) {
+            $this->rowCache()->deleteRow($canonicalIdentity, $generation);
+        }
 
         if (!$this->rowCache()->isTableIdentity($ids)) {
             // Drop the alias too: the update may have moved the row's
@@ -665,13 +687,23 @@ trait WithDatastoreHandlerMethods
      */
     protected function resolveTableIdentity(array $ids, ?string $generation = null): ?array
     {
+        $identityFields = array_flip($this->table->getFieldsForIdentity());
+
+        // Raw caller/row values are preferred: this identity feeds the SQL
+        // WHERE, and cache-key stringification is cache vocabulary that
+        // should not leak into driver-typed comparisons. (The cache delete
+        // canonicalizes separately via rowIdentity().)
         if ($this->rowCache()->isTableIdentity($ids)) {
-            return $this->rowCache()->rowIdentity($ids);
+            return array_intersect_key($ids, $identityFields);
         }
 
         $aliased = $this->rowCache()->resolveAliasedIdentity($ids, $generation);
 
         if ($aliased !== null) {
+            // Alias entries store the canonical (stringified) identity — the
+            // only form available without a query. The merged WHERE keeps
+            // the caller's raw business key alongside it, and SQL drivers
+            // coerce numeric strings.
             return $aliased;
         }
 
@@ -683,7 +715,9 @@ trait WithDatastoreHandlerMethods
         try {
             [$row] = $this->queryRowAndModel($ids);
 
-            return $this->rowCache()->rowIdentity($row);
+            $identity = array_intersect_key($row, $identityFields);
+
+            return count($identity) === count($identityFields) ? $identity : null;
         } catch (RecordNotFoundException $e) {
             return null;
         }

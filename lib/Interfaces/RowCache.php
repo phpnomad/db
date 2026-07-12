@@ -15,11 +15,11 @@ use PHPNomad\Datastore\Interfaces\DataModel;
  * contract supplies the operations it composes.
  *
  * No-throw obligation: consumers call these methods UNGUARDED on read and
- * write paths alike. Implementations must treat cache-layer failures as
- * misses on reads (hasRow, resolveAliasedIdentity, snapshotGeneration) and
- * swallow-and-log them on mutations (storeRow, storeAlias, deleteRow,
- * deleteAlias, invalidateAfterWrite) — a throwing implementation breaks
- * datastore reads and deletes during a cache outage.
+ * write paths alike, so cache-layer failures must never escape — each
+ * method documents its own degradation (reads generally degrade to misses,
+ * mutations swallow-and-log, and snapshotGeneration distinguishes a read
+ * FAILURE from a miss). A throwing implementation breaks datastore reads
+ * and deletes during a cache outage.
  *
  * @see \PHPNomad\Database\Services\DatastoreRowCache the default implementation
  */

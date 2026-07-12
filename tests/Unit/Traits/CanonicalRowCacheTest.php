@@ -141,9 +141,9 @@ class CanonicalRowCacheTest extends TestCase
     }
 
     /**
-     * @dataProvider generationModes
+     * @dataProvider generationModesWithRowEntryCounts
      */
-    public function testWhereCachesRowsUnderTableIdentityNotModelIdentity(bool $useGenerations): void
+    public function testWhereCachesRowsUnderTableIdentityNotModelIdentity(bool $useGenerations, int $expectedEntries): void
     {
         $handler = $this->makeHandler(['orgId', 'id'], 'test_records', $useGenerations);
 
@@ -168,7 +168,7 @@ class CanonicalRowCacheTest extends TestCase
             $this->cacheableService->exists(['type' => IdentityRowModel::class, 'identities' => ['id' => '42']]),
             'Row leaked a cache entry keyed by the MODEL identity.'
         );
-        $this->assertCount($useGenerations ? 2 : 1, $this->cacheStrategy->store, 'Unexpected cache entries beyond the row (and generation token).');
+        $this->assertCount($expectedEntries, $this->cacheStrategy->store, 'Unexpected cache entries beyond the row (and generation token).');
 
         // A second identical read: findIds queries again (list SQL is not
         // cached), but the row itself is served from cache — no SELECT *.
@@ -389,6 +389,19 @@ class CanonicalRowCacheTest extends TestCase
     }
 
     /**
+     * One cached row plus the generation-token entry the ON mode keeps.
+     *
+     * @return array<string, array{0: bool, 1: int}>
+     */
+    public function generationModesWithRowEntryCounts(): array
+    {
+        return [
+            'generations on (production default)' => [true, 2],
+            'generations off (opt-out)' => [false, 1],
+        ];
+    }
+
+    /**
      * @dataProvider generationModesWithExpectedEntries
      */
     public function testRowMissingAnIdentityFieldIsNotCachedAndWarns(bool $useGenerations, int $expectedEntries): void
@@ -561,7 +574,9 @@ class CanonicalRowCacheTest extends TestCase
         // rows can't be verified. On a generation-disabled table the alias
         // must not be trusted: every lookup re-resolves from the database.
         $logger = $this->createMock(LoggerStrategy::class);
-        $logger->expects($this->atLeastOnce())->method('warning');
+        $logger->expects($this->atLeastOnce())
+            ->method('warning')
+            ->with($this->stringContains('could not be verified'));
 
         $handler = $this->makeHandler(['id'], 'test_records', false, $logger, null, new HidingModelAdapter());
 
@@ -690,14 +705,20 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame([['keyHash' => 'abc', 'id' => '7'], ['keyHash' => 'abc', 'status' => 'revoked']], $this->queryStrategy->updates[0]);
     }
 
-    public function testReadsSurviveACacheThatFailsOnReads(): void
+    public function testBusinessKeyReadSurvivesACacheThatFailsOnReads(): void
     {
-        // Probe/read failures must degrade to database loads — never break
-        // the read. Covers readRow (canonical), the alias read, and the
-        // generation-token read in one lookup flow.
+        // Alias-read and token-read failures must degrade to database
+        // loads — never break the lookup.
         $flaky = $this->useFlakyCache();
         $logger = $this->createMock(LoggerStrategy::class);
-        $logger->expects($this->atLeastOnce())->method('warning');
+        $logger->expects($this->atLeastOnce())
+            ->method('warning')
+            ->with($this->logicalOr(
+                $this->stringContains('read failed'),
+                $this->stringContains('store failed'),
+                $this->stringContains('Could not cache'),
+                $this->stringContains('Could not persist')
+            ));
 
         $handler = $this->makeHandler(['id'], 'test_records', true, $logger);
 
@@ -706,10 +727,30 @@ class CanonicalRowCacheTest extends TestCase
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
         $byKey = $handler->findByCompound(['keyHash' => 'abc']);
 
+        $this->assertSame('7', $byKey->get('id'));
+    }
+
+    public function testCanonicalReadSurvivesACacheThatFailsOnReads(): void
+    {
+        // A broken read-through probe must load directly from the database.
+        $flaky = $this->useFlakyCache();
+        $logger = $this->createMock(LoggerStrategy::class);
+        $logger->expects($this->atLeastOnce())
+            ->method('warning')
+            ->with($this->logicalOr(
+                $this->stringContains('read failed'),
+                $this->stringContains('store failed'),
+                $this->stringContains('Could not cache'),
+                $this->stringContains('Could not persist')
+            ));
+
+        $handler = $this->makeHandler(['id'], 'test_records', true, $logger);
+
+        $flaky->failReads = true;
+
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
         $byId = $handler->findByCompound(['id' => '7']);
 
-        $this->assertSame('7', $byKey->get('id'));
         $this->assertSame('active', $byId->get('status'));
     }
 
@@ -773,6 +814,25 @@ class CanonicalRowCacheTest extends TestCase
         $this->expectException(DuplicateEntryException::class);
 
         $handler->updateCompound(['orgId' => '1', 'id' => '42'], ['keyHash' => 'abc']);
+    }
+
+    public function testConcurrentlyDeletedRowDoesNotCollapseTheListResult(): void
+    {
+        // A row deleted between the id query and hydration must be skipped —
+        // not allowed to throw RecordNotFoundException into where()'s catch,
+        // which would discard rows that still exist.
+        $handler = $this->makeHandler(['id'], 'test_records', true);
+
+        // findIds sees two rows; the batch SELECT only finds one (row 2
+        // vanished); the per-id fallback for row 2 also finds nothing.
+        $this->queryStrategy->queueQueryResult([['id' => '1'], ['id' => '2']]);
+        $this->queryStrategy->queueQueryResult([['id' => '1', 'name' => 'survivor']]);
+        $this->queryStrategy->queueQueryResult([]);
+
+        $models = $handler->where([['type' => 'AND', 'clauses' => [['column' => 'name', 'operator' => '!=', 'value' => '']]]]);
+
+        $this->assertCount(1, $models, 'A concurrently deleted row collapsed the whole result.');
+        $this->assertSame('survivor', $models[0]->get('name'));
     }
 
 }
