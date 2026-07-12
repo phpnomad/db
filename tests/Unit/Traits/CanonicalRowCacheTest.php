@@ -822,6 +822,21 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame(9, $handler->getEstimatedCount());
     }
 
+    public function testPoisonedEstimatedCountSlotIsBypassedNotServed(): void
+    {
+        // The set-level slot is not evict-and-repaired like row/alias slots,
+        // but a poisoned value must never be garbage-cast and served — the
+        // database answers instead.
+        $handler = $this->makeHandler(['id'], 'test_records', true);
+
+        $this->queryStrategy->estimatedCountValue = 9;
+        $this->assertSame(9, $handler->getEstimatedCount());
+
+        $this->cacheableService->set($this->contextAdapter->toTableContext($this->currentToken()), 'garbage');
+
+        $this->assertSame(9, $handler->getEstimatedCount());
+    }
+
     public function testGenerationReadBlipDoesNotClobberAHealthyToken(): void
     {
         // A read FAILURE mints an ephemeral token without persisting: when
