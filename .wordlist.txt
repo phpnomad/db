@@ -23,4 +23,10 @@ Traceback
 nodejs
 npm
 fediverse
-readme
+readmegetUnprefixedName
+lookups
+phpnomad
+PrimaryKeyFactory
+schemas
+txt
+WithDatastoreHandlerMethods
