@@ -361,7 +361,7 @@ class DummyDatastoreHandler
 
     public function exposeRowContext(array $row): ?array
     {
-        return $this->getCanonicalRowContext($row);
+        return $this->rowCache()->rowContext($row);
     }
 
     /**

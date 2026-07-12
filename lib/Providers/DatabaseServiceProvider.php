@@ -3,6 +3,7 @@
 namespace PHPNomad\Database\Providers;
 
 use PHPNomad\Cache\Services\CacheableService;
+use PHPNomad\Database\Factories\DatastoreRowCacheFactory;
 use PHPNomad\Database\Interfaces\ClauseBuilder;
 use PHPNomad\Database\Interfaces\QueryBuilder;
 use PHPNomad\Database\Interfaces\QueryStrategy;
@@ -18,6 +19,7 @@ class DatabaseServiceProvider
     public QueryBuilder $queryBuilder;
     public ClauseBuilder $clauseBuilder;
     public EventStrategy $eventStrategy;
+    public DatastoreRowCacheFactory $rowCacheFactory;
 
     public function __construct(
         LoggerStrategy   $loggerStrategy,
@@ -25,7 +27,8 @@ class DatabaseServiceProvider
         QueryBuilder     $queryBuilder,
         ClauseBuilder    $clauseBuilder,
         CacheableService $cacheableService,
-        EventStrategy    $eventStrategy
+        EventStrategy    $eventStrategy,
+        ?DatastoreRowCacheFactory $rowCacheFactory = null
     )
     {
         $this->clauseBuilder = $clauseBuilder;
@@ -34,5 +37,8 @@ class DatabaseServiceProvider
         $this->queryBuilder = $queryBuilder;
         $this->cacheableService = $cacheableService;
         $this->eventStrategy = $eventStrategy;
+        // Optional so existing six-argument construction keeps working; the
+        // default factory composes from the same injected services.
+        $this->rowCacheFactory = $rowCacheFactory ?? new DatastoreRowCacheFactory($cacheableService, $loggerStrategy);
     }
 }

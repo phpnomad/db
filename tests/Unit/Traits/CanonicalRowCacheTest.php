@@ -90,9 +90,27 @@ class CanonicalRowCacheTest extends TestCase
         );
     }
 
-    public function testWhereCachesRowsUnderTableIdentityNotModelIdentity(): void
+    /**
+     * Both generation modes must exhibit identical canonical-keying behavior;
+     * generations only change WHICH key a context hashes to, never the
+     * invariants. (Production default is generations ON.)
+     *
+     * @return array<string, array{0: bool}>
+     */
+    public function generationModes(): array
     {
-        $handler = $this->makeHandler(['orgId', 'id']);
+        return [
+            'generations on (production default)' => [true],
+            'generations off (opt-out)' => [false],
+        ];
+    }
+
+    /**
+     * @dataProvider generationModes
+     */
+    public function testWhereCachesRowsUnderTableIdentityNotModelIdentity(bool $useGenerations): void
+    {
+        $handler = $this->makeHandler(['orgId', 'id'], 'test_records', $useGenerations);
 
         // findIds → identity rows; then SELECT * for the uncached row.
         $this->queryStrategy->queueQueryResult([['orgId' => '1', 'id' => '42']]);
@@ -121,9 +139,12 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame(3, $this->queryStrategy->queryCount, 'Cached row was re-queried.');
     }
 
-    public function testUpdateByBusinessKeyInvalidatesTheCanonicalRowEntry(): void
+    /**
+     * @dataProvider generationModes
+     */
+    public function testUpdateByBusinessKeyInvalidatesTheCanonicalRowEntry(bool $useGenerations): void
     {
-        $handler = $this->makeHandler(['id'], 'test_api_keys');
+        $handler = $this->makeHandler(['id'], 'test_api_keys', $useGenerations);
 
         // Prime the row cache the way production reads do (list hydration).
         $this->queryStrategy->queueQueryResult([['id' => '7']]);
@@ -150,9 +171,12 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame('revoked', $models[0]->get('status'));
     }
 
-    public function testBusinessKeyLookupIsServedByAliasWithoutRequery(): void
+    /**
+     * @dataProvider generationModes
+     */
+    public function testBusinessKeyLookupIsServedByAliasWithoutRequery(bool $useGenerations): void
     {
-        $handler = $this->makeHandler(['id']);
+        $handler = $this->makeHandler(['id'], 'test_records', $useGenerations);
 
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
 
@@ -164,9 +188,12 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame(1, $this->queryStrategy->queryCount, 'Alias-resolved lookup hit the database again.');
     }
 
-    public function testStaleAliasSelfHeals(): void
+    /**
+     * @dataProvider generationModes
+     */
+    public function testStaleAliasSelfHeals(bool $useGenerations): void
     {
-        $handler = $this->makeHandler(['id']);
+        $handler = $this->makeHandler(['id'], 'test_records', $useGenerations);
 
         // Seed: keyHash abc → id 7.
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
@@ -304,7 +331,7 @@ class CanonicalHandler
 
     public function exposeRowContext(array $row): ?array
     {
-        return $this->getCanonicalRowContext($row);
+        return $this->rowCache()->rowContext($row);
     }
 }
 
