@@ -9,7 +9,7 @@ use PHPNomad\Datastore\Events\RecordUpdated;
 use PHPNomad\Datastore\Exceptions\RecordNotFoundException;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
-use PHPNomad\Database\Services\DatastoreRowCache;
+use PHPNomad\Database\Interfaces\RowCache;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
 use PHPNomad\Datastore\Exceptions\DuplicateEntryException;
@@ -31,7 +31,7 @@ trait WithDatastoreHandlerMethods
      */
     protected string $model;
     protected ModelAdapter $modelAdapter;
-    protected ?DatastoreRowCache $rowCacheService = null;
+    protected ?RowCache $rowCacheService = null;
 
     /**
      * @inheritDoc
@@ -39,7 +39,7 @@ trait WithDatastoreHandlerMethods
     public function getEstimatedCount(): int
     {
         return $this->serviceProvider->cacheableService
-            ->getWithCache(Operation::Read, $this->rowCache()->withGeneration(['type' => $this->model]), function () {
+            ->getWithCache(Operation::Read, $this->rowCache()->tableContext(), function () {
                 return $this->serviceProvider->queryStrategy->estimatedCount($this->table);
             });
     }
@@ -165,11 +165,12 @@ trait WithDatastoreHandlerMethods
         // generation and stays readable; set-level caches (estimatedCount)
         // keyed under the old generation become unreachable.
         $generation = $this->rowCache()->bumpGeneration();
+        $this->invalidateSetCachesWithoutGenerations();
 
         // Pre-warm the cache so subsequent reads of this record don't have to
         // round-trip the DB at all. Same canonical key every read path uses,
         // so existing read paths transparently pick it up.
-        $this->cacheRow($row, $result, $generation);
+        $this->rowCache()->storeRow($row, $result, $generation);
 
         $this->serviceProvider->eventStrategy->broadcast(new RecordCreated($result));
 
@@ -218,30 +219,50 @@ trait WithDatastoreHandlerMethods
         $generation = $this->rowCache()->snapshotGeneration();
         $deleted = false;
 
-        foreach ($identityRows as $identityRow) {
-            // Delete by the full table identity. The previous implementation
-            // deleted by the MODEL's identity, which can be a subset of the
-            // table's — on such tables that SQL delete could reach rows
-            // outside the matched set.
-            $this->serviceProvider->queryStrategy->delete($this->table, $identityRow);
+        // Alias entries pointing at deleted rows are left to self-heal: the
+        // row read they resolve to misses and falls through to the database.
+        // The finally block guarantees the generation bump lands even when a
+        // later row's SQL delete throws — rows already deleted (and
+        // broadcast) must not leave set-level caches serving stale data.
+        try {
+            foreach ($identityRows as $identityRow) {
+                // Delete by the full table identity. The previous implementation
+                // deleted by the MODEL's identity, which can be a subset of the
+                // table's — on such tables that SQL delete could reach rows
+                // outside the matched set.
+                $this->serviceProvider->queryStrategy->delete($this->table, $identityRow);
 
-            $identity = $this->rowCache()->rowIdentity($identityRow);
+                $identity = $this->rowCache()->rowIdentity($identityRow);
 
-            if ($identity !== null) {
-                $this->serviceProvider->cacheableService->delete($this->rowCache()->identityContext($identity, $generation));
+                if ($identity !== null) {
+                    $this->rowCache()->deleteRow($identity, $generation);
+                }
+
+                // The broadcast carries the raw identity row (DB-typed values):
+                // the deletion HAPPENED, so listeners must hear about it even
+                // when a canonical cache identity could not be derived, and cache
+                // key normalization must not leak into the event contract.
+                $this->serviceProvider->eventStrategy->broadcast(new RecordDeleted($this->model, $identityRow));
+
+                $deleted = true;
             }
-
-            // The broadcast carries the raw identity row (DB-typed values):
-            // the deletion HAPPENED, so listeners must hear about it even
-            // when a canonical cache identity could not be derived, and cache
-            // key normalization must not leak into the event contract.
-            $this->serviceProvider->eventStrategy->broadcast(new RecordDeleted($this->model, $identityRow));
-
-            $deleted = true;
+        } finally {
+            if ($deleted) {
+                $this->rowCache()->bumpGeneration();
+                $this->invalidateSetCachesWithoutGenerations();
+            }
         }
+    }
 
-        if ($deleted) {
-            $this->rowCache()->bumpGeneration();
+    /**
+     * Set-level caches (estimatedCount) are normally orphaned by the
+     * generation bump. Tables opted out of generations have no bump, so
+     * writes delete the set-level context precisely instead.
+     */
+    protected function invalidateSetCachesWithoutGenerations(): void
+    {
+        if (!$this->rowCache()->usesGenerations()) {
+            $this->rowCache()->deleteTableContext();
         }
     }
 
@@ -334,9 +355,9 @@ trait WithDatastoreHandlerMethods
      * cache context this trait uses (canonical row identities, alias
      * entries, generation tokens).
      *
-     * @see \PHPNomad\Database\Services\DatastoreRowCache
+     * @see \PHPNomad\Database\Interfaces\RowCache
      */
-    protected function rowCache(): DatastoreRowCache
+    protected function rowCache(): RowCache
     {
         return $this->rowCacheService ??= $this->serviceProvider->rowCacheFactory->make(
             $this->table,
@@ -348,36 +369,20 @@ trait WithDatastoreHandlerMethods
     /**
      * Whether this table's cache contexts are keyed under a per-table
      * generation token. On by default; override to opt a write-hot table out
-     * (accepting TTL-bounded staleness on the read-back race in exchange for
-     * a higher hit rate).
+     * in exchange for a higher hit rate.
+     *
+     * What opting out costs: the cache-aside read-back race is only
+     * TTL-bounded (a slow reader can write a just-invalidated row back), and
+     * set-level caches plus rotated aliases fall to precise handling
+     * (invalidateSetCachesWithoutGenerations() and the read-time lookup
+     * verification in findFromCompound()) instead of being orphaned
+     * wholesale by the bump.
      */
     protected function shouldUseTableGenerations(): bool
     {
         return true;
     }
 
-    /**
-     * Caches a single row's model under its canonical row context. Skips
-     * silently (already logged by DatastoreRowCache::rowIdentity()) when the
-     * row cannot produce a full identity.
-     *
-     * Callers on read paths MUST pass the generation snapshot they took
-     * before querying the database: rebuilding the context here with a fresh
-     * token would let a stale row land under a generation minted AFTER a
-     * concurrent write — reopening the exact race generations exist to close.
-     *
-     * @param array<string, mixed> $row
-     * @param DataModel $model
-     * @param string|null $generation Pre-query generation snapshot.
-     */
-    protected function cacheRow(array $row, DataModel $model, ?string $generation = null): void
-    {
-        $context = $this->rowCache()->rowContext($row, $generation);
-
-        if ($context !== null) {
-            $this->serviceProvider->cacheableService->set($context, $model);
-        }
-    }
 
     /**
      * @param array $conditions
@@ -407,12 +412,6 @@ trait WithDatastoreHandlerMethods
     }
 
     /**
-     * Gets the models from the specified list of IDs.
-     *
-     * @param array<string, int>[] $ids
-     * @return array
-     */
-    /**
      * Gets the models for the given identity rows, read-through cached.
      *
      * @param array<string, int|string>[] $ids Identity rows from findIds() (values arrive DB-typed).
@@ -421,8 +420,8 @@ trait WithDatastoreHandlerMethods
     protected function getModels(array $ids): array
     {
         // One generation snapshot for the whole operation, taken BEFORE any
-        // database read — see cacheRow() for why this must not be re-fetched
-        // at write-back time.
+        // database read — see RowCache::storeRow() for why this must not be
+        // re-fetched at write-back time.
         $generation = $this->rowCache()->snapshotGeneration();
 
         // Filter out the items that are currently in the cache.
@@ -449,11 +448,11 @@ trait WithDatastoreHandlerMethods
             // from the ROW's identity values — never the model's getIdentity(),
             // which is not necessarily the table's identity.
             foreach ($data as $row) {
-                $this->cacheRow($row, $this->modelAdapter->toModel($row), $generation);
+                $this->rowCache()->storeRow($row, $this->modelAdapter->toModel($row), $generation);
             }
         }
 
-        // Now, use the cache to get all the posts in the proper order.
+        // Now, use the cache to return the rows in the requested order.
         return Arr::map($ids, fn(array $id) => $this->findFromCompound($id, $generation));
     }
 
@@ -462,7 +461,7 @@ trait WithDatastoreHandlerMethods
      * identity addresses the canonical row entry directly; any other key (a
      * business key) resolves through an alias entry first.
      *
-     * @param non-empty-array<string, mixed> $ids
+     * @param array<string, mixed> $ids Must be non-empty; an empty key throws RecordNotFoundException.
      * @param string|null $generation Pre-query generation snapshot; taken here when the caller has none.
      * @return DataModel
      * @throws DatastoreErrorException
@@ -490,16 +489,27 @@ trait WithDatastoreHandlerMethods
 
         // Business-key lookup: resolve through an alias entry so the row is
         // still cached exactly once, under its canonical identity.
-        $aliasContext = $this->rowCache()->aliasContext($ids, $generation);
         $aliasedIdentity = $this->rowCache()->resolveAliasedIdentity($ids, $generation);
 
         if ($aliasedIdentity !== null) {
             try {
-                return $this->findFromCompound($aliasedIdentity, $generation);
+                $model = $this->findFromCompound($aliasedIdentity, $generation);
+
+                // Verify the resolved row still matches the caller's lookup
+                // values. An identity-keyed update can rotate a business key
+                // out from under its alias, and on generation-disabled
+                // tables nothing else would ever notice — the alias would
+                // keep serving fresh-looking rows for a key they no longer
+                // carry.
+                if ($this->modelMatchesLookup($model, $ids)) {
+                    return $model;
+                }
+
+                $this->rowCache()->deleteAlias($ids, $generation);
             } catch (RecordNotFoundException $e) {
                 // Stale alias — the row it points at moved or died. Drop it
                 // and re-resolve from the database.
-                $this->serviceProvider->cacheableService->delete($aliasContext);
+                $this->rowCache()->deleteAlias($ids, $generation);
             }
         }
 
@@ -508,11 +518,43 @@ trait WithDatastoreHandlerMethods
         $identity = $this->rowCache()->rowIdentity($row);
 
         if ($identity !== null) {
-            $this->serviceProvider->cacheableService->set($aliasContext, $identity);
-            $this->cacheRow($row, $model, $generation);
+            $this->rowCache()->storeAlias($ids, $identity, $generation);
+            $this->rowCache()->storeRow($row, $model, $generation);
         }
 
         return $model;
+    }
+
+    /**
+     * True when the model's serialized data still carries the caller's
+     * lookup values. Fields the adapter does not expose are skipped — they
+     * cannot be verified, and models with narrower serialization should not
+     * lose alias caching over it.
+     *
+     * @param DataModel $model
+     * @param array<string, mixed> $ids The caller's lookup key.
+     */
+    protected function modelMatchesLookup(DataModel $model, array $ids): bool
+    {
+        $data = $this->modelAdapter->toArray($model);
+
+        foreach ($ids as $field => $value) {
+            if (!array_key_exists($field, $data)) {
+                continue;
+            }
+
+            $actual = $data[$field];
+
+            if (is_scalar($actual) && is_scalar($value)) {
+                if ((string) $actual !== (string) $value) {
+                    return false;
+                }
+            } elseif ($actual !== $value) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -572,16 +614,17 @@ trait WithDatastoreHandlerMethods
         // deletes carry tables that opt out of generations; the bump closes
         // the cache-aside race for everyone else.
         if ($identity !== null) {
-            $this->serviceProvider->cacheableService->delete($this->rowCache()->identityContext($identity, $generation));
+            $this->rowCache()->deleteRow($identity, $generation);
         }
 
         if (!$this->rowCache()->isTableIdentity($ids)) {
             // Drop the alias too: the update may have moved the row's
             // business key or identity out from under it.
-            $this->serviceProvider->cacheableService->delete($this->rowCache()->aliasContext($ids, $generation));
+            $this->rowCache()->deleteAlias($ids, $generation);
         }
 
         $this->rowCache()->bumpGeneration();
+        $this->invalidateSetCachesWithoutGenerations();
 
         $this->serviceProvider->eventStrategy->broadcast(new RecordUpdated($record::class, $ids, $attributes));
     }

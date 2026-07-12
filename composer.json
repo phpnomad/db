@@ -30,11 +30,11 @@
         "phpnomad/chrono": "^1.0",
         "phpnomad/datastore": "^2.0",
         "phpnomad/singleton": "^1.0",
-        "phpnomad/logger": "^1.0"
+        "phpnomad/logger": "^1.0",
+        "phpnomad/event": "^1.0"
     },
     "require-dev": {
-        "phpnomad/tests": "^0.1.0 || ^0.3.0",
-        "phpnomad/event": "*"
+        "phpnomad/tests": "^0.1.0 || ^0.3.0"
     },
     "config": {
         "allow-plugins": {

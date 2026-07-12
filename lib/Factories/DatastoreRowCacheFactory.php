@@ -3,6 +3,7 @@
 namespace PHPNomad\Database\Factories;
 
 use PHPNomad\Cache\Services\CacheableService;
+use PHPNomad\Database\Interfaces\RowCache;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Services\DatastoreRowCache;
 use PHPNomad\Logger\Interfaces\LoggerStrategy;
@@ -28,7 +29,7 @@ class DatastoreRowCacheFactory
     /**
      * @param class-string $model
      */
-    public function make(Table $table, string $model, bool $useGenerations = true): DatastoreRowCache
+    public function make(Table $table, string $model, bool $useGenerations = true): RowCache
     {
         return new DatastoreRowCache($this->cacheableService, $this->logger, $table, $model, $useGenerations);
     }

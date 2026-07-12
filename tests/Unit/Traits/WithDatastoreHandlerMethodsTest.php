@@ -232,8 +232,8 @@ class WithDatastoreHandlerMethodsTest extends TestCase
 
     public function testUpdateCompoundInvalidatesCacheRegardlessOfIdentityType(): void
     {
-        // Drives the actual stale-read scenario end-to-end: cacheItems writes
-        // with int identity (from the hydrated model), updateCompound is called
+        // Drives the actual stale-read scenario end-to-end: the read path
+        // caches rows with int identity values, updateCompound is called
         // with the string identity that came back from queryStrategy->query()
         // — both must hit the same cache key for the invalidation to land.
         $loggerStrategy = $this->createMock(LoggerStrategy::class);
@@ -244,7 +244,10 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $cacheableService = $this->createMock(CacheableService::class);
         $cacheableService->method('getWithCache')
             ->willReturnCallback(fn(string $operation, array $context, callable $callback) => $callback());
-        $cacheableService->expects($this->once())
+        // Two deletes: the canonical row entry, then the set-level context
+        // (this handler opts out of generations, so estimatedCount has no
+        // bump to orphan it and is deleted precisely).
+        $cacheableService->expects($this->exactly(2))
             ->method('delete')
             ->willReturnCallback(function (array $context) use (&$deletedKeys) {
                 $deletedKeys[] = $context;
@@ -285,8 +288,9 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         // The deleted cache context must match what the read path wrote,
         // which used the int identity from the hydrated row.
         $expected = $handler->exposeRowContext(['id' => 42]);
-        $this->assertCount(1, $deletedKeys);
+        $this->assertCount(2, $deletedKeys);
         $this->assertSame($expected, $deletedKeys[0]);
+        $this->assertSame(['type' => TestModel::class], $deletedKeys[1]);
     }
 
     public function testFindFromCompoundIncludesTableAndIdentityWhenRecordIsMissing(): void

@@ -4,6 +4,7 @@ namespace PHPNomad\Database\Services;
 
 use PHPNomad\Cache\Exceptions\CachedItemNotFoundException;
 use PHPNomad\Cache\Services\CacheableService;
+use PHPNomad\Database\Interfaces\RowCache;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Logger\Interfaces\LoggerStrategy;
 
@@ -13,13 +14,14 @@ use PHPNomad\Logger\Interfaces\LoggerStrategy;
  *
  * The design invariant this class enforces: a row has exactly ONE cache
  * entry, keyed by its table identity derived from row data — never from the
- * model's own identity, never from the shape of a caller's lookup. Because
- * every context is built here, writers can always name the keys readers
- * used, which is what makes precise invalidation possible at all.
+ * model's own identity, never from the shape of a caller's lookup. Every
+ * row, alias, and set-level context is built (and every cache mutation on
+ * them performed) here, so writers can always name the keys readers used —
+ * which is what makes precise invalidation possible at all.
  *
  * @see \PHPNomad\Database\Traits\WithDatastoreHandlerMethods the consuming datastore flows
  */
-class DatastoreRowCache
+class DatastoreRowCache implements RowCache
 {
     protected CacheableService $cacheableService;
     protected LoggerStrategy $logger;
@@ -145,6 +147,84 @@ class DatastoreRowCache
         ksort($normalized);
 
         return $this->withGeneration(['type' => $this->model, 'alias' => $normalized], $generation);
+    }
+
+    /**
+     * The set-level context for whole-table values (estimatedCount and any
+     * future query caches).
+     *
+     * @param string|null $generation Generation snapshot to key under; taken fresh when omitted.
+     */
+    public function tableContext(?string $generation = null): array
+    {
+        return $this->withGeneration(['type' => $this->model], $generation);
+    }
+
+    /**
+     * Stores a row's model under its canonical row context. Skips silently
+     * (already logged by rowIdentity()) when the row cannot produce a full
+     * identity.
+     *
+     * Read paths MUST pass the generation snapshot they took before querying
+     * the database: taking a fresh token here would let a stale row land
+     * under a generation minted AFTER a concurrent write — reopening the
+     * exact race generations exist to close.
+     *
+     * @param array<string, mixed> $row
+     * @param mixed $model
+     * @param string|null $generation Pre-query generation snapshot.
+     */
+    public function storeRow(array $row, $model, ?string $generation = null): void
+    {
+        $context = $this->rowContext($row, $generation);
+
+        if ($context !== null) {
+            $this->cacheableService->set($context, $model);
+        }
+    }
+
+    /**
+     * Stores an alias entry pointing a business key at a canonical identity.
+     *
+     * @param array<string, mixed> $ids
+     * @param array<string, mixed> $identity
+     * @param string|null $generation
+     */
+    public function storeAlias(array $ids, array $identity, ?string $generation = null): void
+    {
+        $this->cacheableService->set($this->aliasContext($ids, $generation), $identity);
+    }
+
+    /**
+     * Deletes the row entry for a canonical identity.
+     *
+     * @param array<string, mixed> $identity
+     * @param string|null $generation The generation readers wrote under.
+     */
+    public function deleteRow(array $identity, ?string $generation = null): void
+    {
+        $this->cacheableService->delete($this->identityContext($identity, $generation));
+    }
+
+    /**
+     * Deletes an alias entry.
+     *
+     * @param array<string, mixed> $ids
+     * @param string|null $generation
+     */
+    public function deleteAlias(array $ids, ?string $generation = null): void
+    {
+        $this->cacheableService->delete($this->aliasContext($ids, $generation));
+    }
+
+    /**
+     * Deletes the set-level context. Writes on generation-disabled tables
+     * call this because they have no bump to orphan it; generation-enabled
+     * tables never need it.
+     */
+    public function deleteTableContext(): void
+    {
+        $this->cacheableService->delete($this->tableContext());
     }
 
     /**

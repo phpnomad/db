@@ -38,7 +38,9 @@ class DatabaseServiceProvider
         $this->cacheableService = $cacheableService;
         $this->eventStrategy = $eventStrategy;
         // Optional so existing six-argument construction keeps working; the
-        // default factory composes from the same injected services.
+        // default factory composes from the same injected services. Prefer
+        // binding the factory at the container level — this parameter is
+        // slated to become required in the next major.
         $this->rowCacheFactory = $rowCacheFactory ?? new DatastoreRowCacheFactory($cacheableService, $loggerStrategy);
     }
 }

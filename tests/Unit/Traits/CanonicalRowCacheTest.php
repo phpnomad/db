@@ -2,22 +2,23 @@
 
 namespace PHPNomad\Database\Tests\Unit\Traits;
 
-use PHPNomad\Cache\Exceptions\CachedItemNotFoundException;
-use PHPNomad\Cache\Interfaces\CachePolicy;
-use PHPNomad\Cache\Interfaces\CacheStrategy;
 use PHPNomad\Cache\Services\CacheableService;
-use PHPNomad\Database\Interfaces\QueryBuilder;
-use PHPNomad\Database\Interfaces\QueryStrategy;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
+use PHPNomad\Database\Tests\Doubles\ArrayCacheStrategy;
 use PHPNomad\Database\Tests\Doubles\NoopClauseBuilder;
 use PHPNomad\Database\Tests\Doubles\NoopQueryBuilder;
+use PHPNomad\Database\Tests\Doubles\NullEventStrategy;
+use PHPNomad\Database\Tests\Doubles\RecordingEventStrategy;
+use PHPNomad\Database\Tests\Doubles\ScriptedQueryStrategy;
+use PHPNomad\Database\Tests\Doubles\SerializingCachePolicy;
 use PHPNomad\Database\Tests\TestCase;
 use PHPNomad\Database\Traits\WithDatastoreHandlerMethods;
+use PHPNomad\Datastore\Events\RecordDeleted;
+use PHPNomad\Datastore\Exceptions\RecordNotFoundException;
 use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Datastore\Interfaces\ModelAdapter;
-use PHPNomad\Events\Interfaces\Event;
 use PHPNomad\Events\Interfaces\EventStrategy;
 use PHPNomad\Logger\Interfaces\LoggerStrategy;
 
@@ -30,9 +31,10 @@ use PHPNomad\Logger\Interfaces\LoggerStrategy;
  *    of the caller's question;
  *  - business-key lookups resolve through alias entries (pointer to the
  *    canonical identity), so writers can always name the keys readers used;
- *  - stale aliases self-heal;
+ *  - stale or rotated aliases self-heal;
  *  - per-table generation tokens make a late stale write-back unreachable
- *    without transactions.
+ *    without transactions;
+ *  - deletes remove rows by full table identity and always broadcast.
  *
  * The cache policy used here hashes with md5(serialize($context)) — an
  * ORDER-SENSITIVE function — on purpose: it proves the contexts the trait
@@ -61,7 +63,8 @@ class CanonicalRowCacheTest extends TestCase
         array $identityFields,
         string $tableName = 'test_records',
         bool $useGenerations = false,
-        ?LoggerStrategy $logger = null
+        ?LoggerStrategy $logger = null,
+        ?EventStrategy $events = null
     ): CanonicalHandler {
         $table = $this->createMock(Table::class);
         $table->method('getName')->willReturn($tableName);
@@ -77,7 +80,7 @@ class CanonicalRowCacheTest extends TestCase
             new NoopQueryBuilder(),
             new NoopClauseBuilder(),
             $this->cacheableService,
-            new NullEventStrategy()
+            $events ?? new NullEventStrategy()
         );
 
         return new CanonicalHandler(
@@ -213,9 +216,12 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame('9', $model->get('id'), 'Stale alias did not self-heal.');
     }
 
-    public function testHealedAliasServesNextLookupWithoutQuery(): void
+    /**
+     * @dataProvider generationModes
+     */
+    public function testHealedAliasServesNextLookupWithoutQuery(bool $useGenerations): void
     {
-        $handler = $this->makeHandler(['id']);
+        $handler = $this->makeHandler(['id'], 'test_records', $useGenerations);
 
         // Same healing sequence as testStaleAliasSelfHeals…
         $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
@@ -230,6 +236,32 @@ class CanonicalRowCacheTest extends TestCase
         $handler->findByCompound(['keyHash' => 'abc']);
 
         $this->assertSame($before, $this->queryStrategy->queryCount);
+    }
+
+    public function testRotatedBusinessKeyAliasDoesNotServeTheOldKey(): void
+    {
+        // Generations OFF: without the bump, ONLY read-time verification
+        // stands between a rotated business key and its orphaned alias
+        // serving fresh-looking rows for a key they no longer carry.
+        $handler = $this->makeHandler(['id'], 'test_api_keys', false);
+
+        // Seed alias: keyHash abc → id 7.
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $handler->findByCompound(['keyHash' => 'abc']);
+
+        // Rotate the key via an identity-keyed update — the alias for 'abc'
+        // is not directly addressable from ['id' => '7'].
+        $handler->updateCompound(['id' => '7'], ['keyHash' => 'xyz']);
+
+        // Lookup by the OLD key: alias → id 7 → row entry was invalidated →
+        // DB re-read returns the rotated row (keyHash xyz) → verification
+        // rejects it → alias dropped → re-resolve by keyHash finds nothing.
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'xyz', 'status' => 'active']]);
+        $this->queryStrategy->queueQueryResult([]);
+
+        $this->expectException(RecordNotFoundException::class);
+
+        $handler->findByCompound(['keyHash' => 'abc']);
     }
 
     public function testGenerationBumpMakesLateStaleWriteUnreachable(): void
@@ -275,14 +307,64 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame(6, $handler->getEstimatedCount(), 'estimatedCount survived a write — generation did not invalidate it.');
     }
 
-    public function testRowMissingAnIdentityFieldIsNotCachedAndWarns(): void
+    public function testEstimatedCountInvalidatesAfterWriteWithoutGenerations(): void
+    {
+        // Opt-out tables have no generation bump; writes must delete the
+        // set-level context precisely instead.
+        $handler = $this->makeHandler(['id'], 'test_records', false);
+
+        $this->queryStrategy->estimatedCountValue = 5;
+        $this->assertSame(5, $handler->getEstimatedCount());
+
+        $this->queryStrategy->estimatedCountValue = 6;
+        $this->assertSame(5, $handler->getEstimatedCount());
+
+        $handler->create(['name' => 'new row']);
+
+        $this->assertSame(6, $handler->getEstimatedCount(), 'estimatedCount survived a write on a generation-disabled table.');
+    }
+
+    public function testCreatePreWarmsRowReadableWithoutQuery(): void
+    {
+        // Bump-then-pre-warm ordering: the created row's entry must land
+        // under the NEW generation, or every post-create read would miss.
+        $handler = $this->makeHandler(['id'], 'test_records', true);
+
+        $created = $handler->create(['name' => 'warm']);
+
+        // No query result is queued: a DB round-trip here would throw.
+        $read = $handler->findByCompound(['id' => 1]);
+
+        $this->assertSame('warm', $read->get('name'));
+        $this->assertSame(0, $this->queryStrategy->queryCount);
+        $this->assertSame($created, $read);
+    }
+
+    /**
+     * Cache-entry expectations differ only by the generation-token entry the
+     * ON mode keeps in the store.
+     *
+     * @return array<string, array{0: bool, 1: int}>
+     */
+    public function generationModesWithExpectedEntries(): array
+    {
+        return [
+            'generations on (production default)' => [true, 1],
+            'generations off (opt-out)' => [false, 0],
+        ];
+    }
+
+    /**
+     * @dataProvider generationModesWithExpectedEntries
+     */
+    public function testRowMissingAnIdentityFieldIsNotCachedAndWarns(bool $useGenerations, int $expectedEntries): void
     {
         $logger = $this->createMock(LoggerStrategy::class);
         $logger->expects($this->atLeastOnce())
             ->method('warning')
             ->with($this->stringContains('missing an identity field'), $this->arrayHasKey('missingField'));
 
-        $handler = $this->makeHandler(['orgId', 'id'], 'test_records', false, $logger);
+        $handler = $this->makeHandler(['orgId', 'id'], 'test_records', $useGenerations, $logger);
 
         // The SELECT * row lacks orgId — a partial identity must never
         // become a cache key.
@@ -293,7 +375,79 @@ class CanonicalRowCacheTest extends TestCase
 
         $handler->where([['type' => 'AND', 'clauses' => [['column' => 'name', 'operator' => '=', 'value' => 'incomplete']]]]);
 
-        $this->assertSame([], $this->cacheStrategy->store, 'A partial-identity row produced a cache entry.');
+        // Only the generation token (when enabled) may exist — no row entry,
+        // no alias entry.
+        $this->assertCount($expectedEntries, $this->cacheStrategy->store, 'A partial-identity row produced a cache entry.');
+    }
+
+    /**
+     * @dataProvider generationModes
+     */
+    public function testDeleteWhereDeletesByTableIdentityAndInvalidates(bool $useGenerations): void
+    {
+        $events = new RecordingEventStrategy();
+        $handler = $this->makeHandler(['orgId', 'id'], 'test_records', $useGenerations, null, $events);
+
+        // Prime the cache.
+        $this->queryStrategy->queueQueryResult([['orgId' => '1', 'id' => '42']]);
+        $this->queryStrategy->queueQueryResult([['orgId' => '1', 'id' => '42', 'name' => 'doomed']]);
+        $handler->where([['type' => 'AND', 'clauses' => [['column' => 'name', 'operator' => '=', 'value' => 'doomed']]]]);
+
+        // deleteWhere resolves identity rows and deletes by the FULL table
+        // identity — not the model's subset identity.
+        $this->queryStrategy->queueQueryResult([['orgId' => '1', 'id' => '42']]);
+        $handler->deleteWhere([['column' => 'name', 'operator' => '=', 'value' => 'doomed']]);
+
+        $this->assertSame([['orgId' => '1', 'id' => '42']], $this->queryStrategy->deletes);
+        $this->assertFalse(
+            $this->cacheableService->exists($handler->exposeRowContext(['orgId' => '1', 'id' => '42'])),
+            'deleteWhere left the canonical row entry behind.'
+        );
+
+        // The deletion is broadcast with the raw identity row — DB-typed
+        // values, no cache normalization in the event contract.
+        $deletions = array_filter($events->broadcasts, fn($event) => $event instanceof RecordDeleted);
+        $this->assertCount(1, $deletions);
+        $deletion = array_values($deletions)[0];
+        $this->assertSame(AttrModel::class, $deletion->getType());
+        $this->assertSame(['orgId' => '1', 'id' => '42'], $deletion->getIdentity());
+    }
+
+    public function testDeleteWhereBroadcastsWhenIdentityCannotBeDerived(): void
+    {
+        $events = new RecordingEventStrategy();
+        $logger = $this->createMock(LoggerStrategy::class);
+        $logger->expects($this->atLeastOnce())->method('warning');
+
+        $handler = $this->makeHandler(['orgId', 'id'], 'test_records', false, $logger, $events);
+
+        // The identity row is missing orgId, so no cache entry can be named
+        // — but the SQL delete still runs and listeners MUST hear about it.
+        $this->queryStrategy->queueQueryResult([['id' => '42']]);
+        $handler->deleteWhere([['column' => 'name', 'operator' => '=', 'value' => 'orphan']]);
+
+        $this->assertSame([['id' => '42']], $this->queryStrategy->deletes);
+
+        $deletions = array_filter($events->broadcasts, fn($event) => $event instanceof RecordDeleted);
+        $this->assertCount(1, $deletions);
+        $this->assertSame(['id' => '42'], array_values($deletions)[0]->getIdentity());
+    }
+
+    public function testDeleteWhereWithNoMatchesLeavesCacheUntouched(): void
+    {
+        $handler = $this->makeHandler(['id'], 'test_records', true);
+
+        // Prime a generation token + row entry via a read.
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'status' => 'active']]);
+        $handler->findByCompound(['id' => '7']);
+        $storeBefore = $this->cacheStrategy->store;
+
+        // No rows match: nothing may be deleted, bumped, or re-minted.
+        $this->queryStrategy->queueQueryResult([]);
+        $handler->deleteWhere([['column' => 'status', 'operator' => '=', 'value' => 'missing']]);
+
+        $this->assertSame($storeBefore, $this->cacheStrategy->store);
+        $this->assertSame([], $this->queryStrategy->deletes);
     }
 }
 
@@ -351,6 +505,11 @@ class AttrModel implements DataModel
         return $this->row[$field] ?? null;
     }
 
+    public function toRow(): array
+    {
+        return $this->row;
+    }
+
     public function getIdentity(): array
     {
         return ['id' => $this->row['id'] ?? null];
@@ -366,131 +525,6 @@ class ArrayModelAdapter implements ModelAdapter
 
     public function toArray(DataModel $model): array
     {
-        return [];
-    }
-}
-
-class ScriptedQueryStrategy implements QueryStrategy
-{
-    /** @var array[] */
-    private array $queryResults = [];
-    public int $queryCount = 0;
-    public int $estimatedCountValue = 0;
-    /** @var array[] */
-    public array $updates = [];
-    /** @var array[] */
-    public array $deletes = [];
-
-    public function queueQueryResult(array $result): void
-    {
-        $this->queryResults[] = $result;
-    }
-
-    public function query(QueryBuilder $builder): array
-    {
-        $this->queryCount++;
-
-        if (empty($this->queryResults)) {
-            throw new \LogicException('ScriptedQueryStrategy ran out of queued query results — unexpected query #' . $this->queryCount);
-        }
-
-        return array_shift($this->queryResults);
-    }
-
-    public function insert(Table $table, array $data): array
-    {
-        return ['id' => 1];
-    }
-
-    public function delete(Table $table, array $ids): void
-    {
-        $this->deletes[] = $ids;
-    }
-
-    public function update(Table $table, array $ids, array $data): void
-    {
-        $this->updates[] = [$ids, $data];
-    }
-
-    public function estimatedCount(Table $table): int
-    {
-        return $this->estimatedCountValue;
-    }
-}
-
-class ArrayCacheStrategy implements CacheStrategy
-{
-    /** @var array<string, mixed> */
-    public array $store = [];
-
-    public function get(string $key)
-    {
-        if (!array_key_exists($key, $this->store)) {
-            throw new CachedItemNotFoundException('No cached item found for key ' . $key);
-        }
-
-        return $this->store[$key];
-    }
-
-    public function set(string $key, $value, ?int $ttl): void
-    {
-        $this->store[$key] = $value;
-    }
-
-    public function delete(string $key): void
-    {
-        unset($this->store[$key]);
-    }
-
-    public function exists(string $key): bool
-    {
-        return array_key_exists($key, $this->store);
-    }
-
-    public function clear(): void
-    {
-        $this->store = [];
-    }
-}
-
-/**
- * Deliberately order-sensitive key function: proves the trait's contexts are
- * canonical by construction rather than rescued by a normalizing policy.
- */
-class SerializingCachePolicy implements CachePolicy
-{
-    public function shouldCache(string $operation, array $context = []): bool
-    {
-        return true;
-    }
-
-    public function getCacheKey(array $context): string
-    {
-        return md5(serialize($context));
-    }
-
-    public function getTtl(array $context = []): ?int
-    {
-        return 60;
-    }
-
-    public function shouldInvalidate(string $operation, array $context = []): bool
-    {
-        return true;
-    }
-}
-
-class NullEventStrategy implements EventStrategy
-{
-    public function broadcast(Event $event): void
-    {
-    }
-
-    public function attach(string $event, callable $action, ?int $priority = null): void
-    {
-    }
-
-    public function detach(string $event, callable $action, ?int $priority = null): void
-    {
+        return $model instanceof AttrModel ? $model->toRow() : [];
     }
 }
