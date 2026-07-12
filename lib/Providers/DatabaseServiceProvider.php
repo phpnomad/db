@@ -14,6 +14,13 @@ class DatabaseServiceProvider
 {
     public LoggerStrategy $loggerStrategy;
     public QueryStrategy $queryStrategy;
+
+    /**
+     * Kept on the bundle as an extension surface for downstream handlers
+     * with caching needs beyond row caching — the package's own datastore
+     * flows no longer touch it directly (everything routes through the
+     * RowCache built by $rowCacheFactory).
+     */
     public CacheableService $cacheableService;
 
     public QueryBuilder $queryBuilder;

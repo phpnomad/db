@@ -160,45 +160,62 @@ class DatastoreRowCache implements RowCache
         return $this->withGeneration(['type' => $this->model], $generation);
     }
 
-    /**
-     * Stores a row's model under its canonical row context. Skips without
-     * throwing (rowIdentity() logs the reason) when the row cannot produce a
-     * full identity.
-     *
-     * Read paths MUST pass the generation snapshot they took before querying
-     * the database: taking a fresh token here would let a stale row land
-     * under a generation minted AFTER a concurrent write — reopening the
-     * exact race generations exist to close.
-     *
-     * @param array<string, mixed> $row
-     * @param mixed $model
-     * @param string|null $generation Pre-query generation snapshot.
-     */
+    /** @inheritDoc */
     public function storeRow(array $row, $model, ?string $generation = null): void
     {
         $context = $this->rowContext($row, $generation);
 
-        if ($context !== null) {
+        if ($context === null) {
+            return;
+        }
+
+        try {
             $this->cacheableService->set($context, $model);
+        } catch (Throwable $e) {
+            $this->logger->warning(
+                'Could not cache a row — the next read will hit the database.',
+                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+            );
         }
     }
 
     /** @inheritDoc */
     public function storeAlias(array $ids, array $identity, ?string $generation = null): void
     {
-        $this->cacheableService->set($this->aliasContext($ids, $generation), $identity);
+        try {
+            $this->cacheableService->set($this->aliasContext($ids, $generation), $identity);
+        } catch (Throwable $e) {
+            $this->logger->warning(
+                'Could not cache an alias — the next lookup will re-resolve from the database.',
+                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+            );
+        }
     }
 
     /** @inheritDoc */
     public function deleteRow(array $identity, ?string $generation = null): void
     {
-        $this->cacheableService->delete($this->identityContext($identity, $generation));
+        try {
+            $this->cacheableService->delete($this->identityContext($identity, $generation));
+        } catch (Throwable $e) {
+            $this->logger->error(
+                'Could not delete a cached row — it may serve stale data until the generation bump or TTL.',
+                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+            );
+        }
     }
 
     /** @inheritDoc */
     public function deleteAlias(array $ids, ?string $generation = null): void
     {
-        $this->cacheableService->delete($this->aliasContext($ids, $generation));
+        try {
+            $this->cacheableService->delete($this->aliasContext($ids, $generation));
+        } catch (Throwable $e) {
+            $this->logger->error(
+                'Could not delete a cached alias — it may serve a stale identity until the generation bump or TTL.',
+                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+            );
+        }
     }
 
     /**
@@ -213,11 +230,62 @@ class DatastoreRowCache implements RowCache
     /** @inheritDoc */
     public function readRow(array $identity, ?string $generation, callable $fallback)
     {
-        return $this->cacheableService->getWithCache(
-            Operation::Read,
-            $this->identityContext($identity, $generation),
-            $fallback
-        );
+        return $this->guardedReadThrough($this->identityContext($identity, $generation), $fallback);
+    }
+
+    /**
+     * Read-through that survives a failing cache backend without masking
+     * domain exceptions. Three outcomes are distinguished by where the
+     * failure happened relative to the fallback:
+     *
+     *  - fallback loaded, then the cache store threw → return the loaded
+     *    value (the cache write was best-effort);
+     *  - the fallback itself threw → propagate untouched (that is a domain
+     *    error like RecordNotFoundException, not a cache problem);
+     *  - the cache probe threw before the fallback ran → load directly from
+     *    the fallback.
+     *
+     * @param array $context
+     * @param callable $fallback
+     * @return mixed
+     */
+    protected function guardedReadThrough(array $context, callable $fallback)
+    {
+        $started = false;
+        $resolved = false;
+        $value = null;
+
+        $capturing = function () use ($fallback, &$started, &$resolved, &$value) {
+            $started = true;
+            $value = $fallback();
+            $resolved = true;
+
+            return $value;
+        };
+
+        try {
+            return $this->cacheableService->getWithCache(Operation::Read, $context, $capturing);
+        } catch (Throwable $e) {
+            if ($resolved) {
+                $this->logger->warning(
+                    'Cache store failed after a successful load — serving the loaded value uncached.',
+                    ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+                );
+
+                return $value;
+            }
+
+            if ($started) {
+                throw $e;
+            }
+
+            $this->logger->warning(
+                'Cache read failed — loading directly from the fallback.',
+                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
+            );
+
+            return $fallback();
+        }
     }
 
     /** @inheritDoc */
@@ -247,7 +315,7 @@ class DatastoreRowCache implements RowCache
      */
     public function readTableValue(callable $fallback)
     {
-        return $this->cacheableService->getWithCache(Operation::Read, $this->tableContext(), $fallback);
+        return $this->guardedReadThrough($this->tableContext(), $fallback);
     }
 
     /**
@@ -444,7 +512,13 @@ class DatastoreRowCache implements RowCache
     protected function stringifyScalars(array $values): array
     {
         foreach ($values as $key => $value) {
-            $values[$key] = is_scalar($value) ? (string) $value : $value;
+            if (is_bool($value)) {
+                // (string) false is '' — explicit '0' keeps booleans from
+                // colliding with empty strings in cache keys.
+                $values[$key] = $value ? '1' : '0';
+            } elseif (is_scalar($value)) {
+                $values[$key] = (string) $value;
+            }
         }
 
         return $values;

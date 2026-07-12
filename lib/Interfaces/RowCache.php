@@ -14,6 +14,13 @@ use PHPNomad\Datastore\Interfaces\DataModel;
  * is datastore orchestration and lives with the consuming trait; this
  * contract supplies the operations it composes.
  *
+ * No-throw obligation: consumers call these methods UNGUARDED on read and
+ * write paths alike. Implementations must treat cache-layer failures as
+ * misses on reads (hasRow, resolveAliasedIdentity, snapshotGeneration) and
+ * swallow-and-log them on mutations (storeRow, storeAlias, deleteRow,
+ * deleteAlias, invalidateAfterWrite) — a throwing implementation breaks
+ * datastore reads and deletes during a cache outage.
+ *
  * @see \PHPNomad\Database\Services\DatastoreRowCache the default implementation
  */
 interface RowCache
@@ -68,9 +75,10 @@ interface RowCache
     public function hasRow(array $identityRow, ?string $generation = null): bool;
 
     /**
-     * Read-through for the table's set-level value (estimatedCount and any
-     * future whole-table caches): serves the cached value or runs the
-     * fallback and caches its result.
+     * Read-through for the table's single set-level value (estimatedCount):
+     * serves the cached value or runs the fallback and caches its result.
+     * One undiscriminated slot per table — a second whole-table value would
+     * need a discriminator added to the context.
      *
      * @param callable $fallback Computes the value on miss; its result is cached.
      * @return mixed
@@ -148,5 +156,4 @@ interface RowCache
      * disabled.
      */
     public function snapshotGeneration(): ?string;
-
-    }
+}

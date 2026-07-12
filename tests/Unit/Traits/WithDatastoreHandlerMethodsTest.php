@@ -46,9 +46,13 @@ class WithDatastoreHandlerMethodsTest extends TestCase
 
         $cacheableService = $this->createMock(CacheableService::class);
         $cacheableService->expects($this->never())->method('exists');
+        // No pre-warm: create() never caches the attribute-hydrated model.
+        // Its only cache write path here (generations disabled) is the
+        // set-level context delete.
+        $cacheableService->expects($this->never())->method('set');
         $cacheableService->expects($this->once())
-            ->method('set')
-            ->with(['identities' => ['id' => '123'], 'type' => TestModel::class], $createdModel);
+            ->method('delete')
+            ->with(['type' => TestModel::class]);
 
         $table = $this->createMock(Table::class);
         $table->method('getFieldsForIdentity')->willReturn(['id']);
@@ -104,7 +108,7 @@ class WithDatastoreHandlerMethodsTest extends TestCase
         $createdModel = new TestModel(123);
 
         $cacheableService = $this->createMock(CacheableService::class);
-        $cacheableService->expects($this->once())->method('set');
+        $cacheableService->expects($this->never())->method('set');
 
         $nameColumn = new Column('name', 'VARCHAR', [255]);
         $createdAtColumn = (new Column('createdAt', 'TIMESTAMP'))

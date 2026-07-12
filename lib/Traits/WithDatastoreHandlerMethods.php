@@ -160,26 +160,15 @@ trait WithDatastoreHandlerMethods
         $row = Arr::merge($attributes, $ids);
         $result = $this->modelAdapter->toModel($row);
 
-        // The insert is committed: cache maintenance below is best-effort
-        // and must not fail the create or suppress RecordCreated. Bump
-        // BEFORE pre-warming so the row entry lands under the new
-        // generation and stays readable; set-level caches keyed under the
-        // old generation become unreachable. Bump and pre-warm failures are
-        // logged separately — the first means stale set-level caches until
-        // TTL, the second only a missed warm-up.
-        $generation = $this->invalidateAfterWriteSafely();
-
-        try {
-            // Pre-warm the cache so subsequent reads of this record don't
-            // have to round-trip the DB at all. Same canonical key every
-            // read path uses, so existing read paths transparently pick it up.
-            $this->rowCache()->storeRow($row, $result, $generation);
-        } catch (Throwable $e) {
-            $this->serviceProvider->loggerStrategy->warning(
-                'Post-create pre-warm failed — the row was created but the first read will hit the database.',
-                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
-            );
-        }
+        // The insert is committed: the bump below is best-effort and must
+        // not fail the create or suppress RecordCreated. There is
+        // deliberately NO cache pre-warm: a model hydrated from write
+        // attributes carries request-typed scalars instead of column types
+        // (#29), and a pre-warm keyed under create's own post-insert bump
+        // can seed the newest generation with a row another writer already
+        // overwrote. The first read after create costs one DB round-trip
+        // and is always correct.
+        $this->invalidateAfterWriteSafely();
 
         $this->serviceProvider->eventStrategy->broadcast(new RecordCreated($result));
 
@@ -244,19 +233,12 @@ trait WithDatastoreHandlerMethods
                 // outside the matched set.
                 $this->serviceProvider->queryStrategy->delete($this->table, $identityRow);
 
-                try {
-                    $identity = $this->rowCache()->rowIdentity($identityRow);
+                $identity = $this->rowCache()->rowIdentity($identityRow);
 
-                    if ($identity !== null) {
-                        $this->rowCache()->deleteRow($identity, $generation);
-                    }
-                } catch (Throwable $e) {
-                    // Cache trouble must not abort the remaining SQL deletes;
-                    // the finally-block invalidation is the safety net.
-                    $this->serviceProvider->loggerStrategy->warning(
-                        'Cache invalidation failed for a deleted row.',
-                        ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
-                    );
+                if ($identity !== null) {
+                    // Swallow-and-log inside RowCache: cache trouble cannot
+                    // abort the remaining SQL deletes.
+                    $this->rowCache()->deleteRow($identity, $generation);
                 }
 
                 $broadcastQueue[] = $identityRow;
@@ -615,39 +597,40 @@ trait WithDatastoreHandlerMethods
 
         $identity = $this->resolveTableIdentity($ids, $generation);
 
-        // The SQL update targets the RESOLVED table identity when the
-        // pre-read could produce one: updateCompound's contract is "update
-        // THE record this key identifies" (the pre-read is limit(1) and one
-        // RecordUpdated fires), so a non-unique business key must not fan
-        // the write out to rows the invalidation below never saw. The
-        // caller's key is the fallback only when resolution failed.
-        $this->serviceProvider->queryStrategy->update($this->table, $identity ?? $ids, $attributes);
-
-        // The DB write is committed: everything below is best-effort cache
-        // maintenance, and a cache-layer failure must not turn the
-        // successful update into a caller-visible error or suppress the
-        // RecordUpdated broadcast. Precise deletes run under the pre-write
-        // generation (the one readers wrote their entries with), then the
-        // finally-block bump closes the cache-aside race — precise deletes
-        // carry tables that opt out of generations.
-        try {
-            if ($identity !== null) {
-                $this->rowCache()->deleteRow($identity, $generation);
-            }
-
-            if (!$this->rowCache()->isTableIdentity($ids)) {
-                // Drop the alias too: the update may have moved the row's
-                // business key or identity out from under it.
-                $this->rowCache()->deleteAlias($ids, $generation);
-            }
-        } catch (Throwable $e) {
-            $this->serviceProvider->loggerStrategy->error(
-                'Post-update cache invalidation failed — the generation bump is the remaining safety net.',
-                ['table' => $this->table->getName(), 'exception' => $e->getMessage()]
-            );
-        } finally {
-            $this->invalidateAfterWriteSafely();
+        if ($identity === null) {
+            // The pre-read saw the record, but it cannot be re-resolved to a
+            // table identity now — it vanished mid-operation. Falling back
+            // to the caller's raw key would fan a non-unique business key
+            // out to rows the invalidation below never saw, so this fails
+            // the same way the pre-read would have.
+            throw new RecordNotFoundException(sprintf(
+                'Record could not be re-resolved for update in table "%s" using lookup key %s.',
+                $this->table->getName(),
+                $this->encodeExceptionContext($ids)
+            ));
         }
+
+        // The SQL update targets the RESOLVED table identity: updateCompound's
+        // contract is "update THE record this key identifies" (the pre-read
+        // is limit(1) and one RecordUpdated fires), so a non-unique business
+        // key must never fan the write out to rows the invalidation below
+        // never saw.
+        $this->serviceProvider->queryStrategy->update($this->table, $identity, $attributes);
+
+        // The DB write is committed: the invalidation below is best-effort
+        // (RowCache mutations swallow-and-log cache failures) and runs under
+        // the pre-write generation — the one readers wrote their entries
+        // with. The bump closes the cache-aside race; precise deletes carry
+        // tables that opt out of generations.
+        $this->rowCache()->deleteRow($identity, $generation);
+
+        if (!$this->rowCache()->isTableIdentity($ids)) {
+            // Drop the alias too: the update may have moved the row's
+            // business key or identity out from under it.
+            $this->rowCache()->deleteAlias($ids, $generation);
+        }
+
+        $this->invalidateAfterWriteSafely();
 
         // The event intentionally carries the caller's key — the lookup
         // contract they wrote against — not the cache-normalized identity

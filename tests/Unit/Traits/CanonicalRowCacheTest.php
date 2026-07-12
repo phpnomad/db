@@ -347,20 +347,21 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame(6, $handler->getEstimatedCount(), 'estimatedCount survived a write.');
     }
 
-    public function testCreatePreWarmsRowReadableWithoutQuery(): void
+    public function testFirstReadAfterCreateHitsTheDatabase(): void
     {
-        // Bump-then-pre-warm ordering: the created row's entry must land
-        // under the NEW generation, or every post-create read would miss.
+        // create() deliberately does NOT pre-warm: a model hydrated from
+        // write attributes carries request-typed scalars, and a pre-warm can
+        // seed the newest generation with a row another writer already
+        // overwrote. The first read costs one round-trip and is DB-true.
         $handler = $this->makeHandler(['id'], 'test_records', true);
 
-        $created = $handler->create(['name' => 'warm']);
+        $handler->create(['name' => 'as-written']);
 
-        // No query result is queued: a DB round-trip here would throw.
+        $this->queryStrategy->queueQueryResult([['id' => '1', 'name' => 'db-truth']]);
         $read = $handler->findByCompound(['id' => 1]);
 
-        $this->assertSame('warm', $read->get('name'));
-        $this->assertSame(0, $this->queryStrategy->queryCount);
-        $this->assertSame($created, $read);
+        $this->assertSame('db-truth', $read->get('name'));
+        $this->assertSame(1, $this->queryStrategy->queryCount);
     }
 
     /**
@@ -489,7 +490,7 @@ class CanonicalRowCacheTest extends TestCase
         $flaky = $this->useFlakyCache();
         $events = new RecordingEventStrategy();
         $logger = $this->createMock(LoggerStrategy::class);
-        $logger->expects($this->atLeastOnce())->method('warning');
+        $logger->expects($this->atLeastOnce())->method('error');
 
         $handler = $this->makeHandler(['id'], 'test_records', true, $logger, $events);
 
@@ -527,7 +528,7 @@ class CanonicalRowCacheTest extends TestCase
         $flaky = $this->useFlakyCache();
         $events = new RecordingEventStrategy();
         $logger = $this->createMock(LoggerStrategy::class);
-        $logger->expects($this->atLeastOnce())->method('warning');
+        $logger->expects($this->atLeastOnce())->method('error');
 
         $handler = $this->makeHandler(['id'], 'test_records', true, $logger, $events);
 
@@ -564,6 +565,75 @@ class CanonicalRowCacheTest extends TestCase
 
         $this->assertSame('7', $model->get('id'));
         $this->assertSame(2, $this->queryStrategy->queryCount, 'An unverifiable alias was trusted on a generation-disabled table.');
+    }
+
+    public function testColdBusinessKeyReadSurvivesCacheWriteFailure(): void
+    {
+        // The DB answered; a cache that cannot store the result must not
+        // turn a successful read into an error.
+        $flaky = $this->useFlakyCache();
+        $logger = $this->createMock(LoggerStrategy::class);
+
+        $handler = $this->makeHandler(['id'], 'test_records', true, $logger);
+
+        $flaky->failWrites = true;
+
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $model = $handler->findByCompound(['keyHash' => 'abc']);
+
+        $this->assertSame('7', $model->get('id'));
+    }
+
+    public function testRotatedAliasLookupSurfacesNotFoundNotCacheErrorsUnderWriteFailure(): void
+    {
+        // The self-heal path performs cache mutations (row store, alias
+        // delete); with a write-failing cache the lookup must still resolve
+        // to its true outcome — RecordNotFoundException — not a cache error.
+        $flaky = $this->useFlakyCache();
+
+        $handler = $this->makeHandler(['id'], 'test_api_keys', false);
+
+        // Prime alias keyHash abc → id 7 while healthy, then drop the row
+        // entry so the next lookup takes the re-read path.
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        $handler->findByCompound(['keyHash' => 'abc']);
+        $this->cacheableService->delete($this->prober->exposeRowContext(['id' => '7']));
+
+        $flaky->failWrites = true;
+
+        // Alias → id 7 → row re-read shows the key rotated away → alias
+        // dropped (swallowed failure) → re-resolve by key finds nothing.
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'xyz', 'status' => 'active']]);
+        $this->queryStrategy->queueQueryResult([]);
+
+        $this->expectException(RecordNotFoundException::class);
+
+        $handler->findByCompound(['keyHash' => 'abc']);
+    }
+
+    public function testUpdateCompoundThrowsWhenTheRecordCannotBeReResolved(): void
+    {
+        // With a write-dead cache the alias never persists, and the DB
+        // fallback resolution comes back empty (the row vanished
+        // mid-operation). Falling back to the caller's business key could
+        // fan the write out — the update must fail instead.
+        $flaky = $this->useFlakyCache();
+
+        $handler = $this->makeHandler(['id'], 'test_api_keys', true);
+
+        $flaky->failWrites = true;
+
+        // Pre-read resolves via the DB (alias store fails silently)…
+        $this->queryStrategy->queueQueryResult([['id' => '7', 'keyHash' => 'abc', 'status' => 'active']]);
+        // …then identity resolution's DB fallback finds the row gone.
+        $this->queryStrategy->queueQueryResult([]);
+
+        try {
+            $handler->updateCompound(['keyHash' => 'abc'], ['status' => 'revoked']);
+            $this->fail('Expected RecordNotFoundException when the record cannot be re-resolved.');
+        } catch (RecordNotFoundException $e) {
+            $this->assertSame([], $this->queryStrategy->updates, 'An unresolvable record was still updated by raw business key.');
+        }
     }
 
 }
