@@ -184,6 +184,19 @@ class CanonicalRowCacheTest extends TestCase
     }
 
     /**
+     * One cached row plus the generation-token entry the ON mode keeps.
+     *
+     * @return array<string, array{0: bool, 1: int}>
+     */
+    public static function generationModesWithRowAndTokenEntryCounts(): array
+    {
+        return [
+            'generations on (production default)' => [true, 2],
+            'generations off (opt-out)' => [false, 1],
+        ];
+    }
+
+    /**
      * @dataProvider generationModesWithRowAndTokenEntryCounts
      */
     public function testWhereCachesRowsUnderTableIdentityNotModelIdentity(bool $useGenerations, int $expectedEntries): void
@@ -436,19 +449,6 @@ class CanonicalRowCacheTest extends TestCase
     }
 
     /**
-     * One cached row plus the generation-token entry the ON mode keeps.
-     *
-     * @return array<string, array{0: bool, 1: int}>
-     */
-    public static function generationModesWithRowAndTokenEntryCounts(): array
-    {
-        return [
-            'generations on (production default)' => [true, 2],
-            'generations off (opt-out)' => [false, 1],
-        ];
-    }
-
-    /**
      * @dataProvider generationModesWithTokenOnlyEntryCounts
      */
     public function testRowMissingAnIdentityFieldIsNotCachedAndWarns(bool $useGenerations, int $expectedEntries): void
@@ -544,6 +544,7 @@ class CanonicalRowCacheTest extends TestCase
         $this->assertSame($storeBefore, $this->cacheStrategy->store);
         $this->assertSame([], $this->queryStrategy->deletes);
     }
+
     private function useFlakyCache(): FlakyCacheStrategy
     {
         $flaky = new FlakyCacheStrategy();
@@ -749,10 +750,11 @@ class CanonicalRowCacheTest extends TestCase
 
     public function testBusinessKeyUpdateResendingOwnUniqueValuesIsNotADuplicate(): void
     {
-        // Self-matches are filtered by the pre-read model's identity: a
-        // business-key caller re-sending the record's own unique values must
-        // not trip DuplicateEntryException just because their lookup key
-        // never equals a model identity.
+        // Self-matches are filtered by the pre-read record's TABLE identity
+        // (model identity only as a fallback): a business-key caller
+        // re-sending the record's own unique values must not trip
+        // DuplicateEntryException just because their lookup key never
+        // equals an identity.
         $handler = $this->makeHandler(['id'], 'test_api_keys', true, null, null, null, [['keyHash']]);
 
         // Pre-read resolves the record by business key…

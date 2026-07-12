@@ -88,17 +88,9 @@ class RowCacheContextAdapter
      */
     public function toRowIdentity(array $row): ?array
     {
-        $identity = [];
+        $identity = $this->toRawIdentity($row);
 
-        foreach ($this->table->getFieldsForIdentity() as $field) {
-            if (!array_key_exists($field, $row)) {
-                return null;
-            }
-
-            $identity[$field] = $row[$field];
-        }
-
-        return $this->stringifyScalars($identity);
+        return $identity === null ? null : $this->stringifyScalars($identity);
     }
 
     /**
