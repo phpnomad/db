@@ -42,9 +42,20 @@ abstract class Table implements CoreTable
      */
     public function getName(): string
     {
-        return Str::append($this->globalPrefixProvider->getGlobalDatabasePrefix(), '_')
-            . Str::append($this->localPrefixProvider->getLocalDatabasePrefix(), '_')
+        return $this->formatPrefix($this->globalPrefixProvider->getGlobalDatabasePrefix())
+            . $this->formatPrefix($this->localPrefixProvider->getLocalDatabasePrefix())
             . $this->getUnprefixedName();
+    }
+
+    /**
+     * Adds a separator to non-empty table prefixes.
+     *
+     * @param string $prefix
+     * @return string
+     */
+    private function formatPrefix(string $prefix): string
+    {
+        return $prefix === '' ? '' : Str::append($prefix, '_');
     }
 
     /** @inheritdoc */
