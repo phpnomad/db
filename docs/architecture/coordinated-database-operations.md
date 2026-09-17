@@ -1,8 +1,6 @@
 # Coordinated database operations
 
-Status: architecture contract. No integration provides this capability yet.
-The acceptance suite and integration implementations follow in dependent PRs.
-This change is based on database 2.2.2, not the 3.x clock migration.
+Status: contract defined. Runtime support requires adapter conformance proof.
 
 ## Purpose and layers
 
@@ -108,6 +106,13 @@ Synchronous callers propagate failure and log it, without business-level retries
 An unknown outcome must be visible through LoggerStrategy and its distinct
 exception. This library adds no queue, retry scheduler, or dead-letter system.
 
+Siren's effect claim commits in the same operation as all recipient changes.
+There is no separately committed in-flight claim to strand after rollback.
+An unknown outcome is reconciled against that durable claim. A queue caller
+that owns another in-flight domain state must settle it through its existing
+terminal-failure hook when attempts end, and prove that transition. This does
+not add queue states to the database capability or Siren's effect claim.
+
 ## Database-handler bridge
 
 A following database-package slice will create operation-local clones of the
@@ -169,6 +174,14 @@ must remain compatible. No cache or event effect may escape a rollback. Siren
 then adds domain tests for claims, all recipients, merges, current-distribution
 creation, and both legacy and enriched event paths.
 
+Before feature release, checked-in end-to-end tests must drive the real running
+Siren application through its actual event entry point, production bindings,
+database, and cache. They must assert the final scores, durable claims, cache
+visibility, and record notifications for both legacy and enriched facts, with
+retry and failure cases. Each supported platform must pass. A skipped adapter
+or end-to-end suite is not a passing release gate. Manual UAT proof remains a
+separate gate and does not replace these repeatable tests.
+
 ## Delivery order
 
 1. Database contracts and optional query-source metadata.
@@ -181,20 +194,3 @@ creation, and both legacy and enriched event paths.
 Adapters unable to support coordination remain valid ordinary adapters. The
 first supported Siren paths are its PDO and WordPress database paths. SafeMySQL
 must remain usable without falsely advertising a capability it does not have.
-
-Cross-repository draft dependencies may use explicit branch aliases and locked
-commit hashes for review. Those pins are temporary and are not release-ready.
-No package release, deployment, or merge is authorized by this implementation.
-
-## Baseline and tooling
-
-The release/2.2 baseline is commit 633eb43. Its unit suite passes with 15 tests
-and 38 assertions. Its existing level-9 static analysis reports 231 errors in
-13 files. New changes must not add errors, and the inherited failure remains an
-open check rather than a green gate.
-
-The installed CLI has no recipes namespace. Its available model recipe creates
-a persisted entity, which does not match these interfaces or exceptions. These
-declarations have no suitable installed scaffold. Index generation and command
-discovery ran before source inspection. No production method is implemented in
-this contract slice.
