@@ -257,19 +257,24 @@ final class OperationQueryStrategyContractTest extends TestCase
     }
 
     /**
-     * @dataProvider invalidElements
+     * @dataProvider invalidElementsAtEveryPosition
      * @param mixed $invalid
      */
-    public function testEveryParticipantElementMustBeATable($invalid): void
+    public function testEveryParticipantElementMustBeATable($invalid, int $position): void
     {
+        $participants = [$this->table('scores'), $this->table('programs')];
+        array_splice($participants, $position, 0, [$invalid]);
         $this->expectException(InvalidArgumentException::class);
-        new OperationQueryStrategy($this->unusedDelegate(), [$this->table('scores'), $invalid]);
+        new OperationQueryStrategy($this->unusedDelegate(), $participants);
     }
 
-    public function testEveryParticipantNameMustBeNonempty(): void
+    /** @dataProvider undeclaredSourcePositions */
+    public function testEveryParticipantNameMustBeNonempty(int $position): void
     {
+        $participants = [$this->table('scores'), $this->table('programs')];
+        array_splice($participants, $position, 0, [$this->table('')]);
         $this->expectException(InvalidArgumentException::class);
-        new OperationQueryStrategy($this->unusedDelegate(), [$this->table('scores'), $this->table('')]);
+        new OperationQueryStrategy($this->unusedDelegate(), $participants);
     }
 
     public function testParticipantsMustBeAList(): void
@@ -303,25 +308,30 @@ final class OperationQueryStrategyContractTest extends TestCase
     }
 
     /**
-     * @dataProvider invalidElements
+     * @dataProvider invalidElementsAtEveryPosition
      * @param mixed $invalid
      */
-    public function testEveryQuerySourceElementMustBeATable($invalid): void
+    public function testEveryQuerySourceElementMustBeATable($invalid, int $position): void
     {
         $table = $this->table('scores');
         $operation = new OperationQueryStrategy($this->unusedDelegate(), [$table]);
+        $sources = [$table, $table];
+        array_splice($sources, $position, 0, [$invalid]);
 
         $this->expectException(InvalidArgumentException::class);
-        $operation->query($this->builder([$table, $invalid]));
+        $operation->query($this->builder($sources));
     }
 
-    public function testEveryQuerySourceNameMustBeNonempty(): void
+    /** @dataProvider undeclaredSourcePositions */
+    public function testEveryQuerySourceNameMustBeNonempty(int $position): void
     {
         $table = $this->table('scores');
         $operation = new OperationQueryStrategy($this->unusedDelegate(), [$table]);
+        $sources = [$table, $table];
+        array_splice($sources, $position, 0, [$this->table('')]);
 
         $this->expectException(InvalidArgumentException::class);
-        $operation->query($this->builder([$table, $this->table('')]));
+        $operation->query($this->builder($sources));
     }
 
     public function testQuerySourceListsCannotHaveIndexGaps(): void
@@ -355,10 +365,15 @@ final class OperationQueryStrategyContractTest extends TestCase
         return ['empty' => [[]], 'not tables' => [['scores']], 'null element' => [[null]]];
     }
 
-    /** @return array<string, array{mixed}> */
-    public static function invalidElements(): array
+    /** @return array<string, array{mixed, int}> */
+    public static function invalidElementsAtEveryPosition(): array
     {
-        return ['string' => ['scores'], 'null' => [null], 'unrelated object' => [new \stdClass()]];
+        return [
+            'first string' => ['scores', 0], 'middle string' => ['scores', 1], 'last string' => ['scores', 2],
+            'first null' => [null, 0], 'middle null' => [null, 1], 'last null' => [null, 2],
+            'first object' => [new \stdClass(), 0], 'middle object' => [new \stdClass(), 1],
+            'last object' => [new \stdClass(), 2],
+        ];
     }
 
     private function table(string $name, string $alias = 't'): Table
