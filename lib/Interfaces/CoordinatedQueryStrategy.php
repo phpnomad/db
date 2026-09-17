@@ -15,7 +15,9 @@ interface CoordinatedQueryStrategy extends QueryStrategy
      *
      * All declared participant writes commit together. Successful operations
      * coordinating the same record are equivalent to some serial execution.
-     * The integration may coordinate more broadly than the requested record.
+     * The logical scope retains the resource, table, and complete identity.
+     * A tenant-blind application guard must not replace that scope. Inherent
+     * backend contention may still serialize otherwise unrelated operations.
      * This guarantee covers callers using this capability, not bypass writers.
      *
      * The identity must identify one existing coordination record. Its table

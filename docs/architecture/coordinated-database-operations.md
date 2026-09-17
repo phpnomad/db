@@ -34,8 +34,11 @@ child aggregates even when no aggregate exists yet.
 
 The table and record concepts already belong to the database package. The
 contract exposes no engine names, lock commands, storage-engine inspection, or
-vendor error codes. An integration chooses its mechanism. Coarser coordination
-is valid: separate requested scopes need not execute concurrently.
+vendor error codes. An integration chooses its mechanism. The logical scope
+retains the database resource, table, and complete record identity. An
+application-wide or tenant-blind guard, counter, or quota cannot replace it.
+Inherent backend contention may still serialize unrelated operations. The
+generic contract does not promise parallel progress across distinct records.
 
 HasQueryTables is a second optional interface. An upgraded builder reports the
 actual root and all join tables of its current query. The operation-local query
@@ -82,8 +85,26 @@ Ordinary callback errors propagate after confirmed rollback. A rollback failure
 must preserve uncertainty rather than imply the callback error was harmless.
 Nested or foreign ambient operations are rejected before changing their state.
 The integration does not retry a callback or expose transaction control through
-its scoped query strategy. The caller owns any retry and must use durable effect
-identity where an uncertain result might already have committed.
+its scoped query strategy. Each integration logs detected failures through
+LoggerStrategy with the operation phase, table names, outcome classification,
+retry safety, and chained cause. Sensitive identity values are omitted or
+redacted. Logging must preserve the established outcome classification.
+
+Retry belongs to the caller's existing policy, never an adapter loop:
+
+| Outcome | Caller action |
+| --- | --- |
+| Invalid or unsupported request | Correct configuration or input. Do not retry unchanged. |
+| Missing coordination record | Resolve the missing parent. Do not assume a transient conflict. |
+| Confirmed conflict and rollback | A caller may submit another bounded attempt. |
+| Callback failure with confirmed rollback | Propagate the cause. Only its owner can classify it as transient. |
+| Commit or rollback unknown | Reconcile through durable effect identity before any retry. |
+| Committed data with publication failure | Keep the committed result. Never repeat the database mutation to repair publication. |
+
+Queue callers use the existing durable queue's attempt limits, backoff, and
+terminal-failure reporting. Synchronous callers propagate failure and log it.
+An unknown outcome must be visible through LoggerStrategy and its distinct
+exception. This library adds no queue, retry scheduler, or dead-letter system.
 
 ## Database-handler bridge
 
@@ -103,12 +124,21 @@ After confirmed commit, the bridge invalidates affected shared cache identities
 and then emits compatible record events. It never replays shared cache sets
 from an older operation, which could overwrite a newer committed value.
 Publication is ordered within one invocation only. Cross-invocation event
-ordering and durable delivery are outside this guarantee. Post-commit failures
-must report the committed outcome and must not cause the score to be reapplied.
+ordering and durable delivery are outside this guarantee. The bridge returns a
+typed committed result containing the callback value and any publication
+failures. It logs those failures through LoggerStrategy and continues the
+remaining invalidations and notifications. Callers consume the committed value
+without reapplying the mutation. They may explicitly retry failed publication
+only when that observer's contract makes repetition safe. The bridge never
+throws a generic mutation failure after confirmed commit. The result model and
+its proof belong to the later bridge slice, not this interface-only change.
 
 ## Proof required before enabling an integration
 
 The adapter contract suite must run against real independent database clients.
+The harness uses environment-driven configuration and an explicitly owned
+test schema, resets database state and model caches between cases, and skips
+clearly when its database is absent. A skip is not adapter-conformance proof.
 It must prove overlapping same-scope additions, duplicate occurrence claims,
 absent-child creation, complete rollback on a later write failure, and fresh
 reads after a preceding operation commits. A synchronization barrier must force
@@ -122,11 +152,17 @@ builder reuse and reflect reset or replacement of clauses.
 
 Legacy base-interface implementations remain constructible and usable without
 the new capability. A non-row-lock test implementation will exercise the same
-semantic contract without becoming a supported production backend. No test may
-require distinct scopes to run concurrently, since broad coordination is valid.
+semantic contract without becoming a supported production backend. Generic tests
+do not require distinct scopes to run concurrently because inherent backend
+contention is allowed. They do not permit a tenant-blind application guard.
+The MySQL adapter uses record-specific coordination and must prove that distinct
+identities can progress independently with real clients and explicit barriers.
 
 The handler bridge needs its own integration proof through real public datastore
-calls. Scope, defaults, adaptation, cache identity variants, and record payloads
+calls resolved from the production Application and its real container bindings.
+Event dispatch, caches, middleware where applicable, and persistence stay real.
+Only external network boundaries may be mocked. Scope, defaults, adaptation,
+cache identity variants, and record payloads
 must remain compatible. No cache or event effect may escape a rollback. Siren
 then adds domain tests for claims, all recipients, merges, current-distribution
 creation, and both legacy and enriched event paths.
