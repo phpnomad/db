@@ -208,10 +208,32 @@ final class OperationQueryStrategyContractTest extends TestCase
         new OperationQueryStrategy($this->unusedDelegate(), [$this->table('')]);
     }
 
+    /**
+     * @dataProvider invalidElements
+     * @param mixed $invalid
+     */
+    public function testEveryParticipantElementMustBeATable($invalid): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        new OperationQueryStrategy($this->unusedDelegate(), [$this->table('scores'), $invalid]);
+    }
+
+    public function testEveryParticipantNameMustBeNonempty(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        new OperationQueryStrategy($this->unusedDelegate(), [$this->table('scores'), $this->table('')]);
+    }
+
     public function testParticipantsMustBeAList(): void
     {
         $this->expectException(InvalidArgumentException::class);
         new OperationQueryStrategy($this->unusedDelegate(), ['named' => $this->table('scores')]);
+    }
+
+    public function testParticipantListsCannotHaveIndexGaps(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        new OperationQueryStrategy($this->unusedDelegate(), [0 => $this->table('scores'), 2 => $this->table('programs')]);
     }
 
     /** @dataProvider malformedLists */
@@ -232,6 +254,38 @@ final class OperationQueryStrategyContractTest extends TestCase
         $operation->query($this->builder(['named' => $table]));
     }
 
+    /**
+     * @dataProvider invalidElements
+     * @param mixed $invalid
+     */
+    public function testEveryQuerySourceElementMustBeATable($invalid): void
+    {
+        $table = $this->table('scores');
+        $operation = new OperationQueryStrategy($this->unusedDelegate(), [$table]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $operation->query($this->builder([$table, $invalid]));
+    }
+
+    public function testEveryQuerySourceNameMustBeNonempty(): void
+    {
+        $table = $this->table('scores');
+        $operation = new OperationQueryStrategy($this->unusedDelegate(), [$table]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $operation->query($this->builder([$table, $this->table('')]));
+    }
+
+    public function testQuerySourceListsCannotHaveIndexGaps(): void
+    {
+        $scores = $this->table('scores');
+        $programs = $this->table('programs');
+        $operation = new OperationQueryStrategy($this->unusedDelegate(), [$scores, $programs]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $operation->query($this->builder([0 => $scores, 2 => $programs]));
+    }
+
     /** @return array<string, array{string}> */
     public static function methods(): array
     {
@@ -245,6 +299,12 @@ final class OperationQueryStrategyContractTest extends TestCase
     public static function malformedLists(): array
     {
         return ['empty' => [[]], 'not tables' => [['scores']], 'null element' => [[null]]];
+    }
+
+    /** @return array<string, array{mixed}> */
+    public static function invalidElements(): array
+    {
+        return ['string' => ['scores'], 'null' => [null], 'unrelated object' => [new \stdClass()]];
     }
 
     private function table(string $name, string $alias = 't'): Table
