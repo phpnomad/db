@@ -111,15 +111,18 @@ final class OperationQueryStrategyContractTest extends TestCase
         }
     }
 
-    public function testEveryJoinMustBeDeclared(): void
+    /** @dataProvider undeclaredSourcePositions */
+    public function testEveryQuerySourceMustBeDeclaredRegardlessOfPosition(int $position): void
     {
         $scores = $this->table('scores');
         $allowedJoin = $this->table('programs');
         $outsideJoin = $this->table('private_accounts');
         $operation = new OperationQueryStrategy($this->unusedDelegate(), [$scores, $allowedJoin]);
+        $sources = [$scores, $allowedJoin];
+        array_splice($sources, $position, 0, [$outsideJoin]);
 
         $this->expectException(InvalidArgumentException::class);
-        $operation->query($this->builder([$scores, $allowedJoin, $outsideJoin]));
+        $operation->query($this->builder($sources));
     }
 
     public function testAllowedRootAndJoinsDelegateTogether(): void
@@ -338,6 +341,12 @@ final class OperationQueryStrategyContractTest extends TestCase
             'query' => ['query'], 'insert' => ['insert'], 'update' => ['update'],
             'delete' => ['delete'], 'estimated count' => ['estimatedCount'],
         ];
+    }
+
+    /** @return array<string, array{int}> */
+    public static function undeclaredSourcePositions(): array
+    {
+        return ['root' => [0], 'middle join' => [1], 'last join' => [2]];
     }
 
     /** @return array<string, array{array<mixed>}> */
