@@ -269,17 +269,20 @@ final class OperationQueryStrategyContractTest extends TestCase
         self::assertSame(3, $operation->estimatedCount($original));
     }
 
-    /** @dataProvider malformedLists */
+    /**
+     * @dataProvider malformedLists
+     * @param array<mixed> $participants
+     */
     public function testInvalidParticipantListsAreRejected(array $participants): void
     {
         $this->expectException(InvalidArgumentException::class);
-        new OperationQueryStrategy($this->unusedDelegate(), $participants);
+        $this->constructWithInvalidParticipants($participants);
     }
 
     public function testAnEmptyParticipantNameIsRejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        new OperationQueryStrategy($this->unusedDelegate(), [$this->table('')]);
+        $this->constructWithInvalidParticipants([$this->table('')]);
     }
 
     /**
@@ -291,7 +294,7 @@ final class OperationQueryStrategyContractTest extends TestCase
         $participants = [$this->table('scores'), $this->table('programs')];
         array_splice($participants, $position, 0, [$invalid]);
         $this->expectException(InvalidArgumentException::class);
-        new OperationQueryStrategy($this->unusedDelegate(), $participants);
+        $this->constructWithInvalidParticipants($participants);
     }
 
     /** @dataProvider undeclaredSourcePositions */
@@ -300,22 +303,25 @@ final class OperationQueryStrategyContractTest extends TestCase
         $participants = [$this->table('scores'), $this->table('programs')];
         array_splice($participants, $position, 0, [$this->table('')]);
         $this->expectException(InvalidArgumentException::class);
-        new OperationQueryStrategy($this->unusedDelegate(), $participants);
+        $this->constructWithInvalidParticipants($participants);
     }
 
     public function testParticipantsMustBeAList(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        new OperationQueryStrategy($this->unusedDelegate(), ['named' => $this->table('scores')]);
+        $this->constructWithInvalidParticipants(['named' => $this->table('scores')]);
     }
 
     public function testParticipantListsCannotHaveIndexGaps(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        new OperationQueryStrategy($this->unusedDelegate(), [0 => $this->table('scores'), 2 => $this->table('programs')]);
+        $this->constructWithInvalidParticipants([0 => $this->table('scores'), 2 => $this->table('programs')]);
     }
 
-    /** @dataProvider malformedLists */
+    /**
+     * @dataProvider malformedLists
+     * @param array<mixed> $sources
+     */
     public function testInvalidQuerySourcesAreRejected(array $sources): void
     {
         $operation = new OperationQueryStrategy($this->unusedDelegate(), [$this->table('scores')]);
@@ -420,6 +426,18 @@ final class OperationQueryStrategyContractTest extends TestCase
         $table->method('getName')->willReturn($name);
         $table->method('getAlias')->willReturn($alias);
         return $table;
+    }
+
+    /**
+     * Invoke the real constructor with deliberately invalid inputs while
+     * retaining its useful static contract for ordinary callers.
+     *
+     * @param array<mixed> $participants
+     */
+    private function constructWithInvalidParticipants(array $participants): void
+    {
+        (new \ReflectionClass(OperationQueryStrategy::class))
+            ->newInstanceArgs([$this->unusedDelegate(), $participants]);
     }
 
     /** @param array<mixed> $tables */
