@@ -30,6 +30,15 @@ owns transaction support, identifier safety, resource affinity, fresh reads,
 coordination, and failure classification. A table allowlist is not tenant
 authorization. Real handler scope decorators remain necessary.
 
+The coordinator owns LoggerStrategy reporting for validation and callback
+failures, including errors from this decorator and builder metadata. It records
+phase, participant tables, outcome, and safe scope context before propagating
+or classifying the failure. Coordinator acceptance tests must prove that path.
+The decorator preserves the original cause and adds no retry or I/O. Misuse of
+an escaped handle after closure reaches the caller's normal request or job
+exception boundary, which logs the programming error. It is not a database
+conflict and must not trigger a mutation retry.
+
 Acceptance tests exercise the public decorator contract with a recording query
 delegate. They prove all five methods, exact results and causes, root and join
 boundaries, builder reuse, aliases, descriptor changes, and permanent closure.
