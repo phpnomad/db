@@ -90,19 +90,21 @@ LoggerStrategy with the operation phase, table names, outcome classification,
 retry safety, and chained cause. Sensitive identity values are omitted or
 redacted. Logging must preserve the established outcome classification.
 
-Retry belongs to the caller's existing policy, never an adapter loop:
+Each invocation makes one attempt. Asynchronous retry belongs to durable queue
+redelivery, never an adapter or call-site loop:
 
 | Outcome | Caller action |
 | --- | --- |
 | Invalid or unsupported request | Correct configuration or input. Do not retry unchanged. |
 | Missing coordination record | Resolve the missing parent. Do not assume a transient conflict. |
-| Confirmed conflict and rollback | A caller may submit another bounded attempt. |
+| Confirmed conflict and rollback | Eligible for a bounded durable-queue redelivery. Synchronous callers surface failure. |
 | Callback failure with confirmed rollback | Propagate the cause. Only its owner can classify it as transient. |
 | Commit or rollback unknown | Reconcile through durable effect identity before any retry. |
 | Committed data with publication failure | Keep the committed result. Never repeat the database mutation to repair publication. |
 
 Queue callers use the existing durable queue's attempt limits, backoff, and
-terminal-failure reporting. Synchronous callers propagate failure and log it.
+terminal-failure reporting, with idempotency keys enforced at queue insertion.
+Synchronous callers propagate failure and log it, without business-level retries.
 An unknown outcome must be visible through LoggerStrategy and its distinct
 exception. This library adds no queue, retry scheduler, or dead-letter system.
 
