@@ -31,7 +31,7 @@ coordination, and failure classification. A table allowlist is not tenant
 authorization. Real handler scope decorators remain necessary.
 
 The coordinator owns LoggerStrategy reporting for validation and callback
-failures, including errors from this decorator and builder metadata. It records
+failures, including errors from this decorator and builder metadata. The coordinator records
 phase, participant tables, outcome, and safe scope context before propagating
 or classifying the failure. Coordinator acceptance tests must prove that path.
 The decorator preserves the original cause and adds no retry or I/O. Misuse of
@@ -55,8 +55,9 @@ and mocks of the application do not satisfy this downstream gate. The parent
 coordination contract also requires full Siren business-flow proof on each
 supported platform.
 
-One implementation packet owns OperationQueryStrategy. The implementer may
+One implementer owns OperationQueryStrategy. The implementer may
 remove the acceptance suite's incomplete marker, but may not edit assertions,
-public signatures, or this contract. A separate proof clone must first show
-that a conforming implementation passes and valid-source mutations fail at
-the intended assertions. The scratch implementation is never the deliverable.
+public signatures, or this contract. A separate temporary copy must first show
+that a correct implementation passes. Removing each promised behavior must
+produce its expected assertion failure while the code still compiles. The
+temporary implementation is discarded before production work begins.
