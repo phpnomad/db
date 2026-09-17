@@ -18,7 +18,6 @@ final class OperationQueryStrategyContractTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->markTestIncomplete('OperationQueryStrategy implementation packet is pending.');
     }
 
     /** @dataProvider methods */
