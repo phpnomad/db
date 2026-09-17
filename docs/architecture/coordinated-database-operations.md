@@ -17,10 +17,11 @@ this capability. Siren Core sees domain inputs and results, never tables,
 query builders, connections, or coordination commands. Attribution, filters,
 and score calculation stay outside persistence.
 
-Datastore is not database. Nothing here requires a REST-backed or file-backed
-datastore to implement a database interface. No such backend is being built.
-An application-specific strong datastore capability is separate from ordinary
-datastore CRUD. A handler may offer it only when it can fulfill the guarantee.
+Datastores describe storage-neutral application operations. Their contracts
+remain usable by database, REST, or file handlers. An application-specific
+strong datastore capability is separate from ordinary datastore CRUD. A handler
+may offer it only when it can fulfill the guarantee. Database-backed handlers
+can use this package's optional capability to do so.
 
 ## Optional contracts
 
