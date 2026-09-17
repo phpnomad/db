@@ -95,6 +95,22 @@ final class OperationQueryStrategyContractTest extends TestCase
         $operation->query($builder);
     }
 
+    public function testMetadataFailurePropagatesBeforeBuildOrDelegation(): void
+    {
+        $cause = new RuntimeException('query descriptors changed');
+        $builder = $this->createMock(InspectableQueryBuilder::class);
+        $builder->expects(self::once())->method('getReferencedTables')->willThrowException($cause);
+        $builder->expects(self::never())->method('build');
+        $operation = new OperationQueryStrategy($this->unusedDelegate(), [$this->table('scores')]);
+
+        try {
+            $operation->query($builder);
+            self::fail('Metadata failure must propagate.');
+        } catch (RuntimeException $caught) {
+            self::assertSame($cause, $caught);
+        }
+    }
+
     public function testEveryJoinMustBeDeclared(): void
     {
         $scores = $this->table('scores');
@@ -163,6 +179,16 @@ final class OperationQueryStrategyContractTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $operation->estimatedCount($this->table('Scores'));
+    }
+
+    /** @dataProvider methods */
+    public function testNumericLookingTableNamesRemainDistinctForEveryMethod(string $method): void
+    {
+        $outside = $this->table('0e123');
+        $operation = new OperationQueryStrategy($this->unusedDelegate(), [$this->table('0')]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $operation->$method(...$this->arguments($method, $outside, $this->builder([$outside])));
     }
 
     public function testChangingAParticipantDescriptorCannotAddAnAllowedName(): void
