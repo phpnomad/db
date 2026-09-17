@@ -152,17 +152,31 @@ final class OperationQueryStrategyContractTest extends TestCase
         $operation->query($builder);
     }
 
-    public function testRepeatedQueriesReturnFreshDelegateResults(): void
+    /** @dataProvider methods */
+    public function testRepeatedSuccessfulCallsAlwaysDelegateAndReturnFreshResults(string $method): void
     {
         $table = $this->table('scores');
         $builder = $this->builder([$table]);
+        $arguments = $this->arguments($method, $table, $builder);
+        $first = $this->result($method);
+        $second = $first;
+        if ($method === 'query') {
+            $second = [['score' => '15']];
+        } elseif ($method === 'insert') {
+            $second = ['id' => 8, 'tenantId' => 9];
+        } elseif ($method === 'estimatedCount') {
+            $second = 9;
+        }
         $delegate = $this->createMock(QueryStrategy::class);
-        $delegate->expects(self::exactly(2))->method('query')->with(self::identicalTo($builder))
-            ->willReturnOnConsecutiveCalls([['score' => '12']], [['score' => '15']]);
+        $expectation = $delegate->expects(self::exactly(2))->method($method)
+            ->with(...array_map(static fn ($argument) => self::identicalTo($argument), $arguments));
+        if ($method !== 'delete' && $method !== 'update') {
+            $expectation->willReturnOnConsecutiveCalls($first, $second);
+        }
         $operation = new OperationQueryStrategy($delegate, [$table]);
 
-        self::assertSame([['score' => '12']], $operation->query($builder));
-        self::assertSame([['score' => '15']], $operation->query($builder));
+        self::assertSame($first, $operation->$method(...$arguments));
+        self::assertSame($second, $operation->$method(...$arguments));
     }
 
     public function testAliasesAndDuplicateDeclarationsReferToTheSamePhysicalTable(): void
