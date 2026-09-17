@@ -221,12 +221,13 @@ final class OperationQueryStrategyContractTest extends TestCase
         self::assertSame($result, $operation->$method(...$arguments));
     }
 
-    public function testTableNamesAreComparedExactly(): void
+    /** @dataProvider distinctTableNames */
+    public function testTableNamesAreComparedExactly(string $declared, string $requested): void
     {
-        $operation = new OperationQueryStrategy($this->unusedDelegate(), [$this->table('scores')]);
+        $operation = new OperationQueryStrategy($this->unusedDelegate(), [$this->table($declared)]);
 
         $this->expectException(InvalidArgumentException::class);
-        $operation->estimatedCount($this->table('Scores'));
+        $operation->estimatedCount($this->table($requested));
     }
 
     /** @dataProvider methods */
@@ -383,6 +384,18 @@ final class OperationQueryStrategyContractTest extends TestCase
     public static function undeclaredSourcePositions(): array
     {
         return ['root' => [0], 'middle join' => [1], 'last join' => [2]];
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function distinctTableNames(): array
+    {
+        return [
+            'case' => ['scores', 'Scores'],
+            'quoted request' => ['scores', '`scores`'],
+            'quoted declaration' => ['`scores`', 'scores'],
+            'spaced request' => ['scores', ' scores '],
+            'spaced declaration' => [' scores ', 'scores'],
+        ];
     }
 
     /** @return array<string, array{array<mixed>}> */
