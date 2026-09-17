@@ -13,7 +13,7 @@ use PHPNomad\Database\Interfaces\QueryBuilder;
 use PHPNomad\Database\Interfaces\QueryStrategy;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
-use PHPUnit\Framework\TestCase;
+use PHPNomad\Database\Tests\TestCase;
 use ReflectionClass;
 
 /** Surface compatibility only. Adapter behavior has a separate conformance gate. */
