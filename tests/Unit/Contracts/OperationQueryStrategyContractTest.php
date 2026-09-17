@@ -95,6 +95,18 @@ final class OperationQueryStrategyContractTest extends TestCase
         $operation->query($builder);
     }
 
+    public function testClosingDoesNotControlTheDelegateConnection(): void
+    {
+        $delegate = $this->createMock(ConnectionOwningQueryStrategy::class);
+        $delegate->expects(self::never())->method('commit');
+        $delegate->expects(self::never())->method('rollBack');
+        $delegate->expects(self::never())->method('close');
+        $operation = new OperationQueryStrategy($delegate, [$this->table('scores')]);
+
+        $operation->close();
+        $operation->close();
+    }
+
     public function testMetadataFailurePropagatesBeforeBuildOrDelegation(): void
     {
         $cause = new RuntimeException('query descriptors changed');
@@ -449,4 +461,13 @@ final class OperationQueryStrategyContractTest extends TestCase
 
 interface InspectableQueryBuilder extends QueryBuilder, HasQueryTables
 {
+}
+
+interface ConnectionOwningQueryStrategy extends QueryStrategy
+{
+    public function commit(): bool;
+
+    public function rollBack(): bool;
+
+    public function close(): void;
 }
