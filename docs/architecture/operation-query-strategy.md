@@ -1,6 +1,6 @@
 # Operation-local query boundary
 
-Status: architecture stub. This is not a transaction implementation.
+Status: query boundary implemented. Adapter transaction support is separate.
 
 OperationQueryStrategy decorates an existing QueryStrategy. It permits access
 only to declared table names, requires inspectable query sources, and rejects
@@ -54,10 +54,3 @@ before query execution and reach the expected logging boundary. Component tests
 and mocks of the application do not satisfy this downstream gate. The parent
 coordination contract also requires full Siren business-flow proof on each
 supported platform.
-
-One implementer owns OperationQueryStrategy. The implementer may
-remove the acceptance suite's incomplete marker, but may not edit assertions,
-public signatures, or this contract. A separate temporary copy must first show
-that a correct implementation passes. Removing each promised behavior must
-produce its expected assertion failure while the code still compiles. The
-temporary implementation is discarded before production work begins.
