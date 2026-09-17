@@ -173,6 +173,25 @@ final class OperationQueryStrategyContractTest extends TestCase
         self::assertSame(8, $operation->estimatedCount($alias));
     }
 
+    /** @dataProvider methods */
+    public function testOtherAliasesNeedNoSeparateParticipantDeclaration(string $method): void
+    {
+        $declared = $this->table('scores', 's');
+        $alias = $this->table('scores', 'undeclared_alias');
+        $builder = $this->builder([$alias]);
+        $arguments = $this->arguments($method, $alias, $builder);
+        $result = $this->result($method);
+        $delegate = $this->createMock(QueryStrategy::class);
+        $expectation = $delegate->expects(self::once())->method($method)
+            ->with(...array_map(static fn ($argument) => self::identicalTo($argument), $arguments));
+        if ($method !== 'delete' && $method !== 'update') {
+            $expectation->willReturn($result);
+        }
+        $operation = new OperationQueryStrategy($delegate, [$declared]);
+
+        self::assertSame($result, $operation->$method(...$arguments));
+    }
+
     public function testTableNamesAreComparedExactly(): void
     {
         $operation = new OperationQueryStrategy($this->unusedDelegate(), [$this->table('scores')]);
