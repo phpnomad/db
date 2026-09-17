@@ -29,7 +29,8 @@ final class OperationQueryStrategyContractTest extends TestCase
         $arguments = $this->arguments($method, $table, $builder);
         $result = $this->result($method);
         $delegate = $this->createMock(QueryStrategy::class);
-        $expectation = $delegate->expects(self::once())->method($method)->with(...$arguments);
+        $expectation = $delegate->expects(self::once())->method($method)
+            ->with(...array_map(static fn ($argument) => self::identicalTo($argument), $arguments));
         if ($method !== 'delete' && $method !== 'update') {
             $expectation->willReturn($result);
         }
@@ -46,7 +47,9 @@ final class OperationQueryStrategyContractTest extends TestCase
         $arguments = $this->arguments($method, $table, $this->builder([$table]));
         $failure = new RuntimeException('original failure');
         $delegate = $this->createMock(QueryStrategy::class);
-        $delegate->expects(self::once())->method($method)->with(...$arguments)->willThrowException($failure);
+        $delegate->expects(self::once())->method($method)
+            ->with(...array_map(static fn ($argument) => self::identicalTo($argument), $arguments))
+            ->willThrowException($failure);
         $operation = new OperationQueryStrategy($delegate, [$table]);
 
         try {
@@ -109,7 +112,7 @@ final class OperationQueryStrategyContractTest extends TestCase
         $programs = $this->table('programs');
         $builder = $this->builder([$scores, $programs]);
         $delegate = $this->createMock(QueryStrategy::class);
-        $delegate->expects(self::once())->method('query')->with($builder)->willReturn([['score' => '12']]);
+        $delegate->expects(self::once())->method('query')->with(self::identicalTo($builder))->willReturn([['score' => '12']]);
         $operation = new OperationQueryStrategy($delegate, [$scores, $programs]);
 
         self::assertSame([['score' => '12']], $operation->query($builder));
@@ -122,7 +125,7 @@ final class OperationQueryStrategyContractTest extends TestCase
         $builder->expects(self::exactly(2))->method('getReferencedTables')
             ->willReturnOnConsecutiveCalls([$table], [$table, $this->table('outside')]);
         $delegate = $this->createMock(QueryStrategy::class);
-        $delegate->expects(self::once())->method('query')->with($builder)->willReturn([['id' => '7']]);
+        $delegate->expects(self::once())->method('query')->with(self::identicalTo($builder))->willReturn([['id' => '7']]);
         $operation = new OperationQueryStrategy($delegate, [$table]);
         self::assertSame([['id' => '7']], $operation->query($builder));
 
@@ -135,7 +138,7 @@ final class OperationQueryStrategyContractTest extends TestCase
         $table = $this->table('scores');
         $builder = $this->builder([$table]);
         $delegate = $this->createMock(QueryStrategy::class);
-        $delegate->expects(self::exactly(2))->method('query')->with($builder)
+        $delegate->expects(self::exactly(2))->method('query')->with(self::identicalTo($builder))
             ->willReturnOnConsecutiveCalls([['score' => '12']], [['score' => '15']]);
         $operation = new OperationQueryStrategy($delegate, [$table]);
 
@@ -148,7 +151,7 @@ final class OperationQueryStrategyContractTest extends TestCase
         $table = $this->table('scores', 's');
         $alias = $this->table('scores', 'other_alias');
         $delegate = $this->createMock(QueryStrategy::class);
-        $delegate->expects(self::once())->method('estimatedCount')->with($alias)->willReturn(8);
+        $delegate->expects(self::once())->method('estimatedCount')->with(self::identicalTo($alias))->willReturn(8);
         $operation = new OperationQueryStrategy($delegate, [$table, $alias]);
 
         self::assertSame(8, $operation->estimatedCount($alias));
@@ -185,7 +188,7 @@ final class OperationQueryStrategyContractTest extends TestCase
         });
         $original = $this->table('scores');
         $delegate = $this->createMock(QueryStrategy::class);
-        $delegate->expects(self::once())->method('estimatedCount')->with($original)->willReturn(3);
+        $delegate->expects(self::once())->method('estimatedCount')->with(self::identicalTo($original))->willReturn(3);
         $operation = new OperationQueryStrategy($delegate, [$table]);
         $name = 'private_accounts';
 
