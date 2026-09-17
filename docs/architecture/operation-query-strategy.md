@@ -46,6 +46,15 @@ They are unit contracts because the decorator performs no I/O. Later adapter
 and handler integration tests must exercise this class through real bindings
 and real database operations. These contracts do not prove atomicity.
 
+Before coordinated application behavior is complete, an end-to-end test must
+drive a representative request or job in the real running application through
+its production handler and coordinator bindings. Against a real database, a
+declared joined query must return seeded rows. An undeclared join must fail
+before query execution and reach the expected logging boundary. Component tests
+and mocks of the application do not satisfy this downstream gate. The parent
+coordination contract also requires full Siren business-flow proof on each
+supported platform.
+
 One implementation packet owns OperationQueryStrategy. The implementer may
 remove the acceptance suite's incomplete marker, but may not edit assertions,
 public signatures, or this contract. A separate proof clone must first show
