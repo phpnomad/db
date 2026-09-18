@@ -66,6 +66,48 @@ final class UncachedPrimarySchemaContractTest extends TestCase
         self::assertSame([$firstColumn], $schema->getPrimaryColumnsForTableUncached($first));
     }
 
+    /** @dataProvider uncachedLookups */
+    public function testEachLookupReadsMetadataChangesOnTheSameDescriptor(string $lookup): void
+    {
+        $first = new Column('firstId', 'BIGINT', null, 'PRIMARY KEY');
+        $second = new Column('secondId', 'VARCHAR', [64], 'PRIMARY KEY');
+        $ordinary = new Column('score', 'BIGINT');
+        $columns = [$ordinary, $first];
+        $singular = 'first';
+        $table = $this->createMock(Table::class);
+        $table->method('getName')->willReturn('same_physical_name');
+        $table->method('getColumns')->willReturnCallback(static function () use (&$columns): array { return $columns; });
+        $table->method('getIndices')->willReturn([]);
+        $table->method('getSingularUnprefixedName')->willReturnCallback(static function () use (&$singular): string { return $singular; });
+        $schema = $this->withoutCacheAccess();
+
+        $expected = match ($lookup) {
+            'getPrimaryColumnsForTableUncached' => [1 => $first],
+            'getPrimaryColumnNameForTableUncached' => $first,
+            default => 'firstFirstId',
+        };
+        self::assertSame($expected, $schema->$lookup($table));
+
+        $columns = [$second, $ordinary];
+        $singular = 'second';
+        $expected = match ($lookup) {
+            'getPrimaryColumnsForTableUncached' => [$second],
+            'getPrimaryColumnNameForTableUncached' => $second,
+            default => 'secondSecondId',
+        };
+        self::assertSame($expected, $schema->$lookup($table));
+    }
+
+    /** @return array<string, array{string}> */
+    public static function uncachedLookups(): array
+    {
+        return [
+            'columns' => ['getPrimaryColumnsForTableUncached'],
+            'primary column' => ['getPrimaryColumnNameForTableUncached'],
+            'junction name' => ['getJunctionColumnNameFromTableUncached'],
+        ];
+    }
+
     /** @dataProvider descriptorFailures */
     public function testDescriptorFailuresPropagateUnchangedWithoutCacheAccess(string $method, string $kind, string $lookup): void
     {
