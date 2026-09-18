@@ -16,11 +16,6 @@ use RuntimeException;
 /** Covers descriptor lookup. Later integration tests cover query and event publication. */
 final class UncachedPrimarySchemaContractTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-    }
-
     /**
      * @dataProvider primaryDeclarations
      * @param 'attribute'|'compound index'|'mixed declarations'|'unique only'|'no primary key' $kind
