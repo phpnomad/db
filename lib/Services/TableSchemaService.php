@@ -35,7 +35,8 @@ class TableSchemaService
 
     /**
      * Read the supplied descriptor without consulting or changing shared cache.
-     * Returns the same primary-column metadata as the cached lookup on a miss.
+     * Returns the same primary-column metadata that the cached lookup computes
+     * after a cache miss.
      * Descriptor failures propagate unchanged. This does not inspect storage.
      * Custom descriptors must provide stable, side-effect-free metadata.
      *
