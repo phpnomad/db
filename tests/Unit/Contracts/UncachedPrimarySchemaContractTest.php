@@ -5,6 +5,7 @@ namespace PHPNomad\Database\Tests\Unit\Contracts;
 use Error;
 use PHPNomad\Cache\Enums\Operation;
 use PHPNomad\Cache\Services\CacheableService;
+use PHPNomad\Database\Exceptions\ColumnNotFoundException;
 use PHPNomad\Database\Factories\Column;
 use PHPNomad\Database\Factories\Index;
 use PHPNomad\Database\Interfaces\Table;
@@ -66,7 +67,7 @@ final class UncachedPrimarySchemaContractTest extends TestCase
     }
 
     /** @dataProvider descriptorFailures */
-    public function testDescriptorFailuresPropagateUnchangedWithoutCacheAccess(string $method, string $kind): void
+    public function testDescriptorFailuresPropagateUnchangedWithoutCacheAccess(string $method, string $kind, string $lookup): void
     {
         $original = $kind === 'error' ? new Error('Descriptor unavailable') : new RuntimeException('Descriptor unavailable');
         $table = $this->createMock(Table::class);
@@ -74,7 +75,7 @@ final class UncachedPrimarySchemaContractTest extends TestCase
         $schema = $this->withoutCacheAccess();
         $caught = null;
         try {
-            $schema->getPrimaryColumnsForTableUncached($table);
+            $schema->$lookup($table);
         } catch (RuntimeException|Error $failure) {
             $caught = $failure;
         }
@@ -82,7 +83,8 @@ final class UncachedPrimarySchemaContractTest extends TestCase
         self::assertSame($original, $caught);
     }
 
-    public function testTheExistingCachedLookupStillUsesItsConfiguredCache(): void
+    /** @dataProvider cachedLookups */
+    public function testTheExistingCachedLookupStillUsesItsConfiguredCache(string $method): void
     {
         $column = new Column('cachedId', 'BIGINT', null, 'PRIMARY KEY');
         $cache = $this->createMock(CacheableService::class);
@@ -91,10 +93,85 @@ final class UncachedPrimarySchemaContractTest extends TestCase
         )->willReturn([$column]);
         $table = $this->createMock(Table::class);
         $table->method('getName')->willReturn('existing');
+        $table->method('getSingularUnprefixedName')->willReturn('existing');
         $table->expects(self::never())->method('getColumns');
         $table->expects(self::never())->method('getIndices');
 
-        self::assertSame([$column], (new TableSchemaService($cache))->getPrimaryColumnsForTable($table));
+        $expected = match ($method) {
+            'getPrimaryColumnsForTable' => [$column],
+            'getPrimaryColumnNameForTable' => $column,
+            default => 'existingCachedId',
+        };
+        self::assertSame($expected, (new TableSchemaService($cache))->$method($table));
+    }
+
+    /** @return array<string, array{string}> */
+    public static function cachedLookups(): array
+    {
+        return [
+            'columns' => ['getPrimaryColumnsForTable'],
+            'primary name' => ['getPrimaryColumnNameForTable'],
+            'junction name' => ['getJunctionColumnNameFromTable'],
+        ];
+    }
+
+    public function testUncachedNameHelpersPreserveTheColumnAndExistingJunctionNaming(): void
+    {
+        $column = new Column('externalKey', 'VARCHAR', [64], 'PRIMARY KEY');
+        $table = $this->createMock(Table::class);
+        $table->method('getColumns')->willReturn([$column]);
+        $table->method('getIndices')->willReturn([]);
+        $table->method('getSingularUnprefixedName')->willReturn('program');
+        $schema = $this->withoutCacheAccess();
+
+        self::assertSame($column, $schema->getPrimaryColumnNameForTableUncached($table));
+        self::assertSame('programExternalKey', $schema->getJunctionColumnNameFromTableUncached($table));
+    }
+
+    /** @dataProvider invalidNameCardinality */
+    public function testUncachedNameHelpersRetainTheExactlyOneColumnRule(string $method, bool $compound): void
+    {
+        $table = $this->createMock(Table::class);
+        $table->method('getColumns')->willReturn($compound ? [new Column('tenantId', 'BIGINT'), new Column('id', 'BIGINT')] : []);
+        $table->method('getIndices')->willReturn($compound ? [new Index(['tenantId', 'id'], null, 'PRIMARY KEY')] : []);
+        $schema = $this->withoutCacheAccess();
+
+        $this->expectException(ColumnNotFoundException::class);
+        $this->expectExceptionMessage('Junction Tables must have exactly one primary key column.');
+        $schema->$method($table);
+    }
+
+    public function testNameHelpersDoNotReuseAnotherDescriptorWithTheSamePhysicalName(): void
+    {
+        $firstColumn = new Column('firstId', 'BIGINT', null, 'PRIMARY KEY');
+        $secondColumn = new Column('secondId', 'BIGINT', null, 'PRIMARY KEY');
+        $first = $this->createMock(Table::class);
+        $first->method('getName')->willReturn('same_physical_name');
+        $first->method('getSingularUnprefixedName')->willReturn('first');
+        $first->method('getColumns')->willReturn([$firstColumn]);
+        $first->method('getIndices')->willReturn([]);
+        $second = $this->createMock(Table::class);
+        $second->method('getName')->willReturn('same_physical_name');
+        $second->method('getSingularUnprefixedName')->willReturn('second');
+        $second->method('getColumns')->willReturn([$secondColumn]);
+        $second->method('getIndices')->willReturn([]);
+        $schema = $this->withoutCacheAccess();
+
+        self::assertSame($firstColumn, $schema->getPrimaryColumnNameForTableUncached($first));
+        self::assertSame($secondColumn, $schema->getPrimaryColumnNameForTableUncached($second));
+        self::assertSame('firstFirstId', $schema->getJunctionColumnNameFromTableUncached($first));
+        self::assertSame('secondSecondId', $schema->getJunctionColumnNameFromTableUncached($second));
+    }
+
+    /** @return array<string, array{string, bool}> */
+    public static function invalidNameCardinality(): array
+    {
+        return [
+            'primary absent' => ['getPrimaryColumnNameForTableUncached', false],
+            'primary compound' => ['getPrimaryColumnNameForTableUncached', true],
+            'junction absent' => ['getJunctionColumnNameFromTableUncached', false],
+            'junction compound' => ['getJunctionColumnNameFromTableUncached', true],
+        ];
     }
 
     private function withoutCacheAccess(): TableSchemaService
@@ -116,12 +193,17 @@ final class UncachedPrimarySchemaContractTest extends TestCase
         ];
     }
 
-    /** @return array<string, array{string, string}> */
+    /** @return array<string, array{string, string, string}> */
     public static function descriptorFailures(): array
     {
-        return [
-            'columns exception' => ['getColumns', 'exception'], 'columns error' => ['getColumns', 'error'],
-            'indices exception' => ['getIndices', 'exception'], 'indices error' => ['getIndices', 'error'],
-        ];
+        $cases = [];
+        foreach (['getPrimaryColumnsForTableUncached', 'getPrimaryColumnNameForTableUncached', 'getJunctionColumnNameFromTableUncached'] as $lookup) {
+            foreach (['getColumns', 'getIndices'] as $method) {
+                foreach (['exception', 'error'] as $kind) {
+                    $cases[$lookup . ' ' . $method . ' ' . $kind] = [$method, $kind, $lookup];
+                }
+            }
+        }
+        return $cases;
     }
 }
