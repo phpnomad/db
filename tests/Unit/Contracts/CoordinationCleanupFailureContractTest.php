@@ -13,12 +13,6 @@ use RuntimeException;
 /** Keeps both causes without depending on a storage adapter. Each adapter tests its cleanup behavior. */
 final class CoordinationCleanupFailureContractTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->markTestIncomplete('Coordinated cleanup failure implementation assignment is pending.');
-    }
-
     /** @dataProvider causeKinds */
     public function testBothOriginalFailuresRemainInspectableAsAnUnknownOutcome(bool $operationIsError, bool $cleanupIsError): void
     {
