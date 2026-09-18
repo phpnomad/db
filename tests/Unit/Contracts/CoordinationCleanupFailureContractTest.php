@@ -10,7 +10,7 @@ use PHPNomad\Datastore\Exceptions\DatastoreErrorException;
 use PHPNomad\Database\Tests\TestCase;
 use RuntimeException;
 
-/** Storage-neutral cause retention. Real cleanup behavior belongs to each adapter. */
+/** Keeps both causes without depending on a storage adapter. Each adapter tests its cleanup behavior. */
 final class CoordinationCleanupFailureContractTest extends TestCase
 {
     protected function setUp(): void
