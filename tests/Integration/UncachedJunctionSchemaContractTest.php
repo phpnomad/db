@@ -32,7 +32,6 @@ final class UncachedJunctionSchemaContractTest extends TestCase
             $cache->expects(self::never())->method($method);
         }
         $this->schema = new TableSchemaService($cache);
-        $this->markTestIncomplete('Uncached junction metadata implementation assignment is pending.');
     }
 
     public function testBuiltInJunctionMetadataAvoidsTheSharedCacheBoundary(): void
