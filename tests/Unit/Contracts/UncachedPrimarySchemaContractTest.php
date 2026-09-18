@@ -112,6 +112,12 @@ final class UncachedPrimarySchemaContractTest extends TestCase
     {
         $original = $kind === 'error' ? new Error('Descriptor unavailable') : new RuntimeException('Descriptor unavailable');
         $table = $this->createMock(Table::class);
+        if ($method !== 'getColumns') {
+            $table->method('getColumns')->willReturn([new Column('id', 'BIGINT', null, 'PRIMARY KEY')]);
+        }
+        if ($method !== 'getIndices') {
+            $table->method('getIndices')->willReturn([]);
+        }
         $table->expects(self::once())->method($method)->willThrowException($original);
         $schema = $this->withoutCacheAccess();
         $caught = null;
@@ -244,6 +250,9 @@ final class UncachedPrimarySchemaContractTest extends TestCase
                     $cases[$lookup . ' ' . $method . ' ' . $kind] = [$method, $kind, $lookup];
                 }
             }
+        }
+        foreach (['exception', 'error'] as $kind) {
+            $cases['junction singular name ' . $kind] = ['getSingularUnprefixedName', $kind, 'getJunctionColumnNameFromTableUncached'];
         }
         return $cases;
     }
