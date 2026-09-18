@@ -34,6 +34,52 @@ class TableSchemaService
     }
 
     /**
+     * Read the supplied descriptor without consulting or changing shared cache.
+     * Returns the same primary-column metadata as the cached lookup on a miss.
+     * Descriptor failures propagate unchanged. This does not inspect storage.
+     * Custom descriptors must provide stable, side-effect-free metadata.
+     *
+     * @return Column[]
+     */
+    public function getPrimaryColumnsForTableUncached(TableInterface $table): array
+    {
+        return $this->findPrimaryColumns($table);
+    }
+
+    /**
+     * Return the descriptor's sole primary Column without shared cache access.
+     * Preserves the cached helper's cardinality rule and original Column object.
+     *
+     * @throws ColumnNotFoundException When there is not exactly one primary column.
+     */
+    public function getPrimaryColumnNameForTableUncached(TableInterface $table): Column
+    {
+        $primaryColumns = $this->getPrimaryColumnsForTableUncached($table);
+
+        if (count($primaryColumns) !== 1) {
+            throw new ColumnNotFoundException('Junction Tables must have exactly one primary key column.');
+        }
+
+        /** @var Column $primaryColumn */
+        $primaryColumn = Arr::first($primaryColumns);
+
+        return $primaryColumn;
+    }
+
+    /**
+     * Compose the existing junction-column name without shared cache access.
+     * Descriptor failures propagate unchanged.
+     *
+     * @throws ColumnNotFoundException When there is not exactly one primary column.
+     */
+    public function getJunctionColumnNameFromTableUncached(TableInterface $table): string
+    {
+        $primaryColumn = $this->getPrimaryColumnNameForTableUncached($table);
+
+        return $table->getSingularUnprefixedName() . ucfirst($primaryColumn->getName());
+    }
+
+    /**
      * Locates the primary columns used for this table.
      *
      * @param TableInterface $table
