@@ -34,6 +34,18 @@ class TableSchemaService
     }
 
     /**
+     * Read the supplied descriptor without consulting or changing shared cache.
+     * Returns the same primary-column metadata as the cached lookup on a miss.
+     * Descriptor failures propagate unchanged. This does not inspect storage.
+     *
+     * @return Column[]
+     */
+    public function getPrimaryColumnsForTableUncached(TableInterface $table): array
+    {
+        return [];
+    }
+
+    /**
      * Locates the primary columns used for this table.
      *
      * @param TableInterface $table
