@@ -13,7 +13,7 @@ use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Tests\TestCase;
 use RuntimeException;
 
-/** Pure descriptor lookup. Real query and publication wiring has a later gate. */
+/** Covers descriptor lookup. Later integration tests cover query and event publication. */
 final class UncachedPrimarySchemaContractTest extends TestCase
 {
     protected function setUp(): void

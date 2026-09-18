@@ -19,7 +19,7 @@ use PHPNomad\Logger\Interfaces\LoggerStrategy;
 use PHPUnit\Framework\MockObject\MockObject;
 use RuntimeException;
 
-/** Real junction and schema-service wiring with a verified shared-cache boundary. */
+/** Wires JunctionTable to TableSchemaService and asserts that no shared-cache method runs. */
 final class UncachedJunctionSchemaContractTest extends TestCase
 {
     private TableSchemaService $schema;
