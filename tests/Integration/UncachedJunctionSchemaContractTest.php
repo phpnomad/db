@@ -69,12 +69,14 @@ final class UncachedJunctionSchemaContractTest extends TestCase
     }
 
     /** @dataProvider descriptorFailures */
-    public function testLeafDescriptorFailureReachesTheCallerUnchanged(string $kind): void
+    public function testLeafDescriptorFailureReachesTheCallerUnchanged(string $kind, string $side): void
     {
         $failure = $kind === 'error' ? new Error('Leaf metadata failure') : new RuntimeException('Leaf metadata failure');
-        $left = $this->table('program', 'id', false);
-        $left->method('getColumns')->willThrowException($failure);
-        $junction = $this->junction($left, $this->table('distributor', 'id'));
+        $left = $this->table('program', 'id', $side !== 'left');
+        $right = $this->table('distributor', 'id', $side !== 'right');
+        $leaf = $side === 'left' ? $left : $right;
+        $leaf->expects(self::once())->method('getColumns')->willThrowException($failure);
+        $junction = $this->junction($left, $right);
         $caught = null;
         try {
             $junction->getColumns();
@@ -84,10 +86,13 @@ final class UncachedJunctionSchemaContractTest extends TestCase
         self::assertSame($failure, $caught);
     }
 
-    /** @return array<string, array{string}> */
+    /** @return array<string, array{string, string}> */
     public static function descriptorFailures(): array
     {
-        return ['exception' => ['exception'], 'error' => ['error']];
+        return [
+            'left exception' => ['exception', 'left'], 'left error' => ['error', 'left'],
+            'right exception' => ['exception', 'right'], 'right error' => ['error', 'right'],
+        ];
     }
 
     /** @return Table&MockObject */
