@@ -43,7 +43,7 @@ class TableSchemaService
      */
     public function getPrimaryColumnsForTableUncached(TableInterface $table): array
     {
-        return [];
+        return $this->findPrimaryColumns($table);
     }
 
     /**
@@ -54,7 +54,16 @@ class TableSchemaService
      */
     public function getPrimaryColumnNameForTableUncached(TableInterface $table): Column
     {
-        return new Column('', 'BIGINT');
+        $primaryColumns = $this->getPrimaryColumnsForTableUncached($table);
+
+        if (count($primaryColumns) !== 1) {
+            throw new ColumnNotFoundException('Junction Tables must have exactly one primary key column.');
+        }
+
+        /** @var Column $primaryColumn */
+        $primaryColumn = Arr::first($primaryColumns);
+
+        return $primaryColumn;
     }
 
     /**
@@ -65,7 +74,9 @@ class TableSchemaService
      */
     public function getJunctionColumnNameFromTableUncached(TableInterface $table): string
     {
-        return '';
+        $primaryColumn = $this->getPrimaryColumnNameForTableUncached($table);
+
+        return $table->getSingularUnprefixedName() . ucfirst($primaryColumn->getName());
     }
 
     /**

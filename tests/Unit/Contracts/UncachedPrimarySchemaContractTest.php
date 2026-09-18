@@ -19,7 +19,6 @@ final class UncachedPrimarySchemaContractTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->markTestIncomplete('Uncached schema lookup implementation assignment is pending.');
     }
 
     /**
