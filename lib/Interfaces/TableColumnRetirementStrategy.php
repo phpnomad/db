@@ -30,8 +30,10 @@ interface TableColumnRetirementStrategy extends TableUpdateStrategy
      *
      * The request must contain at least one name, and the whole request must be
      * validated before any mutation. A requested column that is absent is an
-     * idempotent no-op. A requested column that remains declared by the supplied
-     * table, using backend case semantics, is invalid. Implementations must not
+     * idempotent no-op. Multiple requested spellings that identify the same
+     * persisted column under backend case semantics are deduplicated to one
+     * retirement. A requested column that remains declared by the supplied
+     * table, using those same semantics, is invalid. Implementations must not
      * implicitly remove indexes or foreign keys: a requested column with either
      * dependency is refused before DDL. Only requested, currently present, and
      * fully preflighted columns may be retired; unrelated columns are preserved.
