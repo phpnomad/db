@@ -1,6 +1,6 @@
 <?php
 
-namespace PHPNomad\Database\Tests\Integration;
+namespace PHPNomad\Database\Tests\Unit\Contracts;
 
 use Error;
 use PHPNomad\Cache\Services\CacheableService;
