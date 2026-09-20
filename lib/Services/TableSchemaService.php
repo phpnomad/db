@@ -34,11 +34,11 @@ class TableSchemaService
     }
 
     /**
-     * Read the supplied descriptor without consulting or changing shared cache.
-     * Returns the same primary-column metadata that the cached lookup computes
-     * after a cache miss.
+     * Read the supplied descriptor without this service consulting or changing
+     * its shared cache. Returns the same primary-column metadata that the cached
+     * lookup computes after a cache miss.
      * Descriptor failures propagate unchanged. This does not inspect storage.
-     * Custom descriptors must provide stable, side-effect-free metadata.
+     * Descriptor callbacks may invoke cached methods or perform other side effects.
      *
      * @return Column[]
      */
@@ -48,8 +48,9 @@ class TableSchemaService
     }
 
     /**
-     * Return the descriptor's sole primary Column without shared cache access.
-     * Preserves the cached helper's cardinality rule and original Column object.
+     * Return the descriptor's sole primary Column without this service accessing
+     * its shared cache. Preserves the cached helper's cardinality rule and original
+     * Column object. Descriptor callbacks may cross their own cache boundaries.
      *
      * @throws ColumnNotFoundException When there is not exactly one primary column.
      */
@@ -68,8 +69,9 @@ class TableSchemaService
     }
 
     /**
-     * Compose the existing junction-column name without shared cache access.
-     * Descriptor failures propagate unchanged.
+     * Compose the existing junction-column name without this service accessing
+     * its shared cache. Descriptor failures propagate unchanged. Descriptor
+     * callbacks may cross their own cache boundaries.
      *
      * @throws ColumnNotFoundException When there is not exactly one primary column.
      */

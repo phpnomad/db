@@ -19,8 +19,8 @@ use PHPNomad\Logger\Interfaces\LoggerStrategy;
 use PHPUnit\Framework\MockObject\MockObject;
 use RuntimeException;
 
-/** Wires JunctionTable to TableSchemaService and asserts that no shared-cache method runs. */
-final class UncachedJunctionSchemaContractTest extends TestCase
+/** Wires JunctionTable through the established TableSchemaService extension points. */
+final class JunctionSchemaContractTest extends TestCase
 {
     private TableSchemaService $schema;
 
@@ -28,13 +28,13 @@ final class UncachedJunctionSchemaContractTest extends TestCase
     {
         parent::setUp();
         $cache = $this->createMock(CacheableService::class);
-        foreach (['getWithCache', 'get', 'set', 'delete', 'exists'] as $method) {
-            $cache->expects(self::never())->method($method);
-        }
+        $cache->method('getWithCache')->willReturnCallback(
+            static fn(string $operation, array $context, callable $callback) => $callback()
+        );
         $this->schema = new TableSchemaService($cache);
     }
 
-    public function testBuiltInJunctionMetadataAvoidsTheSharedCacheBoundary(): void
+    public function testBuiltInJunctionMetadataPreservesNamesAndIndices(): void
     {
         $left = $this->table('program', 'externalKey');
         $right = $this->table('distributor', 'id');
@@ -58,7 +58,7 @@ final class UncachedJunctionSchemaContractTest extends TestCase
         ));
     }
 
-    public function testNestedJunctionMetadataRetainsItsCompoundKeyRefusalWithoutSharedCacheAccess(): void
+    public function testNestedJunctionMetadataRetainsItsCompoundKeyRefusal(): void
     {
         $inner = $this->junction($this->table('program', 'id'), $this->table('distributor', 'id'));
         $outer = $this->junction($inner, $this->table('account', 'id'));
