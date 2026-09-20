@@ -41,7 +41,7 @@ final class JunctionSchemaOverrideCompatibilityTest extends TestCase
         /** @var list<TableInterface> $seen */
         $seen = [];
         $schema->method('getJunctionColumnNameFromTable')->willReturnCallback(
-            static fn(TableInterface $table): string => $table === $left ? 'leftLink' : 'rightLink'
+            static fn (TableInterface $table): string => $table === $left ? 'leftLink' : 'rightLink'
         );
         $schema->expects(self::exactly(2))->method('getPrimaryColumnNameForTable')->willReturnCallback(
             static function (TableInterface $table) use ($left, &$seen): Column {
@@ -58,7 +58,7 @@ final class JunctionSchemaOverrideCompatibilityTest extends TestCase
         self::assertSame([
             ['FOREIGN KEY', ['leftLink'], ['REFERENCES lefts(externalLeft)']],
             ['FOREIGN KEY', ['rightLink'], ['REFERENCES rights(externalRight)']],
-        ], array_map(static fn(Index $index): array => [
+        ], array_map(static fn (Index $index): array => [
             $index->getType(), $index->getColumns(), $index->getAttributes(),
         ], array_slice($indices, 1)));
     }
@@ -88,13 +88,24 @@ final class JunctionSchemaOverrideCompatibilityTest extends TestCase
 
     private function junction(TableSchemaService $schema, Table $left, Table $right): JunctionTable
     {
-        return new class(
-            $this->createMock(HasLocalDatabasePrefix::class), $this->createMock(HasGlobalDatabasePrefix::class),
-            $this->createMock(HasCharsetProvider::class), $this->createMock(HasCollateProvider::class),
-            $schema, $left, $right, $this->createMock(LoggerStrategy::class)
+        return new class (
+            $this->createMock(HasLocalDatabasePrefix::class),
+            $this->createMock(HasGlobalDatabasePrefix::class),
+            $this->createMock(HasCharsetProvider::class),
+            $this->createMock(HasCollateProvider::class),
+            $schema,
+            $left,
+            $right,
+            $this->createMock(LoggerStrategy::class)
         ) extends JunctionTable {
-            public function getTableVersion(): string { return '1'; }
-            public function getSingularUnprefixedName(): string { return 'link'; }
+            public function getTableVersion(): string
+            {
+                return '1';
+            }
+            public function getSingularUnprefixedName(): string
+            {
+                return 'link';
+            }
         };
     }
 }

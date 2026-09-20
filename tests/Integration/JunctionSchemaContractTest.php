@@ -29,7 +29,7 @@ final class JunctionSchemaContractTest extends TestCase
         parent::setUp();
         $cache = $this->createMock(CacheableService::class);
         $cache->method('getWithCache')->willReturnCallback(
-            static fn(string $operation, array $context, callable $callback) => $callback()
+            static fn (string $operation, array $context, callable $callback) => $callback()
         );
         $this->schema = new TableSchemaService($cache);
     }
@@ -47,14 +47,15 @@ final class JunctionSchemaContractTest extends TestCase
         self::assertSame(['programExternalKey', 'distributorId'], $junction->getFieldsForIdentity());
         self::assertSame([
             ['programExternalKey', 'BIGINT'], ['distributorId', 'BIGINT'],
-        ], array_map(static fn(Column $column): array => [$column->getName(), $column->getType()], $junction->getColumns()));
+        ], array_map(static fn (Column $column): array => [$column->getName(), $column->getType()], $junction->getColumns()));
         self::assertSame([
             ['PRIMARY KEY', ['distributorId', 'programExternalKey'], []],
             ['FOREIGN KEY', ['programExternalKey'], ['REFERENCES global_local_programs(externalKey)']],
             ['FOREIGN KEY', ['distributorId'], ['REFERENCES global_local_distributors(id)']],
-        ], array_map(static fn(Index $index): array => [$index->getType(), $index->getColumns(), $index->getAttributes()], $junction->getIndices()));
+        ], array_map(static fn (Index $index): array => [$index->getType(), $index->getColumns(), $index->getAttributes()], $junction->getIndices()));
         self::assertSame(['programExternalKey', 'distributorId'], array_map(
-            static fn(Column $column): string => $column->getName(), $this->schema->getPrimaryColumnsForTableUncached($junction)
+            static fn (Column $column): string => $column->getName(),
+            $this->schema->getPrimaryColumnsForTableUncached($junction)
         ));
     }
 
@@ -111,9 +112,15 @@ final class JunctionSchemaContractTest extends TestCase
     private function junction(Table $left, Table $right): JunctionTable
     {
         $arguments = [...$this->tableArguments(), $left, $right, $this->createMock(LoggerStrategy::class)];
-        return new class(...$arguments) extends JunctionTable {
-            public function getTableVersion(): string { return '1'; }
-            public function getSingularUnprefixedName(): string { return 'link'; }
+        return new class (...$arguments) extends JunctionTable {
+            public function getTableVersion(): string
+            {
+                return '1';
+            }
+            public function getSingularUnprefixedName(): string
+            {
+                return 'link';
+            }
         };
     }
 
