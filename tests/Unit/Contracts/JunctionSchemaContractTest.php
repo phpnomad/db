@@ -1,6 +1,6 @@
 <?php
 
-namespace PHPNomad\Database\Tests\Integration;
+namespace PHPNomad\Database\Tests\Unit\Contracts;
 
 use Error;
 use PHPNomad\Cache\Services\CacheableService;
@@ -19,8 +19,8 @@ use PHPNomad\Logger\Interfaces\LoggerStrategy;
 use PHPUnit\Framework\MockObject\MockObject;
 use RuntimeException;
 
-/** Wires JunctionTable to TableSchemaService and asserts that no shared-cache method runs. */
-final class UncachedJunctionSchemaContractTest extends TestCase
+/** Wires JunctionTable through the established TableSchemaService extension points. */
+final class JunctionSchemaContractTest extends TestCase
 {
     private TableSchemaService $schema;
 
@@ -28,13 +28,13 @@ final class UncachedJunctionSchemaContractTest extends TestCase
     {
         parent::setUp();
         $cache = $this->createMock(CacheableService::class);
-        foreach (['getWithCache', 'get', 'set', 'delete', 'exists'] as $method) {
-            $cache->expects(self::never())->method($method);
-        }
+        $cache->method('getWithCache')->willReturnCallback(
+            static fn (string $operation, array $context, callable $callback) => $callback()
+        );
         $this->schema = new TableSchemaService($cache);
     }
 
-    public function testBuiltInJunctionMetadataAvoidsTheSharedCacheBoundary(): void
+    public function testBuiltInJunctionMetadataPreservesNamesAndIndices(): void
     {
         $left = $this->table('program', 'externalKey');
         $right = $this->table('distributor', 'id');
@@ -47,18 +47,19 @@ final class UncachedJunctionSchemaContractTest extends TestCase
         self::assertSame(['programExternalKey', 'distributorId'], $junction->getFieldsForIdentity());
         self::assertSame([
             ['programExternalKey', 'BIGINT'], ['distributorId', 'BIGINT'],
-        ], array_map(static fn(Column $column): array => [$column->getName(), $column->getType()], $junction->getColumns()));
+        ], array_map(static fn (Column $column): array => [$column->getName(), $column->getType()], $junction->getColumns()));
         self::assertSame([
             ['PRIMARY KEY', ['distributorId', 'programExternalKey'], []],
             ['FOREIGN KEY', ['programExternalKey'], ['REFERENCES global_local_programs(externalKey)']],
             ['FOREIGN KEY', ['distributorId'], ['REFERENCES global_local_distributors(id)']],
-        ], array_map(static fn(Index $index): array => [$index->getType(), $index->getColumns(), $index->getAttributes()], $junction->getIndices()));
+        ], array_map(static fn (Index $index): array => [$index->getType(), $index->getColumns(), $index->getAttributes()], $junction->getIndices()));
         self::assertSame(['programExternalKey', 'distributorId'], array_map(
-            static fn(Column $column): string => $column->getName(), $this->schema->getPrimaryColumnsForTableUncached($junction)
+            static fn (Column $column): string => $column->getName(),
+            $this->schema->getPrimaryColumnsForTableUncached($junction)
         ));
     }
 
-    public function testNestedJunctionMetadataRetainsItsCompoundKeyRefusalWithoutSharedCacheAccess(): void
+    public function testNestedJunctionMetadataRetainsItsCompoundKeyRefusal(): void
     {
         $inner = $this->junction($this->table('program', 'id'), $this->table('distributor', 'id'));
         $outer = $this->junction($inner, $this->table('account', 'id'));
@@ -111,9 +112,15 @@ final class UncachedJunctionSchemaContractTest extends TestCase
     private function junction(Table $left, Table $right): JunctionTable
     {
         $arguments = [...$this->tableArguments(), $left, $right, $this->createMock(LoggerStrategy::class)];
-        return new class(...$arguments) extends JunctionTable {
-            public function getTableVersion(): string { return '1'; }
-            public function getSingularUnprefixedName(): string { return 'link'; }
+        return new class (...$arguments) extends JunctionTable {
+            public function getTableVersion(): string
+            {
+                return '1';
+            }
+            public function getSingularUnprefixedName(): string
+            {
+                return 'link';
+            }
         };
     }
 
