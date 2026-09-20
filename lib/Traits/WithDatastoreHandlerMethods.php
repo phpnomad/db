@@ -195,7 +195,7 @@ trait WithDatastoreHandlerMethods
     /**
      * Delete all items that fit the specified condition.
      *
-     * @param array $conditions
+     * @param array<array-key, mixed> $conditions
      * @return void
      * @throws DatastoreErrorException
      */
@@ -213,6 +213,7 @@ trait WithDatastoreHandlerMethods
     }
 
     /**
+     * @param array<array-key, string>|null $select
      * @return $this
      */
     protected function initiateQuery(?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC', array $select = null)
@@ -307,7 +308,7 @@ trait WithDatastoreHandlerMethods
      * one of them, leaving the other to serve stale reads.
      *
      * @param array<string, int|string> $identities list of identities keyed by the field name for the identity.
-     * @return array
+     * @return array<array-key, mixed>
      */
     protected function getCacheContextForItem(array $identities): array
     {
@@ -462,8 +463,8 @@ trait WithDatastoreHandlerMethods
     }
 
     /**
-     * @param array $attributes
-     * @param array $fields
+     * @param array<array-key, mixed> $attributes
+     * @param array<array-key, mixed> $fields
      * @return void
      * @throws DatastoreErrorException
      * @throws DuplicateEntryException
@@ -496,9 +497,9 @@ trait WithDatastoreHandlerMethods
     }
 
     /**
-     * @param array $attributes
-     * @param array $fields
-     * @return array
+     * @param array<array-key, mixed> $attributes
+     * @param array<array-key, mixed> $fields
+     * @return array<array-key, mixed>
      */
     protected function removeIdentifiableFields(array $attributes, array $fields): array
     {
@@ -508,7 +509,7 @@ trait WithDatastoreHandlerMethods
     /**
      * Looks up records to check if a record with the specified unique columns already exists.
      *
-     * @param array $data
+     * @param array<array-key, mixed> $data
      * @return DataModel[] List of existing items that match the unique constraints.
      * @throws DatastoreErrorException
      * @throws RecordNotFoundException
@@ -553,8 +554,8 @@ trait WithDatastoreHandlerMethods
 
 
     /**
-     * @param array $data
-     * @param array|null $updateIdentity
+     * @param array<array-key, mixed> $data
+     * @param array<array-key, mixed>|null $updateIdentity
      * @return void
      * @throws DuplicateEntryException
      * @throws DatastoreErrorException
