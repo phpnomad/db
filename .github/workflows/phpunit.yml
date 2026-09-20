@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Check out Datastore prerequisite
         uses: actions/checkout@v4
@@ -16,14 +16,17 @@ jobs:
           ref: codex/ci-prerequisites-clean
           path: .ci/datastore
 
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+          coverage: none
+
       - name: Install dependencies with Datastore prerequisite
         run: |
           composer config repositories.datastore '{"type":"path","url":".ci/datastore","options":{"symlink":false,"versions":{"phpnomad/datastore":"2.0.99"}}}'
           composer update phpnomad/datastore --with-dependencies --no-interaction --prefer-dist
 
       - name: PHPUnit Tests
-        uses: php-actions/phpunit@v3
-        with:
-          configuration: phpunit.xml
-          version: composer
-          php_version: 8.2
+        run: vendor/bin/phpunit --configuration phpunit.xml

@@ -56,6 +56,16 @@ parameters:
 			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
 
 		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:findIds\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:findIds\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
 			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:findMultiple\\(\\) has parameter \\$ids with no value type specified in iterable type array\\.$#"
 			count: 1
 			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
@@ -197,12 +207,12 @@ parameters:
 
 		-
 			message: "#^Parameter \\#1 \\$limit of method PHPNomad\\\\Database\\\\Interfaces\\\\QueryBuilder\\:\\:limit\\(\\) expects int\\<1, max\\>, int\\<min, \\-1\\>\\|int\\<1, max\\> given\\.$#"
-			count: 1
+			count: 2
 			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
 
 		-
 			message: "#^Parameter \\#1 \\$offset of method PHPNomad\\\\Database\\\\Interfaces\\\\QueryBuilder\\:\\:offset\\(\\) expects int\\<1, max\\>, int\\<min, \\-1\\>\\|int\\<1, max\\> given\\.$#"
-			count: 1
+			count: 2
 			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
 
 		-
@@ -381,6 +391,16 @@ parameters:
 			path: lib/Factories/DatabaseDatastoreHandler.php
 
 		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:findIds\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:findIds\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
 			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:getCacheContextForItem\\(\\) return type has no value type specified in iterable type array\\.$#"
 			count: 1
 			path: lib/Factories/DatabaseDatastoreHandler.php
@@ -502,12 +522,12 @@ parameters:
 
 		-
 			message: "#^Parameter \\#1 \\$limit of method PHPNomad\\\\Database\\\\Interfaces\\\\QueryBuilder\\:\\:limit\\(\\) expects int\\<1, max\\>, int\\<min, \\-1\\>\\|int\\<1, max\\> given\\.$#"
-			count: 1
+			count: 2
 			path: lib/Factories/DatabaseDatastoreHandler.php
 
 		-
 			message: "#^Parameter \\#1 \\$offset of method PHPNomad\\\\Database\\\\Interfaces\\\\QueryBuilder\\:\\:offset\\(\\) expects int\\<1, max\\>, int\\<min, \\-1\\>\\|int\\<1, max\\> given\\.$#"
-			count: 1
+			count: 2
 			path: lib/Factories/DatabaseDatastoreHandler.php
 
 		-
@@ -736,6 +756,16 @@ parameters:
 			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
 
 		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:findIds\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:findIds\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
 			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:getCacheContextForItem\\(\\) return type has no value type specified in iterable type array\\.$#"
 			count: 1
 			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
@@ -857,12 +887,12 @@ parameters:
 
 		-
 			message: "#^Parameter \\#1 \\$limit of method PHPNomad\\\\Database\\\\Interfaces\\\\QueryBuilder\\:\\:limit\\(\\) expects int\\<1, max\\>, int\\<min, \\-1\\>\\|int\\<1, max\\> given\\.$#"
-			count: 1
+			count: 2
 			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
 
 		-
 			message: "#^Parameter \\#1 \\$offset of method PHPNomad\\\\Database\\\\Interfaces\\\\QueryBuilder\\:\\:offset\\(\\) expects int\\<1, max\\>, int\\<min, \\-1\\>\\|int\\<1, max\\> given\\.$#"
-			count: 1
+			count: 2
 			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
 
 		-

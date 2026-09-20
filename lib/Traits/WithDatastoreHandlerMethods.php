@@ -348,10 +348,10 @@ trait WithDatastoreHandlerMethods
     }
 
     /**
-     * @param array<array-key, mixed> $conditions
+     * @param array $conditions
      * @param int|null $limit
      * @param int|null $offset
-     * @return array<array-key, mixed>
+     * @return array
      * @throws DatastoreErrorException
      * @throws InvalidArgumentException
      */
@@ -359,14 +359,21 @@ trait WithDatastoreHandlerMethods
     {
         $this->validateIdentityQuery($conditions, $limit, $offset);
 
-        $this->serviceProvider->clauseBuilder->reset();
-        $this->initiateQuery(
-            $limit,
-            $offset,
-            null,
-            'ASC',
-            $this->table->getFieldsForIdentity()
-        );
+        $this->serviceProvider->clauseBuilder
+            ->reset()
+            ->useTable($this->table);
+        $this->serviceProvider->queryBuilder
+            ->reset()
+            ->from($this->table)
+            ->select(...$this->table->getFieldsForIdentity());
+
+        if ($limit) {
+            $this->serviceProvider->queryBuilder->limit($limit);
+        }
+
+        if ($offset) {
+            $this->serviceProvider->queryBuilder->offset($offset);
+        }
 
         $this->buildConditions($conditions);
 
