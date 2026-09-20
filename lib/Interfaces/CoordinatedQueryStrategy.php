@@ -4,6 +4,7 @@ namespace PHPNomad\Database\Interfaces;
 
 use PHPNomad\Database\Exceptions\CoordinatedOperationConflictException;
 use PHPNomad\Database\Exceptions\CoordinatedOperationOutcomeUnknownException;
+use PHPNomad\Database\Exceptions\CoordinatedOperationReportingFailedException;
 use PHPNomad\Database\Exceptions\UnsupportedCoordinationException;
 use PHPNomad\Datastore\Exceptions\RecordNotFoundException;
 
@@ -41,6 +42,8 @@ interface CoordinatedQueryStrategy extends QueryStrategy
      * @throws RecordNotFoundException The coordination record is absent.
      * @throws CoordinatedOperationConflictException A conflict was rolled back.
      * @throws CoordinatedOperationOutcomeUnknownException Commit or rollback is uncertain.
+     * @throws CoordinatedOperationReportingFailedException Reporting failed. Retry classification comes only from its operation failure.
+     *     Neither this envelope nor its reporting failure authorizes another attempt.
      * @throws \Throwable Callback errors propagate after confirmed rollback.
      */
     public function coordinate(
