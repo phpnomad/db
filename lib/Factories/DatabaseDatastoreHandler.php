@@ -3,6 +3,7 @@
 namespace PHPNomad\Database\Factories;
 
 use PHPNomad\Database\Interfaces\DatabaseContextProvider;
+use PHPNomad\Database\Interfaces\DatabaseHandler;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
 use PHPNomad\Database\Traits\WithDatastoreHandlerMethods;
@@ -10,7 +11,7 @@ use PHPNomad\Datastore\Interfaces\Datastore;
 use PHPNomad\Datastore\Interfaces\DatastoreHasCounts;
 use PHPNomad\Datastore\Interfaces\DatastoreHasWhere;
 
-class DatabaseDatastoreHandler implements Datastore, DatastoreHasWhere, DatastoreHasCounts
+class DatabaseDatastoreHandler implements DatabaseHandler, Datastore, DatastoreHasWhere, DatastoreHasCounts
 {
     use WithDatastoreHandlerMethods;
 
