@@ -5,10 +5,16 @@ namespace PHPNomad\Database\Factories;
 final class Index
 {
     protected ?string $name;
+    /** @var array<array-key, mixed> */
     protected array $columns;
     protected ?string $type = null;
+    /** @var array<array-key, mixed> */
     protected array $attributes = [];
 
+    /**
+     * @param array<array-key, mixed> $columns
+     * @param mixed ...$attributes
+     */
     public function __construct(
         array $columns,
         ?string $name = null,
@@ -34,7 +40,7 @@ final class Index
     /**
      * Gets the columns that are part of the index.
      *
-     * @return array|string[]
+     * @return array<array-key, mixed>
      */
     public function getColumns(): array
     {
@@ -54,7 +60,7 @@ final class Index
     /**
      * Gets any additional attributes or options for the index.
      *
-     * @return array
+     * @return array<array-key, mixed>
      */
     public function getAttributes(): array
     {
