@@ -62,7 +62,10 @@ final class TableColumnRetirementSurfaceTest extends TestCase
         );
     }
 
-    /** @param class-string $type */
+    /**
+     * @param class-string $type
+     * @return list<string>
+     */
     private function methodNames(string $type): array
     {
         $names = array_map(
