@@ -1,20 +1,5 @@
 <?php
 
-namespace PHPNomad\Events\Interfaces {
-    if (!interface_exists(Event::class)) {
-        interface Event
-        {
-        }
-    }
-
-    if (!interface_exists(EventStrategy::class)) {
-        interface EventStrategy
-        {
-            public function broadcast(Event $event): void;
-        }
-    }
-}
-
 namespace PHPNomad\Database\Tests\Unit\Traits {
 
 use PHPNomad\Cache\Services\CacheableService;
