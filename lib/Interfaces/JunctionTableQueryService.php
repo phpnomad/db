@@ -22,7 +22,7 @@ interface JunctionTableQueryService
     /**
      * Associates the specified ID with the junctioning ID of the other table.
      *
-     * @param string $tableName The name table the ID came from.
+     * @param string $table The name table the ID came from.
      * @param int $id The ID associated with the $table argument.
      * @param int $bindingId The ID to bind the ID to.
      * @return void
@@ -33,7 +33,7 @@ interface JunctionTableQueryService
     /**
      * Disassociates the specified ID with the junctioning ID of the other table.
      *
-     * @param string $tableName The name table the ID came from.
+     * @param string $table The name table the ID came from.
      * @param int $id The ID associated with the $table argument.
      * @param int $bindingId The ID to bind the ID to.
      * @return void

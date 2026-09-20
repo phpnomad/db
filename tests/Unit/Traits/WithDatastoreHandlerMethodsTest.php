@@ -337,6 +337,10 @@ class DummyDatastoreHandler
 {
     use WithDatastoreHandlerMethods;
 
+    /**
+     * @param class-string<DataModel> $model
+     * @param ModelAdapter<DataModel> $modelAdapter
+     */
     public function __construct(
         DatabaseServiceProvider $serviceProvider,
         Table $table,
@@ -351,11 +355,19 @@ class DummyDatastoreHandler
         $this->modelAdapter = $modelAdapter;
     }
 
+    /**
+     * @param non-empty-array<string, int> $ids
+     * @return mixed
+     */
     public function findByIdentity(array $ids)
     {
         return $this->findFromCompound($ids);
     }
 
+    /**
+     * @param array<string, int|string> $ids
+     * @return array<array-key, mixed>
+     */
     public function exposeCacheContext(array $ids): array
     {
         return $this->getCacheContextForItem($ids);

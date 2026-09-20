@@ -6,7 +6,9 @@ final class Column
 {
     protected string $name;
     protected string $type;
+    /** @var array<array-key, mixed>|null */
     protected ?array $typeArgs = null;
+    /** @var array<array-key, mixed> */
     protected array $attributes = [];
 
     /**
@@ -17,8 +19,8 @@ final class Column
 	/**
 	 * @param string   $name
 	 * @param string   $type
-	 * @param array|null $typeArgs
-	 * @param          ...$attributes
+	 * @param array<array-key, mixed>|null $typeArgs
+	 * @param mixed ...$attributes
 	 */
     public function __construct(string $name, string $type, ?array $typeArgs = null, ...$attributes)
     {
@@ -51,7 +53,7 @@ final class Column
     /**
      * Returns the length limitation on the item, or null if not set.
      *
-     * @return ?array
+     * @return array<array-key, mixed>|null
      */
     public function getTypeArgs(): ?array
     {
@@ -59,7 +61,7 @@ final class Column
     }
 
     /**
-     * @return string[]
+     * @return array<array-key, mixed>
      */
     public function getAttributes(): array
     {
