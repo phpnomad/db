@@ -155,7 +155,7 @@ class TableSchemaService
 
     /**
      * @param TableInterface $table
-     * @return mixed
+     * @return Column
      * @throws ColumnNotFoundException
      */
     public function getPrimaryColumnNameForTable(TableInterface $table): Column
@@ -167,15 +167,17 @@ class TableSchemaService
             throw new ColumnNotFoundException('Junction Tables must have exactly one primary key column.');
         }
 
-        return Arr::first($primaryColumns);
+        /** @var Column $primaryColumn */
+        $primaryColumn = Arr::first($primaryColumns);
+
+        return $primaryColumn;
     }
 
     /**
      * Gets the cache key for this table. Used to cut back on processing when making this table.
      *
-     * @param TableInterface $table
      * @param string $id
-     * @return array
+     * @return array{for: class-string, id: string}
      */
     protected function getCacheContext(string $id): array
     {
