@@ -104,7 +104,7 @@ abstract class JunctionTable extends Table
      */
     public function getLeftColumnName(): string
     {
-        return $this->tableSchemaService->getJunctionColumnNameFromTable($this->leftTable);
+        return $this->tableSchemaService->getJunctionColumnNameFromTableUncached($this->leftTable);
     }
 
     /**
@@ -114,7 +114,7 @@ abstract class JunctionTable extends Table
      */
     public function getRightColumnName(): string
     {
-        return $this->tableSchemaService->getJunctionColumnNameFromTable($this->rightTable);
+        return $this->tableSchemaService->getJunctionColumnNameFromTableUncached($this->rightTable);
     }
 
     /**
@@ -146,7 +146,7 @@ abstract class JunctionTable extends Table
     {
         try {
             // Find the corresponding primary column by the column name
-            $primaryColumn = $this->tableSchemaService->getPrimaryColumnNameForTable($primaryTable);
+            $primaryColumn = $this->tableSchemaService->getPrimaryColumnNameForTableUncached($primaryTable);
         }catch(ColumnNotFoundException $e){
             $this->logger->logException($e, '', [], LoggerLevel::Emergency);
             throw $e;
