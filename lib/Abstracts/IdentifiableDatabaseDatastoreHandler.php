@@ -8,10 +8,11 @@ use PHPNomad\Database\Traits\WithDatastoreHandlerMethods;
 use PHPNomad\Datastore\Interfaces\DataModel;
 use PHPNomad\Datastore\Interfaces\Datastore;
 use PHPNomad\Datastore\Interfaces\DatastoreHasCounts;
+use PHPNomad\Datastore\Interfaces\DatastoreHasIdentityQuery;
 use PHPNomad\Datastore\Interfaces\DatastoreHasPrimaryKey;
 use PHPNomad\Datastore\Interfaces\DatastoreHasWhere;
 
-abstract class IdentifiableDatabaseDatastoreHandler implements Datastore, DatastoreHasPrimaryKey, DatastoreHasWhere, DatastoreHasCounts
+abstract class IdentifiableDatabaseDatastoreHandler implements Datastore, DatastoreHasPrimaryKey, DatastoreHasWhere, DatastoreHasCounts, DatastoreHasIdentityQuery
 {
     use WithDatastoreHandlerMethods;
 

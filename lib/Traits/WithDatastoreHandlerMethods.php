@@ -2,6 +2,7 @@
 
 namespace PHPNomad\Database\Traits;
 
+use InvalidArgumentException;
 use PHPNomad\Cache\Enums\Operation;
 use PHPNomad\Datastore\Events\RecordCreated;
 use PHPNomad\Datastore\Events\RecordDeleted;
@@ -347,30 +348,108 @@ trait WithDatastoreHandlerMethods
     }
 
     /**
-     * @param array $conditions
+     * @param array<array-key, mixed> $conditions
      * @param int|null $limit
      * @param int|null $offset
-     * @return array
+     * @return array<array-key, mixed>
      * @throws DatastoreErrorException
+     * @throws InvalidArgumentException
      */
     public function findIds(array $conditions, ?int $limit = null, ?int $offset = null): array
     {
-        $this->serviceProvider->queryBuilder
-            ->from($this->table)
-            ->select(...$this->table->getFieldsForIdentity());
+        $this->validateIdentityQuery($conditions, $limit, $offset);
 
-
-        if ($limit) {
-            $this->serviceProvider->queryBuilder->limit($limit);
-        }
-
-        if ($offset) {
-            $this->serviceProvider->queryBuilder->offset($offset);
-        }
+        $this->serviceProvider->clauseBuilder->reset();
+        $this->initiateQuery(
+            $limit,
+            $offset,
+            null,
+            'ASC',
+            $this->table->getFieldsForIdentity()
+        );
 
         $this->buildConditions($conditions);
 
         return $this->serviceProvider->queryStrategy->query($this->serviceProvider->queryBuilder);
+    }
+
+    /**
+     * Validate the optional identity-query contract without changing the behavior of other query methods.
+     *
+     * @param array<array-key, mixed> $conditions
+     */
+    protected function validateIdentityQuery(array $conditions, ?int $limit, ?int $offset): void
+    {
+        if ($limit !== null && $limit <= 0) {
+            throw new InvalidArgumentException('The identity-query limit must be greater than zero.');
+        }
+
+        if ($offset !== null && $offset < 0) {
+            throw new InvalidArgumentException('The identity-query offset must not be negative.');
+        }
+
+        if ($conditions === []) {
+            return;
+        }
+
+        if (!$this->isIdentityQueryList($conditions)) {
+            throw new InvalidArgumentException('Identity-query conditions must be a list of groups.');
+        }
+
+        foreach ($conditions as $group) {
+            if (!is_array($group)
+                || !array_key_exists('clauses', $group)
+                || !is_array($group['clauses'])
+                || !$this->isIdentityQueryList($group['clauses'])
+                || $group['clauses'] === []
+            ) {
+                throw new InvalidArgumentException('Each identity-query group must contain a non-empty list of clauses.');
+            }
+
+            foreach (['type', 'groupType'] as $key) {
+                if (array_key_exists($key, $group) && !is_string($group[$key])) {
+                    throw new InvalidArgumentException(sprintf('Identity-query group "%s" must be a string.', $key));
+                }
+            }
+
+            foreach ($group['clauses'] as $clause) {
+                if (!is_array($clause)
+                    || !array_key_exists('column', $clause)
+                    || !array_key_exists('operator', $clause)
+                    || !is_string($clause['operator'])
+                    || $clause['operator'] === ''
+                ) {
+                    throw new InvalidArgumentException('Each identity-query clause must contain a column and string operator.');
+                }
+
+                $column = $clause['column'];
+                if (is_string($column)) {
+                    if ($column === '') {
+                        throw new InvalidArgumentException('Each identity-query clause column must be a non-empty string or non-empty list of strings.');
+                    }
+
+                    continue;
+                }
+
+                if (!is_array($column) || !$this->isIdentityQueryList($column) || $column === []) {
+                    throw new InvalidArgumentException('Each identity-query clause column must be a non-empty string or non-empty list of strings.');
+                }
+
+                foreach ($column as $field) {
+                    if (!is_string($field) || $field === '') {
+                        throw new InvalidArgumentException('Each identity-query clause column must be a non-empty string or non-empty list of strings.');
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     */
+    protected function isIdentityQueryList(array $values): bool
+    {
+        return array_values($values) === $values;
     }
 
     /**
