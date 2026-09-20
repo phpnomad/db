@@ -33,7 +33,7 @@ class DateModifiedFactoryTest extends TestCase
 
     public function testProvidesPhpDefaultThatReturnsMysqlFormatTimestamp(): void
     {
-        $column = (new DateModifiedFactory($this->makeClock()))->toColumn();
+        $column = (new DateModifiedFactory())->toColumn();
         $default = $column->getPhpDefault();
 
         $this->assertIsCallable($default);
