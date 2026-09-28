@@ -1,0 +1,946 @@
+parameters:
+	ignoreErrors:
+		-
+			message: "#^Access to constant class on an unknown class PHPNomad\\\\Datastore\\\\Interfaces\\\\T\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Call to method getIdentity\\(\\) on an unknown class PHPNomad\\\\Datastore\\\\Interfaces\\\\T\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Cannot access constant class on mixed\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Else branch is unreachable because ternary operator condition is always true\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:andWhere\\(\\) has invalid return type PHPNomad\\\\Datastore\\\\Interfaces\\\\T\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:buildConditions\\(\\) has parameter \\$groups with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:countWhere\\(\\) should return int but returns mixed\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:deleteWhere\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:find\\(\\) should return PHPNomad\\\\Datastore\\\\Interfaces\\\\DataModel but returns mixed\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:findBy\\(\\) has parameter \\$value with no type specified\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:findBy\\(\\) should return PHPNomad\\\\Datastore\\\\Interfaces\\\\DataModel but returns mixed\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:findIds\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:findIds\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:findMultiple\\(\\) has parameter \\$ids with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:findMultiple\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:getCacheContextForItem\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:getDuplicates\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:getDuplicates\\(\\) should return array\\<PHPNomad\\\\Datastore\\\\Interfaces\\\\DataModel\\> but returns array\\<PHPNomad\\\\Datastore\\\\Interfaces\\\\T\\>\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:getModels\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:hydrateItems\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:initiateQuery\\(\\) has parameter \\$select with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:maybeThrowForDuplicateIdentity\\(\\) has parameter \\$attributes with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:maybeThrowForDuplicateIdentity\\(\\) has parameter \\$fields with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:maybeThrowForDuplicateUniqueFields\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:maybeThrowForDuplicateUniqueFields\\(\\) has parameter \\$updateIdentity with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:orWhere\\(\\) has invalid return type PHPNomad\\\\Datastore\\\\Interfaces\\\\T\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:removeIdentifiableFields\\(\\) has parameter \\$attributes with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:removeIdentifiableFields\\(\\) has parameter \\$fields with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:removeIdentifiableFields\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:where\\(\\) has invalid return type PHPNomad\\\\Datastore\\\\Interfaces\\\\T\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$array of function array_shift expects array, mixed given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$array of method PHPNomad\\\\Datastore\\\\Interfaces\\\\ModelAdapter\\<PHPNomad\\\\Datastore\\\\Interfaces\\\\DataModel\\>\\:\\:toModel\\(\\) expects array, mixed given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$conditions of method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:countWhere\\(\\) expects array\\{type\\: string, clauses\\: array\\<array\\{column\\: string, operator\\: string, value\\: mixed\\}\\>\\}, array\\{array\\{type\\: 'AND', clauses\\: array\\<array\\{column\\: string, operator\\: string, value\\: mixed\\}\\>\\}\\} given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$conditions of method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:countWhere\\(\\) expects array\\{type\\: string, clauses\\: array\\<array\\{column\\: string, operator\\: string, value\\: mixed\\}\\>\\}, array\\{array\\{type\\: 'OR', clauses\\: array\\<array\\{column\\: string, operator\\: string, value\\: mixed\\}\\>\\}\\} given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$field of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:andWhere\\(\\) expects array\\<string\\>\\|string, mixed given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$field of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:orWhere\\(\\) expects array\\<string\\>\\|string, mixed given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$field of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:where\\(\\) expects array\\<string\\>\\|string, mixed given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$ids of method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:findFromCompound\\(\\) expects non\\-empty\\-array\\<string, int\\>, array given\\.$#"
+			count: 2
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$ids of method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:findFromCompound\\(\\) expects non\\-empty\\-array\\<string, int\\>, array\\<string, int\\> given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$ids of method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:findFromCompound\\(\\) expects non\\-empty\\-array\\<string, int\\>, array\\{id\\: mixed\\} given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$ids of method PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:updateCompound\\(\\) expects array\\<string, int\\>, array\\<string, mixed\\> given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$limit of method PHPNomad\\\\Database\\\\Interfaces\\\\QueryBuilder\\:\\:limit\\(\\) expects int\\<1, max\\>, int\\<min, \\-1\\>\\|int\\<1, max\\> given\\.$#"
+			count: 2
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$offset of method PHPNomad\\\\Database\\\\Interfaces\\\\QueryBuilder\\:\\:offset\\(\\) expects int\\<1, max\\>, int\\<min, \\-1\\>\\|int\\<1, max\\> given\\.$#"
+			count: 2
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$string of function strtoupper expects string, mixed given\\.$#"
+			count: 3
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$subject of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects array, mixed given\\.$#"
+			count: 6
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#2 \\$key of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects string, int given\\.$#"
+			count: 2
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#2 \\$operator of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:andWhere\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#2 \\$operator of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:orWhere\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#2 \\$operator of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:where\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#3 \\$default of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects null, array given\\.$#"
+			count: 2
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#3 \\$default of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects null, int given\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#3 \\$default of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects null, string given\\.$#"
+			count: 2
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Property PHPNomad\\\\Database\\\\Abstracts\\\\IdentifiableDatabaseDatastoreHandler\\:\\:\\$modelAdapter with generic interface PHPNomad\\\\Datastore\\\\Interfaces\\\\ModelAdapter does not specify its types\\: TModel$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Variable \\$ids in empty\\(\\) always exists and is not falsy\\.$#"
+			count: 1
+			path: lib/Abstracts/IdentifiableDatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\JunctionTable\\:\\:getAlias\\(\\) should return string but returns mixed\\.$#"
+			count: 1
+			path: lib/Abstracts/JunctionTable.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\JunctionTable\\:\\:getTables\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Abstracts/JunctionTable.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\JunctionTable\\:\\:getUnprefixedName\\(\\) should return string but returns mixed\\.$#"
+			count: 1
+			path: lib/Abstracts/JunctionTable.php
+
+		-
+			message: "#^PHPDoc tag @var for property PHPNomad\\\\Database\\\\Abstracts\\\\JunctionTable\\:\\:\\$logger with type mixed is not subtype of native type PHPNomad\\\\Logger\\\\Interfaces\\\\LoggerStrategy\\.$#"
+			count: 1
+			path: lib/Abstracts/JunctionTable.php
+
+		-
+			message: "#^Parameter \\#1 \\$localPrefixProvider of method PHPNomad\\\\Database\\\\Abstracts\\\\Table\\:\\:__construct\\(\\) expects PHPNomad\\\\Database\\\\Interfaces\\\\HasLocalDatabasePrefix, mixed given\\.$#"
+			count: 1
+			path: lib/Abstracts/JunctionTable.php
+
+		-
+			message: "#^Property PHPNomad\\\\Database\\\\Abstracts\\\\JunctionTable\\:\\:\\$leftTable \\(PHPNomad\\\\Database\\\\Abstracts\\\\Table\\) does not accept mixed\\.$#"
+			count: 1
+			path: lib/Abstracts/JunctionTable.php
+
+		-
+			message: "#^Property PHPNomad\\\\Database\\\\Abstracts\\\\JunctionTable\\:\\:\\$logger \\(PHPNomad\\\\Logger\\\\Interfaces\\\\LoggerStrategy\\) does not accept mixed\\.$#"
+			count: 1
+			path: lib/Abstracts/JunctionTable.php
+
+		-
+			message: "#^Property PHPNomad\\\\Database\\\\Abstracts\\\\JunctionTable\\:\\:\\$rightTable \\(PHPNomad\\\\Database\\\\Abstracts\\\\Table\\) does not accept mixed\\.$#"
+			count: 1
+			path: lib/Abstracts/JunctionTable.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Abstracts\\\\Table\\:\\:getFieldsForIdentity\\(\\) should return non\\-empty\\-array\\<string\\> but returns array\\.$#"
+			count: 1
+			path: lib/Abstracts/Table.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\Column\\:\\:__construct\\(\\) has parameter \\$attributes with no type specified\\.$#"
+			count: 1
+			path: lib/Factories/Column.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\Column\\:\\:__construct\\(\\) has parameter \\$typeArgs with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/Column.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\Column\\:\\:getTypeArgs\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/Column.php
+
+		-
+			message: "#^Property PHPNomad\\\\Database\\\\Factories\\\\Column\\:\\:\\$attributes type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/Column.php
+
+		-
+			message: "#^Property PHPNomad\\\\Database\\\\Factories\\\\Column\\:\\:\\$typeArgs type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/Column.php
+
+		-
+			message: "#^Access to constant class on an unknown class PHPNomad\\\\Datastore\\\\Interfaces\\\\T\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Call to method getIdentity\\(\\) on an unknown class PHPNomad\\\\Datastore\\\\Interfaces\\\\T\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Cannot access constant class on mixed\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Else branch is unreachable because ternary operator condition is always true\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:andWhere\\(\\) has invalid return type PHPNomad\\\\Datastore\\\\Interfaces\\\\T\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:buildConditions\\(\\) has parameter \\$groups with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:countWhere\\(\\) should return int but returns mixed\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:deleteWhere\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:findBy\\(\\) has parameter \\$value with no type specified\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:findBy\\(\\) should return PHPNomad\\\\Datastore\\\\Interfaces\\\\DataModel but returns mixed\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:findIds\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:findIds\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:getCacheContextForItem\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:getDuplicates\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:getDuplicates\\(\\) should return array\\<PHPNomad\\\\Datastore\\\\Interfaces\\\\DataModel\\> but returns array\\<PHPNomad\\\\Datastore\\\\Interfaces\\\\T\\>\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:getModels\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:hydrateItems\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:initiateQuery\\(\\) has parameter \\$select with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:maybeThrowForDuplicateIdentity\\(\\) has parameter \\$attributes with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:maybeThrowForDuplicateIdentity\\(\\) has parameter \\$fields with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:maybeThrowForDuplicateUniqueFields\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:maybeThrowForDuplicateUniqueFields\\(\\) has parameter \\$updateIdentity with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:orWhere\\(\\) has invalid return type PHPNomad\\\\Datastore\\\\Interfaces\\\\T\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:removeIdentifiableFields\\(\\) has parameter \\$attributes with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:removeIdentifiableFields\\(\\) has parameter \\$fields with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:removeIdentifiableFields\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:where\\(\\) has invalid return type PHPNomad\\\\Datastore\\\\Interfaces\\\\T\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$array of function array_shift expects array, mixed given\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$array of method PHPNomad\\\\Datastore\\\\Interfaces\\\\ModelAdapter\\<PHPNomad\\\\Datastore\\\\Interfaces\\\\DataModel\\>\\:\\:toModel\\(\\) expects array, mixed given\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$conditions of method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:countWhere\\(\\) expects array\\{type\\: string, clauses\\: array\\<array\\{column\\: string, operator\\: string, value\\: mixed\\}\\>\\}, array\\{array\\{type\\: 'AND', clauses\\: array\\<array\\{column\\: string, operator\\: string, value\\: mixed\\}\\>\\}\\} given\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$conditions of method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:countWhere\\(\\) expects array\\{type\\: string, clauses\\: array\\<array\\{column\\: string, operator\\: string, value\\: mixed\\}\\>\\}, array\\{array\\{type\\: 'OR', clauses\\: array\\<array\\{column\\: string, operator\\: string, value\\: mixed\\}\\>\\}\\} given\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$field of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:andWhere\\(\\) expects array\\<string\\>\\|string, mixed given\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$field of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:orWhere\\(\\) expects array\\<string\\>\\|string, mixed given\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$field of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:where\\(\\) expects array\\<string\\>\\|string, mixed given\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$ids of method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:findFromCompound\\(\\) expects non\\-empty\\-array\\<string, int\\>, array given\\.$#"
+			count: 2
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$ids of method PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:findFromCompound\\(\\) expects non\\-empty\\-array\\<string, int\\>, array\\<string, int\\> given\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$limit of method PHPNomad\\\\Database\\\\Interfaces\\\\QueryBuilder\\:\\:limit\\(\\) expects int\\<1, max\\>, int\\<min, \\-1\\>\\|int\\<1, max\\> given\\.$#"
+			count: 2
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$offset of method PHPNomad\\\\Database\\\\Interfaces\\\\QueryBuilder\\:\\:offset\\(\\) expects int\\<1, max\\>, int\\<min, \\-1\\>\\|int\\<1, max\\> given\\.$#"
+			count: 2
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$string of function strtoupper expects string, mixed given\\.$#"
+			count: 3
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#1 \\$subject of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects array, mixed given\\.$#"
+			count: 6
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#2 \\$key of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects string, int given\\.$#"
+			count: 2
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#2 \\$operator of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:andWhere\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#2 \\$operator of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:orWhere\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#2 \\$operator of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:where\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#3 \\$default of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects null, array given\\.$#"
+			count: 2
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#3 \\$default of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects null, int given\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Parameter \\#3 \\$default of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects null, string given\\.$#"
+			count: 2
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Property PHPNomad\\\\Database\\\\Factories\\\\DatabaseDatastoreHandler\\:\\:\\$modelAdapter with generic interface PHPNomad\\\\Datastore\\\\Interfaces\\\\ModelAdapter does not specify its types\\: TModel$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Variable \\$ids in empty\\(\\) always exists and is not falsy\\.$#"
+			count: 1
+			path: lib/Factories/DatabaseDatastoreHandler.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\Index\\:\\:__construct\\(\\) has parameter \\$attributes with no type specified\\.$#"
+			count: 1
+			path: lib/Factories/Index.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\Index\\:\\:__construct\\(\\) has parameter \\$columns with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/Index.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Factories\\\\Index\\:\\:getAttributes\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/Index.php
+
+		-
+			message: "#^Property PHPNomad\\\\Database\\\\Factories\\\\Index\\:\\:\\$attributes type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/Index.php
+
+		-
+			message: "#^Property PHPNomad\\\\Database\\\\Factories\\\\Index\\:\\:\\$columns type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Factories/Index.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Interfaces\\\\DatabaseContextProvider\\:\\:getModelAdapter\\(\\) has invalid return type PHPNomad\\\\Database\\\\Interfaces\\\\ModelAdapter\\.$#"
+			count: 2
+			path: lib/Interfaces/DatabaseContextProvider.php
+
+		-
+			message: "#^PHPDoc tag @param references unknown parameter\\: \\$tableName$#"
+			count: 2
+			path: lib/Interfaces/JunctionTableQueryService.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Interfaces\\\\QueryStrategy\\:\\:insert\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Interfaces/QueryStrategy.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Interfaces\\\\QueryStrategy\\:\\:query\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Interfaces/QueryStrategy.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Interfaces\\\\QueryStrategy\\:\\:update\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Interfaces/QueryStrategy.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Services\\\\TableSchemaService\\:\\:getCacheContext\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: lib/Services/TableSchemaService.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Services\\\\TableSchemaService\\:\\:getPrimaryColumnNameForTable\\(\\) should return PHPNomad\\\\Database\\\\Factories\\\\Column but returns mixed\\.$#"
+			count: 1
+			path: lib/Services/TableSchemaService.php
+
+		-
+			message: "#^PHPDoc tag @param references unknown parameter\\: \\$table$#"
+			count: 1
+			path: lib/Services/TableSchemaService.php
+
+		-
+			message: "#^PHPDoc tag @return with type mixed is not subtype of native type PHPNomad\\\\Database\\\\Factories\\\\Column\\.$#"
+			count: 1
+			path: lib/Services/TableSchemaService.php
+
+		-
+			message: "#^Cannot access constant class on mixed\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Else branch is unreachable because ternary operator condition is always true\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:__construct\\(\\) has parameter \\$modelAdapter with generic interface PHPNomad\\\\Datastore\\\\Interfaces\\\\ModelAdapter but does not specify its types\\: TModel$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:andWhere\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:andWhere\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:buildConditions\\(\\) has parameter \\$groups with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:countAndWhere\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:countOrWhere\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:countWhere\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:countWhere\\(\\) should return int but returns mixed\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:create\\(\\) has parameter \\$attributes with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:deleteWhere\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:exposeCacheContext\\(\\) has parameter \\$ids with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:exposeCacheContext\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:findBy\\(\\) has parameter \\$value with no type specified\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:findBy\\(\\) should return PHPNomad\\\\Datastore\\\\Interfaces\\\\DataModel but returns mixed\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:findByIdentity\\(\\) has no return type specified\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:findByIdentity\\(\\) has parameter \\$ids with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:findIds\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:findIds\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:getCacheContextForItem\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:getDuplicates\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:getModels\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:hydrateItems\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:initiateQuery\\(\\) has parameter \\$select with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:maybeThrowForDuplicateIdentity\\(\\) has parameter \\$attributes with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:maybeThrowForDuplicateIdentity\\(\\) has parameter \\$fields with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:maybeThrowForDuplicateUniqueFields\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:maybeThrowForDuplicateUniqueFields\\(\\) has parameter \\$updateIdentity with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:orWhere\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:orWhere\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:removeIdentifiableFields\\(\\) has parameter \\$attributes with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:removeIdentifiableFields\\(\\) has parameter \\$fields with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:removeIdentifiableFields\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:updateCompound\\(\\) has parameter \\$attributes with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:updateCompound\\(\\) has parameter \\$ids with no type specified\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:where\\(\\) has parameter \\$conditions with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:where\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#1 \\$array of function array_shift expects array, mixed given\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#1 \\$array of method PHPNomad\\\\Datastore\\\\Interfaces\\\\ModelAdapter\\<PHPNomad\\\\Datastore\\\\Interfaces\\\\DataModel\\>\\:\\:toModel\\(\\) expects array, mixed given\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#1 \\$field of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:andWhere\\(\\) expects array\\<string\\>\\|string, mixed given\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#1 \\$field of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:orWhere\\(\\) expects array\\<string\\>\\|string, mixed given\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#1 \\$field of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:where\\(\\) expects array\\<string\\>\\|string, mixed given\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#1 \\$ids of method PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:findFromCompound\\(\\) expects non\\-empty\\-array\\<string, int\\>, array given\\.$#"
+			count: 3
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#1 \\$limit of method PHPNomad\\\\Database\\\\Interfaces\\\\QueryBuilder\\:\\:limit\\(\\) expects int\\<1, max\\>, int\\<min, \\-1\\>\\|int\\<1, max\\> given\\.$#"
+			count: 2
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#1 \\$offset of method PHPNomad\\\\Database\\\\Interfaces\\\\QueryBuilder\\:\\:offset\\(\\) expects int\\<1, max\\>, int\\<min, \\-1\\>\\|int\\<1, max\\> given\\.$#"
+			count: 2
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#1 \\$string of function strtoupper expects string, mixed given\\.$#"
+			count: 3
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#1 \\$subject of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects array, mixed given\\.$#"
+			count: 6
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#2 \\$key of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects string, int given\\.$#"
+			count: 2
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#2 \\$operator of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:andWhere\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#2 \\$operator of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:orWhere\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#2 \\$operator of method PHPNomad\\\\Database\\\\Interfaces\\\\ClauseBuilder\\:\\:where\\(\\) expects string, mixed given\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#3 \\$default of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects null, array given\\.$#"
+			count: 2
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#3 \\$default of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects null, int given\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Parameter \\#3 \\$default of static method PHPNomad\\\\Utils\\\\Helpers\\\\Arr\\:\\:get\\(\\) expects null, string given\\.$#"
+			count: 2
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Property PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:\\$model \\(class\\-string\\<PHPNomad\\\\Datastore\\\\Interfaces\\\\DataModel\\>\\) does not accept string\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Property PHPNomad\\\\Database\\\\Tests\\\\Unit\\\\Traits\\\\DummyDatastoreHandler\\:\\:\\$modelAdapter with generic interface PHPNomad\\\\Datastore\\\\Interfaces\\\\ModelAdapter does not specify its types\\: TModel$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php
+
+		-
+			message: "#^Variable \\$ids in empty\\(\\) always exists and is not falsy\\.$#"
+			count: 1
+			path: tests/Unit/Traits/WithDatastoreHandlerMethodsTest.php

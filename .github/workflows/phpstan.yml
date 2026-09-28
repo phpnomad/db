@@ -14,4 +14,4 @@ jobs:
         with:
           path: lib/ tests/
           level: 9
-          php_version: 8.1
+          php_version: 8.2

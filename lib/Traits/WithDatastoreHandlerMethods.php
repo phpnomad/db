@@ -7,6 +7,7 @@ use PHPNomad\Datastore\Events\RecordCreated;
 use PHPNomad\Datastore\Events\RecordDeleted;
 use PHPNomad\Datastore\Events\RecordUpdated;
 use PHPNomad\Datastore\Exceptions\RecordNotFoundException;
+use PHPNomad\Database\Interfaces\DatabaseHandler;
 use PHPNomad\Database\Interfaces\Table;
 use PHPNomad\Database\Providers\DatabaseServiceProvider;
 use PHPNomad\Database\Services\TableSchemaService;
@@ -30,6 +31,28 @@ trait WithDatastoreHandlerMethods
      */
     protected string $model;
     protected ModelAdapter $modelAdapter;
+
+    public function getDatabaseTable(): Table
+    {
+        return $this->table;
+    }
+
+    public function getDatabaseServiceProvider(): DatabaseServiceProvider
+    {
+        return $this->serviceProvider;
+    }
+
+    public function cloneForOperation(DatabaseServiceProvider $serviceProvider): DatabaseHandler
+    {
+        $clone = clone $this;
+        $clone->serviceProvider = $serviceProvider;
+
+        if (!$clone instanceof DatabaseHandler) {
+            throw new \LogicException('The datastore handler must implement DatabaseHandler.');
+        }
+
+        return $clone;
+    }
 
     /**
      * @inheritDoc
