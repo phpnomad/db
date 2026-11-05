@@ -240,7 +240,7 @@ trait WithDatastoreHandlerMethods
      */
     protected function initiateQuery(?int $limit = null, ?int $offset = null, ?string $orderBy = null, string $order = 'ASC', array $select = null)
     {
-        $this->serviceProvider->clauseBuilder->useTable($this->table);
+        $this->serviceProvider->clauseBuilder->reset()->useTable($this->table);
         $select = $select === null ? $this->table->getFieldsForIdentity() : $select;
 
 
@@ -378,7 +378,10 @@ trait WithDatastoreHandlerMethods
      */
     public function findIds(array $conditions, ?int $limit = null, ?int $offset = null): array
     {
+        $this->serviceProvider->clauseBuilder->reset()->useTable($this->table);
+
         $this->serviceProvider->queryBuilder
+            ->reset()
             ->from($this->table)
             ->select(...$this->table->getFieldsForIdentity());
 
